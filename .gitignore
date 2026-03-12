@@ -24,6 +24,11 @@ migrate_working_dir/
 #.vscode/
 
 # Flutter/Dart/Pub related
+# Flutter platform ephemeral
+**/windows/flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/ios/Flutter/ephemeral/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
