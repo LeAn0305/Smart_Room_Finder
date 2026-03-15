@@ -93,7 +93,7 @@ class OnboardingPage3 extends StatelessWidget {
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 320),
                       child: const Text(
-                        'AI hỗ trợ tìm phòng phù hợp',
+                        'Tìm phòng thông minh & nhanh chóng',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 28,
@@ -109,7 +109,7 @@ class OnboardingPage3 extends StatelessWidget {
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 335),
                       child: const Text(
-                        'Nhận gợi ý thông minh để tìm phòng nhanh hơn và đúng nhu cầu hơn.',
+                        'Hệ thống giúp bạn lọc và tìm kiếm phòng trọ đúng nhu cầu một cách dễ dàng.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 15.5,
