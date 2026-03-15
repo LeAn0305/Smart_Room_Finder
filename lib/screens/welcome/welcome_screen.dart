@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen.dart';
-import 'package:smart_room_finder/screens/ai_chat/ai_chat_screen.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -257,36 +256,6 @@ class WelcomeScreen extends StatelessWidget {
                               ),
 
                               const SizedBox(height: 12),
-
-                              SizedBox(
-                                width: double.infinity,
-                                height: 54,
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const AIChatScreen(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.auto_awesome, size: 20),
-                                  label: Text(
-                                    'Trò chuyện với AI',
-                                    style: TextStyle(
-                                      fontSize: buttonTextSize,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.blueDark,
-                                    side: const BorderSide(color: AppColors.teal, width: 1.5),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                  ),
-                                ),
-                              ),
 
                               const SizedBox(height: 18),
                             ],
