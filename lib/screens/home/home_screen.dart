@@ -1,0 +1,195 @@
+import 'package:flutter/material.dart';
+import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/models/user_model.dart';
+import 'package:smart_room_finder/widgets/custom_text_field.dart';
+import 'package:smart_room_finder/widgets/room_card.dart';
+import 'package:smart_room_finder/widgets/section_title.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final List<RoomModel> rooms = RoomModel.sampleRooms;
+  String selectedCategory = 'Tất cả';
+  final List<String> categories = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
+
+  @override
+  Widget build(BuildContext context) {
+    final user = UserModel.currentUser;
+
+    return Scaffold(
+      backgroundColor: AppColors.mintLight,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Chào buổi sáng,',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          user.name,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.teal, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundImage: NetworkImage(user.profileImageUrl),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Search Bar
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: CustomTextField(
+                  hintText: 'Tìm kiếm phòng trọ, khu vực...',
+                  prefixIcon: Icons.search_rounded,
+                  suffixIcon: Icons.tune_rounded,
+                ),
+              ),
+
+              // Location Chip
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: AppColors.teal, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      user.location,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary, size: 18),
+                  ],
+                ),
+              ),
+
+              // Categories
+              const SizedBox(height: 15),
+              SizedBox(
+                height: 40,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final isSelected = selectedCategory == categories[index];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedCategory = categories[index];
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.teal : AppColors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            if (!isSelected)
+                              BoxShadow(
+                                color: AppColors.blue.withOpacity(0.04),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          categories[index],
+                          style: TextStyle(
+                            color: isSelected ? AppColors.white : AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Recommended Section
+              SectionTitle(
+                title: 'Gợi ý cho bạn',
+                actionText: 'Xem tất cả',
+                onActionTap: () {},
+              ),
+              SizedBox(
+                height: 280,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) {
+                    return RoomCard(
+                      room: rooms[index],
+                      isHorizontal: true,
+                    );
+                  },
+                ),
+              ),
+
+              // Nearby Section
+              SectionTitle(
+                title: 'Phòng gần đây',
+                actionText: 'Xem bản đồ',
+                onActionTap: () {},
+              ),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: 2, // Just show 2 for brevity
+                itemBuilder: (context, index) {
+                  return RoomCard(room: rooms[rooms.length - 1 - index]);
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

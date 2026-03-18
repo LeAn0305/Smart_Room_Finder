@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:smart_room_finder/screens/home/home_screen.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_1.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_2.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_3.dart';
-// import màn sau onboarding ở đây
-// import 'package:smart_room_finder/screens/login/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,12 +16,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentPage = 0;
 
   void _goToNextScreen() {
-    // TODO: đổi thành màn hình thật của cậu
-    // Ví dụ:
-    // Navigator.pushReplacement(
-    //   context,
-    //   MaterialPageRoute(builder: (_) => const LoginScreen()),
-    // );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
   }
 
   void _skipOnboarding() {
