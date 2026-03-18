@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_1.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_2.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_3.dart';
-import 'package:smart_room_finder/screens/home/home_screen.dart';
 // import màn sau onboarding ở đây
-// import 'package:smart_room_finder/screens/login/login_screen.dart';
+import 'package:smart_room_finder/screens/auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -20,7 +19,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _goToNextScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 
