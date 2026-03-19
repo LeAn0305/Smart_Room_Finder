@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smart_room_finder/screens/home/home_screen.dart';
+import 'package:smart_room_finder/screens/auth/login_screen.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_1.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_2.dart';
 import 'package:smart_room_finder/screens/onboarding/onboarding_screen_3.dart';
@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _goToNextScreen() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 
@@ -52,7 +52,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             },
             children: pages,
           ),
-
           Positioned(
             left: 24,
             right: 24,
@@ -80,9 +79,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 if (_currentPage == pages.length - 1)
                   SizedBox(
                     width: double.infinity,
