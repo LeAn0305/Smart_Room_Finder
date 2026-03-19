@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                 child: Row(
@@ -72,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Search Bar
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: CustomTextField(
@@ -82,7 +80,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Location Chip
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                 child: Row(
@@ -103,7 +100,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Categories
               const SizedBox(height: 15),
               SizedBox(
                 height: 40,
@@ -149,7 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Recommended Section
               SectionTitle(
                 title: 'Gợi ý cho bạn',
                 actionText: 'Xem tất cả',
@@ -170,7 +165,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Nearby Section
               SectionTitle(
                 title: 'Phòng gần đây',
                 actionText: 'Xem bản đồ',
@@ -180,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: 2, // Just show 2 for brevity
+                itemCount: 2,
                 itemBuilder: (context, index) {
                   return RoomCard(room: rooms[rooms.length - 1 - index]);
                 },

@@ -12,7 +12,8 @@ class OnboardingPage3 extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isSmallHeight = size.height < 700;
-    final imageWidth = isSmallHeight ? 250.0 : 320.0;
+    final horizontalPadding = isSmallHeight ? 20.0 : 24.0;
+    final imageWidth = isSmallHeight ? 190.0 : 250.0;
 
     return Container(
       width: double.infinity,
@@ -30,17 +31,20 @@ class OnboardingPage3 extends StatelessWidget {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Column(
             children: [
-              const SizedBox(height: 8),
+              SizedBox(height: isSmallHeight ? 6 : 10),
 
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: onSkip ?? () {},
                   style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
                     minimumSize: const Size(50, 30),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -57,71 +61,64 @@ class OnboardingPage3 extends StatelessWidget {
 
               Expanded(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(height: isSmallHeight ? 8 : 14),
-
-                    Expanded(
-                      flex: 6,
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/Onboarding3.png',
+                    Image.asset(
+                      'assets/images/Onboarding3.png',
+                      width: imageWidth,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
                           width: imageWidth,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: imageWidth,
-                              height: imageWidth,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.smart_toy_outlined,
-                                  size: 60,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                          height: imageWidth,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.smart_toy_outlined,
+                              size: 60,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
-                    SizedBox(height: isSmallHeight ? 8 : 18),
+                    SizedBox(height: isSmallHeight ? 20 : 28),
 
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 320),
-                      child: const Text(
-                        'AI hỗ trợ tìm phòng phù hợp',
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'AI hỗ trợ tìm phòng\nphù hợp',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
-                          height: 1.2,
+                          height: 1.25,
                           color: Color(0xFF14213D),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 335),
-                      child: const Text(
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18),
+                      child: Text(
                         'Nhận gợi ý thông minh để tìm phòng nhanh hơn và đúng nhu cầu hơn.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w400,
-                          height: 1.5,
+                          height: 1.6,
                           color: Color(0xFF6B7A90),
                         ),
                       ),
                     ),
 
-                    const Spacer(),
-                    const SizedBox(height: 96),
+                    SizedBox(height: isSmallHeight ? 120 : 135),
                   ],
                 ),
               ),
