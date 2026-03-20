@@ -17,6 +17,7 @@ class RoomModel {
   final String location;
   final List<String> amenities;
   final bool isFavorite;
+  final bool isVerified;
 
   RoomModel({
     required this.id,
@@ -30,6 +31,7 @@ class RoomModel {
     required this.location,
     required this.amenities,
     this.isFavorite = false,
+    this.isVerified = true,
   });
 
   String get typeString {
@@ -52,11 +54,13 @@ class RoomModel {
           description: 'Căn hộ đầy đủ tiện nghi, gần trung tâm thành phố, an ninh 24/7.',
           price: 5500000,
           address: 'Quận 1, TP. Hồ Chí Minh',
-          imageUrl: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          imageUrl: 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=400',
           rating: 4.8,
           type: RoomType.studio,
           location: 'TP. Hồ Chí Minh',
           amenities: ['Wifi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt'],
+          isFavorite: true,
+          isVerified: true,
         ),
         RoomModel(
           id: '2',
@@ -64,11 +68,12 @@ class RoomModel {
           description: 'View đẹp, thoáng mát, gần công viên và trường học.',
           price: 8000000,
           address: 'Quận 7, TP. Hồ Chí Minh',
-          imageUrl: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          imageUrl: 'https://images.unsplash.com/photo-1502672023488-70e25813efdf?auto=format&fit=crop&q=80&w=400',
           rating: 4.5,
           type: RoomType.apartment,
           location: 'TP. Hồ Chí Minh',
           amenities: ['Hồ bơi', 'Phòng gym', 'Wifi', 'Máy lạnh'],
+          isVerified: true,
         ),
         RoomModel(
           id: '3',
@@ -76,11 +81,12 @@ class RoomModel {
           description: 'Phù hợp cho gia đình hoặc nhóm bạn, có sân đậu xe hơi.',
           price: 15000000,
           address: 'Quận Bình Thạnh, TP. Hồ Chí Minh',
-          imageUrl: 'https://images.unsplash.com/photo-1481437156560-3205f6a55735?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          imageUrl: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&q=80&w=400',
           rating: 4.9,
           type: RoomType.house,
           location: 'TP. Hồ Chí Minh',
           amenities: ['Sân vườn', 'Bếp rộng', 'Wifi', 'Máy lạnh'],
+          isVerified: false,
         ),
         RoomModel(
           id: '4',
@@ -93,6 +99,60 @@ class RoomModel {
           type: RoomType.apartment,
           location: 'TP. Hồ Chí Minh',
           amenities: ['Wifi', 'Bếp', 'Chỗ để xe'],
+          isVerified: true,
+        ),
+        RoomModel(
+          id: '5',
+          title: 'Phòng trọ sinh viên tiện nghi',
+          description: 'Gần các trường đại học, an ninh tốt, wifi tốc độ cao.',
+          price: 2800000,
+          address: 'Quận Thủ Đức, TP. Hồ Chí Minh',
+          imageUrl: 'https://images.unsplash.com/photo-1554995207-c18c20360a59?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          rating: 4.0,
+          type: RoomType.studio,
+          location: 'TP. Hồ Chí Minh',
+          amenities: ['Wifi', 'Quạt', 'Giường nệm'],
+          isVerified: true,
+        ),
+        RoomModel(
+          id: '6',
+          title: 'Căn hộ Horizon View',
+          description: 'Căn hộ cao cấp với tầm nhìn toàn thành phố, nội thất nhập khẩu.',
+          price: 12000000,
+          address: 'Quận 2, TP. Hồ Chí Minh',
+          imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          rating: 4.9,
+          type: RoomType.apartment,
+          location: 'TP. Hồ Chí Minh',
+          amenities: ['Hồ bơi cực mây', 'Gym', 'Wifi', 'Full nội thất'],
+          isVerified: true,
+          isFavorite: true,
+        ),
+        RoomModel(
+          id: '7',
+          title: 'Nhà cho thuê nguyên căn hẻm xe hơi',
+          description: 'Khu vực yên tĩnh, dân trí cao, phù hợp ở gia đình.',
+          price: 18000000,
+          address: 'Quận Tân Bình, TP. Hồ Chí Minh',
+          imageUrl: 'https://images.unsplash.com/photo-1494526585181-752496271ad7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          rating: 4.6,
+          type: RoomType.house,
+          location: 'TP. Hồ Chí Minh',
+          amenities: ['Garage', 'Sân thượng', 'Máy lạnh'],
+          isVerified: false,
+        ),
+        RoomModel(
+          id: '8',
+          title: 'Studio nhỏ gọn phong cách Muji',
+          description: 'Phong cách tối giản, đầy đủ ánh sáng tự nhiên.',
+          price: 4800000,
+          address: 'Quận 3, TP. Hồ Chí Minh',
+          imageUrl: 'https://images.unsplash.com/photo-1536376074432-px73934f71a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+          rating: 4.7,
+          type: RoomType.studio,
+          location: 'TP. Hồ Chí Minh',
+          amenities: ['Wifi', 'Nội thất gỗ', 'Bình nóng lạnh'],
+          isVerified: true,
         ),
       ];
 }
