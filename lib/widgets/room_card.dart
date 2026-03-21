@@ -82,17 +82,29 @@ class _RoomCardState extends State<RoomCard> {
                       tag: 'room_image_${widget.room.id}',
                       child: ClipRRect(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                        child: Image.network(
-                          widget.room.imageUrl,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 180,
-                            color: AppColors.mintSoft,
-                            child: const Icon(Icons.image_not_supported_rounded, color: AppColors.teal, size: 40),
-                          ),
-                        ),
+                        child: widget.room.imageUrl.startsWith('assets/')
+                            ? Image.asset(
+                                widget.room.imageUrl,
+                                height: 180,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: 180,
+                                  color: AppColors.mintSoft,
+                                  child: const Icon(Icons.image_not_supported_rounded, color: AppColors.teal, size: 40),
+                                ),
+                              )
+                            : Image.network(
+                                widget.room.imageUrl,
+                                height: 180,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: 180,
+                                  color: AppColors.mintSoft,
+                                  child: const Icon(Icons.image_not_supported_rounded, color: AppColors.teal, size: 40),
+                                ),
+                              ),
                       ),
                     ),
                     Positioned(
