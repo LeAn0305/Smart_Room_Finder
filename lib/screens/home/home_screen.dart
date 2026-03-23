@@ -5,6 +5,7 @@ import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/widgets/custom_text_field.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
+import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -148,10 +149,17 @@ class _HomeScreenState extends State<HomeScreen> {
               SectionTitle(
                 title: 'Gợi ý cho bạn',
                 actionText: 'Xem tất cả',
-                onActionTap: () {},
+                onActionTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SearchResultScreen(),
+                    ),
+                  );
+                },
               ),
               SizedBox(
-                height: 280,
+                height: 360,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
