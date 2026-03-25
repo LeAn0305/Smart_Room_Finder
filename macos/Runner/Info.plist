@@ -32,5 +32,7 @@
 	<string>Ứng dụng cần truy cập vị trí để hiển thị phòng trọ gần bạn.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Ứng dụng cần truy cập vị trí để hiển thị phòng trọ gần bạn.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Ứng dụng cần truy cập vị trí để hiển thị phòng trọ gần bạn.</string>
 </dict>
 </plist>
