@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/services/local_auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -61,18 +62,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     setState(() => _isLoading = true);
-
-    // TODO: Kết nối Firebase Auth khi có firebase_options.dart
-    // final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-    //   email: _emailController.text.trim(),
-    //   password: _passwordController.text,
-    // );
-    // await cred.user?.updateDisplayName(_nameController.text.trim());
-
-    await Future.delayed(const Duration(seconds: 1)); // Demo delay
-
+    await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    final success = LocalAuthService.register(email, password);
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Email này đã được đăng ký rồi'),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
 
     // ✅ Hiển thị thông báo thành công
     ScaffoldMessenger.of(context).showSnackBar(
@@ -81,10 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.white),
             SizedBox(width: 10),
-            Text(
-              'Đăng ký thành công!',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            Text('Đăng ký thành công! Vui lòng đăng nhập.', style: TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
         backgroundColor: AppColors.teal,
@@ -95,10 +97,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
 
-    // ✅ Quay lại LoginScreen sau khi đăng ký thành công
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-    Navigator.pop(context); // pop về LoginScreen
+    Navigator.pop(context); // quay về LoginScreen
   }
 
   @override

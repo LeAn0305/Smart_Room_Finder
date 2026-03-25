@@ -15,6 +15,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
+  final List<Duration> _pageDurations = [
+    const Duration(seconds: 2),
+    const Duration(seconds: 2),
+    const Duration(seconds: 2),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _autoAdvance();
+  }
+
+  void _autoAdvance() async {
+    for (int i = 0; i < _pageDurations.length; i++) {
+      await Future.delayed(_pageDurations[i]);
+      if (!mounted) return;
+      if (i < _pageDurations.length - 1) {
+        _pageController.animateToPage(
+          i + 1,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+        setState(() => _currentPage = i + 1);
+      } else {
+        _goToNextScreen();
+      }
+    }
+  }
+
   void _goToNextScreen() {
     Navigator.pushReplacement(
       context,
@@ -53,57 +82,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: pages,
           ),
           Positioned(
+            top: 16,
+            right: 24,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: _skipOnboarding,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('Bỏ qua',
+                      style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w600, fontSize: 14)),
+                ),
+              ),
+            ),
+          ),          Positioned(
             left: 24,
             right: 24,
             bottom: 24,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    pages.length,
-                    (index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        width: _currentPage == index ? 22 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? const Color(0xFF3B82F6)
-                              : const Color(0xFFD4DCE6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                pages.length,
+                (index) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: _currentPage == index ? 22 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index
+                          ? const Color(0xFF3B82F6)
+                          : const Color(0xFFD4DCE6),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                if (_currentPage == pages.length - 1)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _goToNextScreen,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF3B82F6),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                      child: const Text(
-                        'Bắt đầu ngay',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         ],

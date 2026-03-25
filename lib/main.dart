@@ -21,9 +21,7 @@ class MyApp extends StatelessWidget {
           PointerDeviceKind.trackpad,
         },
       ),
-      home: SplashScreen(
-        nextScreen: const WelcomeScreen(),
-      ),
+      home: SplashScreen(nextScreen: const WelcomeScreen()),
     );
   }
 }

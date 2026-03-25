@@ -37,20 +37,17 @@ class OnboardingPage1 extends StatelessWidget {
 
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: onSkip ?? () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(50, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Bỏ qua',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF8DA2B8),
+                child: Visibility(
+                  visible: false,
+                  child: TextButton(
+                    onPressed: onSkip ?? () {},
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(50, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    child: const Text('Bỏ qua',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF8DA2B8))),
                   ),
                 ),
               ),
@@ -72,15 +69,11 @@ class OnboardingPage1 extends StatelessWidget {
                               width: imageWidth,
                               height: imageWidth,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.65),
+                                color: const Color(0xFFE0F2F1),
                                 borderRadius: BorderRadius.circular(28),
                               ),
                               child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 60,
-                                  color: Color(0xFF94A3B8),
-                                ),
+                                child: Icon(Icons.search_rounded, size: 80, color: Color(0xFF26A69A)),
                               ),
                             );
                           },
