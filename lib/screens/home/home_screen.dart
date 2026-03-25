@@ -19,6 +19,18 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedCategory = 'Tất cả';
   final List<String> categories = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
 
+  List<RoomModel> get filteredRooms {
+    if (selectedCategory == 'Tất cả') return rooms;
+    final typeMap = {
+      'Chung cư': RoomType.apartment,
+      'Phòng trọ': RoomType.studio,
+      'Nhà riêng': RoomType.house,
+      'Biệt thự': RoomType.villa,
+    };
+    final type = typeMap[selectedCategory];
+    return rooms.where((r) => r.type == type).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = UserModel.currentUser;
@@ -160,17 +172,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(
                 height: 360,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: rooms.length,
-                  itemBuilder: (context, index) {
-                    return RoomCard(
-                      room: rooms[index],
-                      isHorizontal: true,
-                    );
-                  },
-                ),
+                child: filteredRooms.isEmpty
+                    ? const Center(
+                        child: Text('Không có phòng nào',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
+                      )
+                    : ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: filteredRooms.length,
+                        itemBuilder: (context, index) {
+                          return RoomCard(
+                            room: filteredRooms[index],
+                            isHorizontal: true,
+                          );
+                        },
+                      ),
               ),
 
               SectionTitle(
@@ -182,9 +199,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: 2,
+                itemCount: filteredRooms.length < 2 ? filteredRooms.length : 2,
                 itemBuilder: (context, index) {
-                  return RoomCard(room: rooms[rooms.length - 1 - index]);
+                  return RoomCard(room: filteredRooms[filteredRooms.length - 1 - index]);
                 },
               ),
               const SizedBox(height: 20),

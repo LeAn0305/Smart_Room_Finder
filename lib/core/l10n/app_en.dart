@@ -1,0 +1,101 @@
+const Map<String, String> appEn = {
+  // Common
+  'app_name': 'Smart Room Finder',
+  'cancel': 'Cancel',
+  'save': 'Save',
+  'delete': 'Delete',
+  'confirm': 'Confirm',
+  'close': 'Close',
+  'loading': 'Loading...',
+  'coming_soon': 'Feature coming soon',
+
+  // Bottom Nav
+  'nav_home': 'Home',
+  'nav_map': 'Map',
+  'nav_favorite': 'Favorites',
+  'nav_profile': 'Profile',
+
+  // Profile
+  'profile_title': 'Profile',
+  'profile_rooms_posted': 'Rooms',
+  'profile_favorites': 'Favorites',
+  'profile_rating': 'Rating',
+  'section_account': 'Account',
+  'section_activity': 'Activity',
+  'section_settings': 'Settings',
+  'section_other': 'Other',
+  'edit_profile': 'Edit Profile',
+  'edit_profile_subtitle': 'Name, phone number, address',
+  'change_password': 'Change Password',
+  'change_password_subtitle': 'Update your password',
+  'verify_account': 'Verify Account',
+  'verify_account_subtitle': 'ID card, phone number',
+  'not_verified': 'Not verified',
+  'my_rooms': 'My Rooms',
+  'saved_rooms': 'Saved Rooms',
+  'view_history': 'View History',
+  'view_history_subtitle': 'Recently viewed rooms',
+  'notifications': 'Notifications',
+  'notifications_subtitle': 'Manage push notifications',
+  'language': 'Language',
+  'support': 'Support & Report',
+  'support_subtitle': 'Send feedback or report a bug',
+  'about_app': 'About App',
+  'about_app_subtitle': 'Version 1.0.0',
+  'logout': 'Logout',
+  'logout_confirm': 'Are you sure you want to logout?',
+
+  // Favorite
+  'favorite_title': 'Favorites',
+  'favorite_saved': 'saved rooms',
+  'favorite_empty_title': 'No favorites yet',
+  'favorite_empty_msg': 'Explore rooms and save the ones you like!',
+  'favorite_no_type': 'No rooms found',
+  'favorite_no_type_msg': 'No rooms of this type in your favorites.',
+  'favorite_removed': 'Removed from favorites',
+  'favorite_undo': 'Undo',
+  'favorite_delete_confirm': 'Remove from favorites?',
+  'sort_by': 'Sort by',
+  'sort_newest': 'Newest',
+  'sort_price_low': 'Price: Low to High',
+  'sort_price_high': 'Price: High to Low',
+  'sort_rating': 'Highest Rated',
+  'filter_all': 'All',
+
+  // Room types
+  'type_studio': 'Studio',
+  'type_apartment': 'Apartment',
+  'type_house': 'House',
+  'type_villa': 'Villa',
+
+  // Language
+  'select_language': 'Select Language',
+  'language_changed': 'Switched to',
+
+  // Edit profile
+  'full_name': 'Full Name',
+  'email': 'Email',
+  'address': 'Address',
+  'save_changes': 'Save Changes',
+
+  // Home
+  'greeting': 'Good morning,',
+  'search_hint': 'Search rooms, areas...',
+  'suggested': 'Suggested for you',
+  'nearby': 'Nearby Rooms',
+  'see_all': 'See all',
+  'see_map': 'View map',
+  'cat_all': 'All',
+  'cat_apartment': 'Apartment',
+  'cat_studio': 'Studio',
+  'cat_house': 'House',
+  'cat_villa': 'Villa',
+
+  // Favorite extra
+  'search_favorite': 'Search favorites...',
+  'select_all': 'Select all',
+  'deselect_all': 'Deselect',
+  'delete_selected': 'Delete selected',
+  'selected': 'selected',
+  'group_by_type': 'Group by type',
+};

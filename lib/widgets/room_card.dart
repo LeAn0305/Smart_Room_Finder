@@ -5,12 +5,14 @@ import 'package:smart_room_finder/models/room_model.dart';
 class RoomCard extends StatefulWidget {
   final RoomModel room;
   final VoidCallback? onTap;
+  final VoidCallback? onFavoriteTap;
   final bool isHorizontal;
 
   const RoomCard({
     super.key,
     required this.room,
     this.onTap,
+    this.onFavoriteTap,
     this.isHorizontal = false,
   });
 
@@ -110,22 +112,25 @@ class _RoomCardState extends State<RoomCard> {
                     Positioned(
                       top: 12,
                       right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.white.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          widget.room.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                          color: widget.room.isFavorite ? Colors.redAccent : AppColors.textSecondary,
-                          size: 20,
+                      child: GestureDetector(
+                        onTap: widget.onFavoriteTap,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            widget.room.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: widget.room.isFavorite ? Colors.redAccent : AppColors.textSecondary,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ),
