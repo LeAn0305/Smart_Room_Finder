@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/home/home_screen.dart';
+import 'package:smart_room_finder/screens/map/map_screen.dart';
+import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
+import 'package:smart_room_finder/screens/profile/profile_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -14,9 +17,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _pages = const [
     HomeScreen(),
-    Center(child: Text('Bản đồ')),
-    Center(child: Text('Yêu thích')),
-    Center(child: Text('Cá nhân')),
+    MapScreen(),
+    FavoriteScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
