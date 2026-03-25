@@ -122,6 +122,16 @@ class RoomModel {
     }
   }
 
+  RoomModel copyWith({bool? isFavorite}) {
+    return RoomModel(
+      id: id, title: title, description: description,
+      price: price, address: address, imageUrl: imageUrl,
+      rating: rating, type: type, location: location,
+      amenities: amenities, isVerified: isVerified,
+      isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
+
   static List<RoomModel> get sampleRooms => [
         RoomModel(
           id: '1', title: 'Căn hộ Studio cao cấp',
