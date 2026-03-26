@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
+import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
 class SearchResultScreen extends StatefulWidget {
   final String? initialSearch;
@@ -172,7 +173,12 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                         room: _filteredRooms[index],
                         isHorizontal: false,
                         onTap: () {
-                          // TODO: Navigate to RoomDetailScreen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RoomDetailScreen(room: _filteredRooms[index]),
+                            ),
+                          );
                         },
                       );
                     },

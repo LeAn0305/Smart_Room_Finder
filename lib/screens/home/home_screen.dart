@@ -6,6 +6,7 @@ import 'package:smart_room_finder/widgets/custom_text_field.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
+import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -168,6 +169,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     return RoomCard(
                       room: rooms[index],
                       isHorizontal: true,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RoomDetailScreen(room: rooms[index]),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -184,7 +193,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: 2,
                 itemBuilder: (context, index) {
-                  return RoomCard(room: rooms[rooms.length - 1 - index]);
+                  return RoomCard(
+                    room: rooms[rooms.length - 1 - index],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RoomDetailScreen(room: rooms[rooms.length - 1 - index]),
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 20),
