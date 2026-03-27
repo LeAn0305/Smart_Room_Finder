@@ -5,12 +5,14 @@ import 'package:smart_room_finder/models/room_model.dart';
 class RoomCard extends StatefulWidget {
   final RoomModel room;
   final VoidCallback? onTap;
+  final VoidCallback? onFavoriteTap;
   final bool isHorizontal;
 
   const RoomCard({
     super.key,
     required this.room,
     this.onTap,
+    this.onFavoriteTap,
     this.isHorizontal = false,
   });
 
@@ -89,29 +91,34 @@ class _RoomCardState extends State<RoomCard> {
                         Hero(
                           tag: 'room_image_${widget.room.id}',
                           child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(28),
+                            ),
                             child: widget.room.imageUrl.startsWith('assets/')
                                 ? Image.asset(
                                     widget.room.imageUrl,
                                     height: imageHeight,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(imageHeight),
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildPlaceholder(imageHeight),
                                   )
                                 : Image.network(
                                     widget.room.imageUrl,
                                     height: imageHeight,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    loadingBuilder: (context, child, loadingProgress) {
+                                    loadingBuilder:
+                                        (context, child, loadingProgress) {
                                       if (loadingProgress == null) return child;
                                       return _buildPlaceholder(imageHeight);
                                     },
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(imageHeight),
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildPlaceholder(imageHeight),
                                   ),
                           ),
                         ),
-                        // Overlay Gradient for image
+
                         Positioned.fill(
                           child: Container(
                             decoration: BoxDecoration(
@@ -127,72 +134,86 @@ class _RoomCardState extends State<RoomCard> {
                             ),
                           ),
                         ),
+
                         Positioned(
-                          top: 14,
-                          right: 14,
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.white.withOpacity(0.95),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              widget.room.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              color: widget.room.isFavorite ? Colors.redAccent : AppColors.textSecondary,
-                              size: 22,
+                          top: 12,
+                          right: 12,
+                          child: GestureDetector(
+                            onTap: widget.onFavoriteTap,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                widget.room.isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: widget.room.isFavorite
+                                    ? Colors.redAccent
+                                    : AppColors.textSecondary,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),
+
                         if (widget.room.isVerified)
                           Positioned(
-                            top: 14,
-                            left: 14,
+                            top: 12,
+                            left: 12,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
+                                color: AppColors.blue.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.blue.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
                                   ),
                                 ],
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(Icons.verified_rounded, color: AppColors.white, size: 16),
-                                  SizedBox(width: 6),
+                                  Icon(
+                                    Icons.verified_rounded,
+                                    color: AppColors.white,
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 4),
                                   Text(
-                                    'XÁC THỰC',
+                                    'Xác thực',
                                     style: TextStyle(
                                       color: AppColors.white,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.bold,
                                       fontSize: 10,
-                                      letterSpacing: 0.8,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
+
                         Positioned(
                           bottom: 14,
                           left: 14,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [AppColors.teal, AppColors.tealDark],
@@ -220,6 +241,7 @@ class _RoomCardState extends State<RoomCard> {
                         ),
                       ],
                     ),
+
                     Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -229,7 +251,10 @@ class _RoomCardState extends State<RoomCard> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.mintSoft,
                                   borderRadius: BorderRadius.circular(10),
@@ -245,14 +270,21 @@ class _RoomCardState extends State<RoomCard> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.amber.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      color: Colors.amber,
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       widget.room.rating.toString(),
@@ -282,7 +314,11 @@ class _RoomCardState extends State<RoomCard> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.location_on_rounded, color: AppColors.teal, size: 18),
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: AppColors.teal,
+                                size: 18,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
@@ -301,19 +337,29 @@ class _RoomCardState extends State<RoomCard> {
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              ...widget.room.amenities.take(3).map((amenity) => Padding(
-                                    padding: const EdgeInsets.only(right: 16),
-                                    child: Icon(
-                                      _getAmenityIcon(amenity),
-                                      size: 20,
-                                      color: AppColors.tealDark.withOpacity(0.7),
+                              ...widget.room.amenities.take(3).map(
+                                    (amenity) => Padding(
+                                      padding: const EdgeInsets.only(right: 16),
+                                      child: Icon(
+                                        _getAmenityIcon(amenity),
+                                        size: 20,
+                                        color: AppColors.tealDark.withOpacity(
+                                          0.7,
+                                        ),
+                                      ),
                                     ),
-                                  )),
+                                  ),
                               if (widget.room.amenities.length > 3)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: AppColors.mintSoft, width: 2),
+                                    border: Border.all(
+                                      color: AppColors.mintSoft,
+                                      width: 2,
+                                    ),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -349,7 +395,11 @@ class _RoomCardState extends State<RoomCard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.image_not_supported_rounded, color: AppColors.teal.withOpacity(0.5), size: 48),
+            Icon(
+              Icons.image_not_supported_rounded,
+              color: AppColors.teal.withOpacity(0.5),
+              size: 48,
+            ),
             const SizedBox(height: 12),
             Text(
               'Đang tải ảnh...',

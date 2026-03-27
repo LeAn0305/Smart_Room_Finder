@@ -1,0 +1,101 @@
+const Map<String, String> appVi = {
+  // Common
+  'app_name': 'Smart Room Finder',
+  'cancel': 'Hủy',
+  'save': 'Lưu',
+  'delete': 'Xóa',
+  'confirm': 'Xác nhận',
+  'close': 'Đóng',
+  'loading': 'Đang tải...',
+  'coming_soon': 'Chức năng đang được phát triển',
+
+  // Bottom Nav
+  'nav_home': 'Trang chủ',
+  'nav_map': 'Bản đồ',
+  'nav_favorite': 'Yêu thích',
+  'nav_profile': 'Cá nhân',
+
+  // Profile
+  'profile_title': 'Hồ sơ',
+  'profile_rooms_posted': 'Phòng đăng',
+  'profile_favorites': 'Yêu thích',
+  'profile_rating': 'Đánh giá',
+  'section_account': 'Tài khoản',
+  'section_activity': 'Hoạt động',
+  'section_settings': 'Cài đặt',
+  'section_other': 'Khác',
+  'edit_profile': 'Chỉnh sửa thông tin',
+  'edit_profile_subtitle': 'Tên, số điện thoại, địa chỉ',
+  'change_password': 'Đổi mật khẩu',
+  'change_password_subtitle': 'Cập nhật mật khẩu của bạn',
+  'verify_account': 'Xác minh tài khoản',
+  'verify_account_subtitle': 'CCCD, số điện thoại',
+  'not_verified': 'Chưa xác minh',
+  'my_rooms': 'Phòng trọ của tôi',
+  'saved_rooms': 'Phòng đã lưu',
+  'view_history': 'Lịch sử xem',
+  'view_history_subtitle': 'Các phòng đã xem gần đây',
+  'notifications': 'Thông báo',
+  'notifications_subtitle': 'Quản lý thông báo đẩy',
+  'language': 'Ngôn ngữ',
+  'support': 'Hỗ trợ & Báo cáo',
+  'support_subtitle': 'Gửi phản hồi hoặc báo cáo lỗi',
+  'about_app': 'Về ứng dụng',
+  'about_app_subtitle': 'Phiên bản 1.0.0',
+  'logout': 'Đăng xuất',
+  'logout_confirm': 'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?',
+
+  // Favorite
+  'favorite_title': 'Yêu thích',
+  'favorite_saved': 'phòng đã lưu',
+  'favorite_empty_title': 'Chưa có phòng yêu thích',
+  'favorite_empty_msg': 'Hãy khám phá và lưu lại những phòng bạn ưng ý nhé!',
+  'favorite_no_type': 'Không có phòng nào',
+  'favorite_no_type_msg': 'Không có phòng loại này trong danh sách yêu thích.',
+  'favorite_removed': 'Đã xóa khỏi yêu thích',
+  'favorite_undo': 'Hoàn tác',
+  'favorite_delete_confirm': 'Xóa khỏi yêu thích?',
+  'sort_by': 'Sắp xếp theo',
+  'sort_newest': 'Mới nhất',
+  'sort_price_low': 'Giá thấp đến cao',
+  'sort_price_high': 'Giá cao đến thấp',
+  'sort_rating': 'Đánh giá cao nhất',
+  'filter_all': 'Tất cả',
+
+  // Room types
+  'type_studio': 'Phòng trọ',
+  'type_apartment': 'Chung cư',
+  'type_house': 'Nhà nguyên căn',
+  'type_villa': 'Biệt thự',
+
+  // Language
+  'select_language': 'Chọn ngôn ngữ',
+  'language_changed': 'Đã chuyển sang',
+
+  // Edit profile
+  'full_name': 'Họ và tên',
+  'email': 'Email',
+  'address': 'Địa chỉ',
+  'save_changes': 'Lưu thay đổi',
+
+  // Home
+  'greeting': 'Chào buổi sáng,',
+  'search_hint': 'Tìm kiếm phòng trọ, khu vực...',
+  'suggested': 'Gợi ý cho bạn',
+  'nearby': 'Phòng gần đây',
+  'see_all': 'Xem tất cả',
+  'see_map': 'Xem bản đồ',
+  'cat_all': 'Tất cả',
+  'cat_apartment': 'Chung cư',
+  'cat_studio': 'Phòng trọ',
+  'cat_house': 'Nhà riêng',
+  'cat_villa': 'Biệt thự',
+
+  // Favorite extra
+  'search_favorite': 'Tìm trong yêu thích...',
+  'select_all': 'Chọn tất cả',
+  'deselect_all': 'Bỏ chọn',
+  'delete_selected': 'Xóa đã chọn',
+  'selected': 'đã chọn',
+  'group_by_type': 'Nhóm theo loại',
+};
