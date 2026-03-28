@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
@@ -8,6 +12,11 @@ import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
 import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
+//import 'package:smart_room_finder/screens/settings/settings_screen.dart';
+import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
+import 'package:smart_room_finder/screens/auth/verify_account_screen.dart';
+import 'package:smart_room_finder/screens/history/view_history_screen.dart';
+import 'package:smart_room_finder/screens/support/support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -25,7 +34,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   final UserModel _user = UserModel.currentUser;
   bool _notificationsEnabled = true;
 
-  // Stats tính từ dữ liệu mẫu
+  File? _avatarFile;
+
+  // Stats tính từ dữ liệu mẫu  
   int get _totalFavorites =>
       RoomModel.sampleRooms.where((r) => r.isFavorite).length;
   int get _totalRooms => RoomModel.sampleRooms.length;
@@ -47,6 +58,78 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _animController.dispose();
     super.dispose();
+  }
+  Future<void> _pickAvatar(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 85);
+      if (picked != null) {
+        setState(() => _avatarFile = File(picked.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            const Text('Chọn ảnh đại diện',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.photo_library_outlined, color: AppColors.teal),
+              ),
+              title: const Text('Thư viện ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAvatar(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.camera_alt_outlined, color: AppColors.teal),
+              ),
+              title: const Text('Chụp ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAvatar(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showComingSoon() {
@@ -160,13 +243,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                         icon: Icons.lock_outline_rounded,
                         label: lang.tr('change_password'),
                         subtitle: lang.tr('change_password_subtitle'),
-                        onTap: _showComingSoon,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
                       ),
                       _buildMenuItem(
                         icon: Icons.shield_outlined,
                         label: lang.tr('verify_account'),
                         subtitle: lang.tr('verify_account_subtitle'),
-                        onTap: _showComingSoon,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyAccountScreen())),
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -201,7 +284,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                         icon: Icons.history_rounded,
                         label: lang.tr('view_history'),
                         subtitle: lang.tr('view_history_subtitle'),
-                        onTap: _showComingSoon,
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewHistoryScreen()));
+                        },
                       ),
                     ]),
                     const SizedBox(height: 16),
@@ -229,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         icon: Icons.help_outline_rounded,
                         label: lang.tr('support'),
                         subtitle: lang.tr('support_subtitle'),
-                        onTap: _showComingSoon,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
                       ),
                     ]),
                     const SizedBox(height: 16),
@@ -329,7 +414,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: Padding(
                 padding: const EdgeInsets.all(3),
                 child: CircleAvatar(
-                  backgroundImage: NetworkImage(_user.profileImageUrl),
+                  backgroundImage: _avatarFile != null
+                      ? FileImage(_avatarFile!) as ImageProvider
+                      : NetworkImage(_user.profileImageUrl),
                   backgroundColor: AppColors.mintGreen,
                   onBackgroundImageError: (_, __) {},
                 ),
@@ -340,7 +427,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               bottom: 4,
               right: 100,
               child: GestureDetector(
-                onTap: () {},
+                onTap: _showImageSourcePicker,
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
