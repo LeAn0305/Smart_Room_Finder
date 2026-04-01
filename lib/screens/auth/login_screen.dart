@@ -1,14 +1,14 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/screens/main_navigation_screen.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:smart_room_finder/services/google_auth_service.dart';
-import 'package:smart_room_finder/services/local_auth_service.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +20,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   String? _emailError;
@@ -32,39 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onLogin() async {
-    setState(() { _emailError = null; _passwordError = null; });
-
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    bool hasError = false;
-    if (email.isEmpty) { setState(() => _emailError = 'Vui lòng nhập email'); hasError = true; }
-    else if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
-      setState(() => _emailError = 'Email không hợp lệ'); hasError = true;
-    }
-    if (password.isEmpty) { setState(() => _passwordError = 'Vui lòng nhập mật khẩu'); hasError = true; }
-    else if (password.length < 6) { setState(() => _passwordError = 'Mật khẩu tối thiểu 6 ký tự'); hasError = true; }
-    if (hasError) return;
-
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (LocalAuthService.login(email, password)) {
-      LocalAuthService.setCurrentUser(email);
-      _goToHome();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Email hoặc mật khẩu không đúng'),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
-    }
-  }
-
   void _goToHome() {
     Navigator.pushAndRemoveUntil(
       context,
@@ -73,18 +41,114 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _signInWithGoogle() async {
+  void _onLogin() async {
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+    });
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    bool hasError = false;
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Vui lòng nhập email');
+      hasError = true;
+    } else if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() => _emailError = 'Email không hợp lệ');
+      hasError = true;
+    }
+
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Vui lòng nhập mật khẩu');
+      hasError = true;
+    } else if (password.length < 6) {
+      setState(() => _passwordError = 'Mật khẩu tối thiểu 6 ký tự');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     setState(() => _isLoading = true);
+
     try {
-      final account = await GoogleAuthService.signIn();
-      if (account == null) return;
+      await AuthService.signInWithEmail(email, password);
+
       if (!mounted) return;
       _goToHome();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String message = 'Đăng nhập thất bại';
+
+      if (e.code == 'user-not-found') {
+        message = 'Email chưa được đăng ký';
+      } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        message = 'Email hoặc mật khẩu không đúng';
+      } else if (e.code == 'invalid-email') {
+        message = 'Email không hợp lệ';
+      } else if (e.code == 'too-many-requests') {
+        message = 'Bạn thử lại sau ít phút';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi đăng nhập Google: $e'),
-            backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text('Có lỗi xảy ra: $e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final cred = await AuthService.signInWithGoogle();
+
+      if (cred == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      if (!mounted) return;
+      _goToHome();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng nhập Google thất bại: ${e.message ?? e.code}'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi đăng nhập Google: $e'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -99,12 +163,9 @@ class _LoginScreenState extends State<LoginScreen> {
           AppleIDAuthorizationScopes.fullName,
         ],
       );
+
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        (route) => false,
-      );
+      _goToHome();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -133,7 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Glows
               Positioned(
                 top: -60,
                 left: -40,
@@ -144,7 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 right: -40,
                 child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
               ),
-
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
@@ -152,7 +211,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SizedBox(height: 60),
 
-                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
@@ -178,7 +236,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 40),
 
-                    // Header
                     const Text(
                       'Chào mừng trở lại! 👋',
                       style: TextStyle(
@@ -199,7 +256,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 36),
 
-                    // Email field
                     _buildInputField(
                       controller: _emailController,
                       label: 'Email',
@@ -210,7 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Password field
                     _buildInputField(
                       controller: _passwordController,
                       label: 'Mật khẩu',
@@ -219,14 +274,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       isPassword: true,
                       isPasswordVisible: _isPasswordVisible,
                       onTogglePassword: () {
-                        setState(() => _isPasswordVisible = !_isPasswordVisible);
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
                       },
                       errorText: _passwordError,
                     ),
 
                     const SizedBox(height: 8),
 
-                    // ── Forgot Password link ──
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -248,7 +304,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 16),
 
-                    // ── Login button ──
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -263,17 +318,26 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? const SizedBox(width: 24, height: 24,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                            : const Text('Đăng nhập',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Đăng nhập',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
-                    const SizedBox(height: 8),
 
                     const SizedBox(height: 24),
 
-                    // Divider
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey[300])),
@@ -282,7 +346,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             'Hoặc tiếp tục với',
                             style: TextStyle(
-                                color: Colors.grey[600], fontSize: 14),
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                         Expanded(child: Divider(color: Colors.grey[300])),
@@ -291,7 +357,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 20),
 
-                    // ── Google + Phone ──
                     Row(
                       children: [
                         Expanded(
@@ -321,7 +386,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
 
-                    // ── Apple Sign-In (iOS only, hidden on web) ──
                     if (!kIsWeb && Platform.isIOS) ...[
                       const SizedBox(height: 12),
                       GestureDetector(
@@ -355,7 +419,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 32),
 
-                    // ── Register link ──
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -406,45 +469,82 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: errorText != null ? Border.all(color: Colors.redAccent, width: 1.5) : null,
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+            border: errorText != null
+                ? Border.all(color: Colors.redAccent, width: 1.5)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: TextFormField(
             controller: controller,
             obscureText: isPassword && !isPasswordVisible,
             keyboardType: keyboardType,
             onChanged: (_) => setState(() {
-              if (isPassword) _passwordError = null;
-              else _emailError = null;
+              if (isPassword) {
+                _passwordError = null;
+              } else {
+                _emailError = null;
+              }
             }),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
-              prefixIcon: Icon(icon, color: AppColors.teal, size: 22),
+              hintStyle: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 16,
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: AppColors.teal,
+                size: 22,
+              ),
               suffixIcon: isPassword
                   ? IconButton(
                       icon: Icon(
-                        isPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Colors.grey[400], size: 22,
+                        isPasswordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Colors.grey[400],
+                        size: 22,
                       ),
                       onPressed: onTogglePassword,
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
             ),
           ),
         ),
         if (errorText != null) ...[
           const SizedBox(height: 6),
-          Text(errorText, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(
+            errorText,
+            style: const TextStyle(
+              color: Colors.redAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ],
     );
@@ -458,7 +558,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: _isLoading ? null : onTap,
       child: Container(
         height: 56,
         decoration: BoxDecoration(
@@ -499,7 +599,11 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: color, blurRadius: 70, spreadRadius: 24),
+          BoxShadow(
+            color: color,
+            blurRadius: 70,
+            spreadRadius: 24,
+          ),
         ],
       ),
     );

@@ -1,12 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
+import 'package:smart_room_finder/core/config/google_oauth_config.dart';
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
   static final _firestore = FirebaseFirestore.instance;
-  static final _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  static final _googleSignIn = GoogleSignIn(
+  params: const GoogleSignInParams(
+    clientId: GoogleOAuthConfig.windowsClientId,
 
+    clientSecret: GoogleOAuthConfig.windowsClientSecret,
+    scopes: ['openid', 'profile', 'email'],
+    ),
+  );
+  
   static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -38,20 +46,19 @@ class AuthService {
 
   // Đăng nhập Google
   static Future<UserCredential?> signInWithGoogle() async {
-    await _googleSignIn.signOut();
-    final account = await _googleSignIn.signIn();
-    if (account == null) return null;
+    final credentials = await _googleSignIn.signInOnline();
 
-    final googleAuth = await account.authentication;
+    if (credentials == null) return null;
+
     final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
+      idToken: credentials.idToken,
+      accessToken: credentials.accessToken,
+  );
 
-    final cred = await _auth.signInWithCredential(credential);
-    await _saveUserToFirestore(cred.user!);
-    return cred;
-  }
+  final cred = await _auth.signInWithCredential(credential);
+  await _saveUserToFirestore(cred.user!);
+  return cred;
+}
 
   // Lưu user vào Firestore
   static Future<void> _saveUserToFirestore(User user, {String? name}) async {
@@ -76,9 +83,12 @@ class AuthService {
 
   // Đăng xuất
   static Future<void> signOut() async {
-    await _googleSignIn.signOut();
-    await _auth.signOut();
-  }
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+
+  await _auth.signOut();
+}
 
   // Quên mật khẩu
   static Future<void> sendPasswordReset(String email) async {

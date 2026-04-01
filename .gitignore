@@ -11,7 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-
+lib/core/config/google_oauth_config.dart
 # IntelliJ related
 *.iml
 *.ipr

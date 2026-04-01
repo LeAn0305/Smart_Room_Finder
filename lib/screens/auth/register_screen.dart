@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/services/local_auth_service.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -49,58 +49,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _onRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đồng ý với Điều khoản & Chính sách'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    final success = LocalAuthService.register(email, password);
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Email này đã được đăng ký rồi'),
+  if (!_agreedToTerms) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Vui lòng đồng ý với Điều khoản & Chính sách'),
         backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ));
-      return;
-    }
+      ),
+    );
+    return;
+  }
 
-    // ✅ Hiển thị thông báo thành công
+  setState(() => _isLoading = true);
+
+  final name = _nameController.text.trim();
+  final email = _emailController.text.trim();
+  final password = _passwordController.text;
+
+  try {
+    await AuthService.registerWithEmail(email, password, name);
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
           children: [
             Icon(Icons.check_circle, color: Colors.white),
             SizedBox(width: 10),
-            Text('Đăng ký thành công! Vui lòng đăng nhập.', style: TextStyle(fontWeight: FontWeight.w600)),
+            Expanded(
+              child: Text(
+                'Đăng ký thành công! Vui lòng đăng nhập.',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
         backgroundColor: AppColors.teal,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         margin: const EdgeInsets.all(16),
       ),
     );
 
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
-    Navigator.pop(context); // quay về LoginScreen
+    Navigator.pop(context);
+  } on FirebaseAuthException catch (e) {
+    if (!mounted) return;
+
+    String message = 'Đăng ký thất bại';
+
+    if (e.code == 'email-already-in-use') {
+      message = 'Email này đã được đăng ký rồi';
+    } else if (e.code == 'invalid-email') {
+      message = 'Email không hợp lệ';
+    } else if (e.code == 'weak-password') {
+      message = 'Mật khẩu quá yếu';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Có lỗi xảy ra: $e'),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {

@@ -2,11 +2,20 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
+import 'package:smart_room_finder/firebase_options.dart';
 import 'package:smart_room_finder/screens/splash/splash_screen.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => LanguageProvider(),
@@ -21,6 +30,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final langProvider = context.watch<LanguageProvider>();
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       locale: langProvider.locale,
