@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -20,26 +22,70 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _onSendReset() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng nhập địa chỉ email hợp lệ'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
+  final email = _emailController.text.trim();
 
-    setState(() => _isLoading = true);
-    // Demo: simulate network call
-    await Future.delayed(const Duration(seconds: 1));
+  if (email.isEmpty || !email.contains('@')) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Vui lòng nhập địa chỉ email hợp lệ'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    await AuthService.sendPasswordReset(email);
+
     if (!mounted) return;
+
     setState(() {
       _isLoading = false;
       _emailSent = true;
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email đặt lại mật khẩu đã được gửi'),
+        backgroundColor: AppColors.teal,
+      ),
+    );
+  } on FirebaseAuthException catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    String message = 'Có lỗi xảy ra, vui lòng thử lại';
+
+    if (e.code == 'user-not-found') {
+      message = 'Email này chưa được đăng ký tài khoản';
+    } else if (e.code == 'invalid-email') {
+      message = 'Địa chỉ email không hợp lệ';
+    } else if (e.code == 'too-many-requests') {
+      message = 'Bạn thao tác quá nhiều lần, vui lòng thử lại sau';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Không thể gửi email đặt lại mật khẩu'),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -134,26 +180,78 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 32),
 
                     // Title
-                    Text(
-                      _emailSent ? 'Kiểm tra email của bạn!' : 'Quên mật khẩu?',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _emailSent
-                          ? 'Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến\n${_emailController.text.trim()}'
-                          : 'Đừng lo! Nhập email đăng ký và chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu cho bạn.',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
+                    // Title
+                    SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: _emailSent
+                            ? CrossAxisAlignment.center
+                            : CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _emailSent ? 'Kiểm tra email của bạn!' : 'Quên mật khẩu?',
+                            textAlign: _emailSent ? TextAlign.center : TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _emailSent
+                                ? 'Chúng tôi đã gửi liên kết đặt lại mật khẩu đến\n${_emailController.text.trim()}.'
+                                : 'Đừng lo! Nhập email đăng ký và chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu cho bạn.',
+                            textAlign: _emailSent ? TextAlign.center : TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppColors.textSecondary,
+                              height: 1.6,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
+                    if (_emailSent) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.teal.withOpacity(0.18),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              color: AppColors.teal,
+                              size: 22,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Vui lòng kiểm tra cả hộp thư Spam hoặc Junk nếu bạn chưa thấy email.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 28),
+                    
                     const SizedBox(height: 40),
 
                     if (!_emailSent) ...[
@@ -269,12 +367,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       const SizedBox(height: 20),
                       Center(
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() => _emailSent = false);
-                          },
-                          child: const Text(
-                            'Gửi lại email',
-                            style: TextStyle(
+                          onTap: _isLoading ? null : _onSendReset,
+                          child: Text(
+                            _isLoading ? 'Đang gửi lại...' : 'Gửi lại email',
+                            style: const TextStyle(
                               fontSize: 15,
                               color: AppColors.teal,
                               fontWeight: FontWeight.w600,

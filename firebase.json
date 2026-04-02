@@ -1,1 +1,25 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"smart-room-finder-app-firebase","appId":"1:154072375713:android:c281b06fa515de96462be0","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"smart-room-finder-app-firebase","configurations":{"android":"1:154072375713:android:c281b06fa515de96462be0","ios":"1:154072375713:ios:1e4c39226db2c303462be0","macos":"1:154072375713:ios:1e4c39226db2c303462be0","web":"1:154072375713:web:255bd8068bbad4ac462be0","windows":"1:154072375713:web:255bd8068bbad4ac462be0"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "smart-room-finder-app-firebase",
+          "appId": "1:154072375713:android:c281b06fa515de96462be0",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "smart-room-finder-app-firebase",
+          "configurations": {
+            "android": "1:154072375713:android:c281b06fa515de96462be0",
+            "ios": "1:154072375713:ios:1e4c39226db2c303462be0",
+            "macos": "1:154072375713:ios:1e4c39226db2c303462be0",
+            "web": "1:154072375713:web:255bd8068bbad4ac462be0",
+            "windows": "1:154072375713:web:255bd8068bbad4ac462be0"
+          }
+        }
+      }
+    }
+  }
+}

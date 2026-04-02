@@ -92,6 +92,7 @@ class AuthService {
 
   // Quên mật khẩu
   static Future<void> sendPasswordReset(String email) async {
+    await _auth.setLanguageCode('en');
     await _auth.sendPasswordResetEmail(email: email);
-  }
+}
 }
