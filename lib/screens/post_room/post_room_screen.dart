@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 
@@ -23,6 +26,9 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   int _durationDays = 30;
   final List<String> _selectedAmenities = [];
   bool _isLoading = false;
+  List<String> _images = [];
+  final ImagePicker _picker = ImagePicker();
+
   bool get isEditing => widget.editRoom != null;
 
   final List<String> _allAmenities = [
@@ -45,6 +51,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
       _selectedDirection = r.direction;
       _bedrooms = r.bedrooms ?? 1;
       _selectedAmenities.addAll(r.amenities);
+      if (r.images.isNotEmpty) {
+        _images = List.from(r.images);
+      } else if (r.imageUrl.isNotEmpty) {
+        _images = [r.imageUrl];
+      }
     }
   }
 
@@ -53,6 +64,25 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     _titleCtrl.dispose(); _descCtrl.dispose();
     _priceCtrl.dispose(); _addressCtrl.dispose(); _areaCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _images.add(image.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _images.removeAt(index);
+    });
   }
 
   void _saveDraft() async {
@@ -86,7 +116,8 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
       description: _descCtrl.text.trim(),
       price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
       address: _addressCtrl.text.trim(),
-      imageUrl: isEditing ? widget.editRoom!.imageUrl : 'assets/images/room_studio_luxury.png',
+      imageUrl: _images.isNotEmpty ? _images.first : 'assets/images/room_studio_luxury.png',
+      images: _images,
       rating: isEditing ? widget.editRoom!.rating : 0.0,
       type: _selectedType,
       location: 'TP. Ho Chi Minh',
@@ -221,7 +252,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         height: 120,
         child: ListView(scrollDirection: Axis.horizontal, children: [
           GestureDetector(
-            onTap: () {},
+            onTap: _pickImage,
             child: Container(
               width: 120, height: 120,
               margin: const EdgeInsets.only(right: 10),
@@ -238,24 +269,36 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
               ]),
             ),
           ),
-          if (isEditing)
-            Container(
+          ..._images.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final String imgPath = entry.value;
+            final isAsset = imgPath.startsWith('assets/');
+            final isNetwork = imgPath.startsWith('http');
+            
+            return Container(
               width: 120, height: 120,
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(fit: StackFit.expand, children: [
-                  Image.asset(widget.editRoom!.imageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft)),
-                  Positioned(top: 4, right: 4, child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 12),
+                  isAsset 
+                      ? Image.asset(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
+                      : isNetwork || kIsWeb 
+                          ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
+                          : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft)),
+                  Positioned(top: 4, right: 4, child: GestureDetector(
+                    onTap: () => _removeImage(index),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 12),
+                    ),
                   )),
                 ]),
               ),
-            ),
+            );
+          }).toList(),
         ]),
       ),
     ]);

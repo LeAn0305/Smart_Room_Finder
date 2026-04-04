@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
@@ -30,9 +32,7 @@ class RoomDetailScreen extends StatelessWidget {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       image: DecorationImage(
-                        image: room.imageUrl.startsWith('assets/')
-                            ? AssetImage(room.imageUrl) as ImageProvider
-                            : NetworkImage(room.imageUrl),
+                        image: _getRoomImageProvider(room.imageUrl),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -409,6 +409,16 @@ class RoomDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  ImageProvider _getRoomImageProvider(String imgPath) {
+    if (imgPath.startsWith('assets/')) {
+      return AssetImage(imgPath);
+    } else if (imgPath.startsWith('http') || kIsWeb) {
+      return NetworkImage(imgPath);
+    } else {
+      return FileImage(File(imgPath));
+    }
   }
 
   Widget _buildActionButton(IconData icon, Color bgColor, Color iconColor) {

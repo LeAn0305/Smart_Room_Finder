@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
@@ -51,7 +53,11 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
   void _toggleActive(RoomModel room) {
     setState(() {
       final idx = _rooms.indexWhere((r) => r.id == room.id);
-      if (idx != -1) _rooms[idx] = room.copyWith(isActive: !room.isActive);
+      if (idx != -1) {
+        _rooms[idx] = room.copyWith(isActive: !room.isActive);
+        final gIdx = RoomModel.sampleRooms.indexWhere((r) => r.id == room.id);
+        if (gIdx != -1) RoomModel.sampleRooms[gIdx] = _rooms[idx];
+      }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(room.isActive ? 'Đã ẩn "${room.title}"' : 'Đã hiện "${room.title}"'),
@@ -81,7 +87,10 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
       ),
     );
     if (confirm == true) {
-      setState(() => _rooms.removeWhere((r) => r.id == room.id));
+      setState(() {
+        _rooms.removeWhere((r) => r.id == room.id);
+        RoomModel.sampleRooms.removeWhere((r) => r.id == room.id);
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Đã xóa "${room.title}"'),
         backgroundColor: Colors.redAccent,
@@ -92,13 +101,18 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
   }
 
   void _duplicateRoom(RoomModel room) {
-    setState(() => _rooms.insert(0, room.copyWith(
+    final dup = room.copyWith(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: '${room.title} (bản sao)',
       isActive: false,
       isDraft: true,
       postedAt: DateTime.now(),
       expiresAt: null,
-    )));
+    );
+    setState(() {
+      _rooms.insert(0, dup);
+      RoomModel.sampleRooms.insert(0, dup);
+    });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('Đã nhân bản "${room.title}"'),
       backgroundColor: AppColors.teal,
@@ -116,6 +130,8 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
           expiresAt: DateTime.now().add(const Duration(days: 30)),
           isActive: true,
         );
+        final gIdx = RoomModel.sampleRooms.indexWhere((r) => r.id == room.id);
+        if (gIdx != -1) RoomModel.sampleRooms[gIdx] = _rooms[idx];
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -132,7 +148,11 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
       if (updated != null && updated is RoomModel) {
         setState(() {
           final idx = _rooms.indexWhere((r) => r.id == updated.id);
-          if (idx != -1) _rooms[idx] = updated;
+          if (idx != -1) {
+            _rooms[idx] = updated;
+            final gIdx = RoomModel.sampleRooms.indexWhere((r) => r.id == updated.id);
+            if (gIdx != -1) RoomModel.sampleRooms[gIdx] = updated;
+          }
         });
       }
     });
@@ -193,22 +213,34 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
               colors: [AppColors.mintLight, AppColors.mintSoft, AppColors.mintGreen]),
         ),
         child: SafeArea(
-          child: Column(children: [
-            _buildHeader(),
-            _buildStats(),
-            _buildSearchBar(),
-            _buildTabBar(),
-            Expanded(child: TabBarView(controller: _tabController, children: [
-              _buildRoomList(_activeRooms, tab: 'active'),
-              _buildRoomList(_hiddenRooms, tab: 'hidden'),
-              _buildRoomList(_draftRooms, tab: 'draft'),
-            ])),
-          ]),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(children: [
+                _buildHeader(),
+                _buildStats(),
+                _buildSearchBar(),
+                _buildTabBar(),
+                Expanded(child: TabBarView(controller: _tabController, children: [
+                  _buildRoomList(_activeRooms, tab: 'active'),
+                  _buildRoomList(_hiddenRooms, tab: 'hidden'),
+                  _buildRoomList(_draftRooms, tab: 'draft'),
+                ])),
+              ]),
+            ),
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PostRoomScreen()))
-            .then((r) { if (r is RoomModel) setState(() => _rooms.insert(0, r)); }),
+            .then((r) {
+              if (r is RoomModel) {
+                setState(() {
+                  _rooms.insert(0, r);
+                  RoomModel.sampleRooms.insert(0, r);
+                });
+              }
+            }),
         backgroundColor: AppColors.teal,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: const Text('Đăng phòng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
@@ -362,9 +394,7 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
         Stack(children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: Image.asset(room.imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(height: 150, color: AppColors.mintSoft,
-                    child: const Icon(Icons.image_not_supported_rounded, color: AppColors.teal, size: 40))),
+            child: _buildRoomImage(room.imageUrl),
           ),
           Positioned(top: 10, left: 10, child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -444,6 +474,22 @@ class _MyRoomScreenState extends State<MyRoomScreen> with SingleTickerProviderSt
       ]),
     );
   }
+
+  Widget _buildRoomImage(String imgPath) {
+    if (imgPath.startsWith('assets/')) {
+      return Image.asset(imgPath, height: 150, width: double.infinity, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _errorImage());
+    } else if (imgPath.startsWith('http') || kIsWeb) {
+      return Image.network(imgPath, height: 150, width: double.infinity, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _errorImage());
+    } else {
+      return Image.file(File(imgPath), height: 150, width: double.infinity, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _errorImage());
+    }
+  }
+
+  Widget _errorImage() => Container(height: 150, color: AppColors.mintSoft,
+      child: const Icon(Icons.image_not_supported_rounded, color: AppColors.teal, size: 40));
 
   Widget _miniStat(IconData icon, String value, Color color) {
     return Row(children: [

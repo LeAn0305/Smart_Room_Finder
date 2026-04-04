@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 
 class RoomCard extends StatefulWidget {
   final RoomModel room;
@@ -51,12 +53,13 @@ class _RoomCardState extends State<RoomCard> {
 
   @override
   Widget build(BuildContext context) {
+    bool isFavorite = context.watch<FavoriteProvider>().isFavorite(widget.room.id);
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = widget.isHorizontal ? 280.0 : constraints.maxWidth;
         final imageHeight = widget.isHorizontal ? 160.0 : 200.0;
 
-        return MouseRegion(
+        Widget cardContent = MouseRegion(
           onEnter: (_) => setState(() => isHovered = true),
           onExit: (_) => setState(() => isHovered = false),
           child: AnimatedScale(
@@ -153,10 +156,10 @@ class _RoomCardState extends State<RoomCard> {
                                 ],
                               ),
                               child: Icon(
-                                widget.room.isFavorite
+                                isFavorite
                                     ? Icons.favorite_rounded
                                     : Icons.favorite_border_rounded,
-                                color: widget.room.isFavorite
+                                color: isFavorite
                                     ? Colors.redAccent
                                     : AppColors.textSecondary,
                                 size: 20,
@@ -382,6 +385,7 @@ class _RoomCardState extends State<RoomCard> {
             ),
           ),
         );
+        return widget.isHorizontal ? cardContent : Center(child: cardContent);
       },
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/widgets/custom_text_field.dart';
@@ -39,10 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _toggleFavorite(RoomModel room) {
-    setState(() {
-      final idx = rooms.indexWhere((r) => r.id == room.id);
-      if (idx != -1) rooms[idx] = room.copyWith(isFavorite: !room.isFavorite);
-    });
+    context.read<FavoriteProvider>().toggleFavorite(room.id);
   }
 
   @override
@@ -52,10 +51,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.mintLight,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -172,37 +174,51 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                             ),
-                            SectionTitle(
-                              title: 'Phòng gần đây',
-                              actionText: 'Xem bản đồ',
-                              onActionTap: () {},
-                            ),
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              itemCount: filteredRooms.length < 2 ? filteredRooms.length : 2,
-                              itemBuilder: (context, index) {
-                              final room = filteredRooms[filteredRooms.length - 1 - index];
-                              return RoomCard(
-                                room: room,
-                                onFavoriteTap: () => _toggleFavorite(room),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => RoomDetailScreen(room: room),
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 600),
+                                child: Column(
+                                  children: [
+                                    SectionTitle(
+                                      title: 'Phòng gần đây',
+                                      actionText: 'Xem bản đồ',
+                                      onActionTap: () {},
                                     ),
-                                  );
-                                },
-                              );
-                },
-              ),
-              const SizedBox(height: 20),
+                                    ListView.builder(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                                      itemCount: filteredRooms.length < 3 ? filteredRooms.length : 3,
+                                      itemBuilder: (context, index) {
+                                        final room = filteredRooms[filteredRooms.length - 1 - index];
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 20),
+                                          child: RoomCard(
+                                            room: room,
+                                            onFavoriteTap: () => _toggleFavorite(room),
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => RoomDetailScreen(room: room),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
             ],
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 }

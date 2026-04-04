@@ -5,6 +5,8 @@ import 'package:smart_room_finder/core/l10n/language_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/emty_state.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
+import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
 enum FavoriteSortOption { newest, priceLow, priceHigh, rating }
 
@@ -16,7 +18,6 @@ class FavoriteScreen extends StatefulWidget {
 }
 
 class _FavoriteScreenState extends State<FavoriteScreen> {
-  late List<RoomModel> _allFavorites;
   List<RoomModel> _filtered = [];
 
   RoomType? _selectedType;
@@ -36,11 +37,8 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   void initState() {
     super.initState();
-    _allFavorites = RoomModel.sampleRooms.where((r) => r.isFavorite).toList();
-    _applyFilter();
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
-      _applyFilter();
     });
   }
 
@@ -50,41 +48,13 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     super.dispose();
   }
 
-  void _applyFilter() {
-    List<RoomModel> result = _selectedType == null
-        ? List.from(_allFavorites)
-        : _allFavorites.where((r) => r.type == _selectedType).toList();
-
-    if (_searchQuery.isNotEmpty) {
-      result = result.where((r) =>
-          r.title.toLowerCase().contains(_searchQuery) ||
-          r.address.toLowerCase().contains(_searchQuery)).toList();
-    }
-
-    switch (_sortOption) {
-      case FavoriteSortOption.priceLow:
-        result.sort((a, b) => a.price.compareTo(b.price));
-        break;
-      case FavoriteSortOption.priceHigh:
-        result.sort((a, b) => b.price.compareTo(a.price));
-        break;
-      case FavoriteSortOption.rating:
-        result.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case FavoriteSortOption.newest:
-        break;
-    }
-
-    setState(() => _filtered = result);
-  }
-
   void _removeFromFavorite(RoomModel room) {
     final lang = context.read<LanguageProvider>();
+    final provider = context.read<FavoriteProvider>();
     setState(() {
-      _allFavorites.removeWhere((r) => r.id == room.id);
       _selectedIds.remove(room.id);
-      _applyFilter();
     });
+    provider.removeFavorite(room.id);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('${lang.tr('favorite_removed')}: "${room.title}"'),
       backgroundColor: AppColors.tealDark,
@@ -93,22 +63,21 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       action: SnackBarAction(
         label: lang.tr('favorite_undo'),
         textColor: Colors.white,
-        onPressed: () => setState(() {
-          _allFavorites.add(room);
-          _applyFilter();
-        }),
+        onPressed: () => provider.addFavorite(room.id),
       ),
     ));
   }
 
   void _deleteSelected() {
     final lang = context.read<LanguageProvider>();
+    final provider = context.read<FavoriteProvider>();
     final count = _selectedIds.length;
+    for (var id in _selectedIds) {
+      provider.removeFavorite(id);
+    }
     setState(() {
-      _allFavorites.removeWhere((r) => _selectedIds.contains(r.id));
       _selectedIds.clear();
       _isSelecting = false;
-      _applyFilter();
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('${lang.tr('delete_selected')}: $count'),
@@ -169,7 +138,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               return GestureDetector(
                 onTap: () {
                   setState(() => _sortOption = opt.$1);
-                  _applyFilter();
                   Navigator.pop(context);
                 },
                 child: Container(
@@ -201,6 +169,33 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
+    final provider = context.watch<FavoriteProvider>();
+    final allFavs = RoomModel.sampleRooms.where((r) => provider.isFavorite(r.id)).toList();
+
+    _filtered = _selectedType == null
+        ? List.from(allFavs)
+        : allFavs.where((r) => r.type == _selectedType).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      _filtered = _filtered.where((r) =>
+          r.title.toLowerCase().contains(_searchQuery) ||
+          r.address.toLowerCase().contains(_searchQuery)).toList();
+    }
+
+    switch (_sortOption) {
+      case FavoriteSortOption.priceLow:
+        _filtered.sort((a, b) => a.price.compareTo(b.price));
+        break;
+      case FavoriteSortOption.priceHigh:
+        _filtered.sort((a, b) => b.price.compareTo(a.price));
+        break;
+      case FavoriteSortOption.rating:
+        _filtered.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case FavoriteSortOption.newest:
+        break;
+    }
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -213,23 +208,28 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           ),
         ),
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(lang),
-              _buildSearchBar(lang),
-              _buildFilterBar(lang),
-              if (_isSelecting) _buildSelectionBar(lang),
-              const SizedBox(height: 4),
-              Expanded(child: _buildBody(lang)),
-            ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(lang, allFavs.length),
+                  _buildSearchBar(lang),
+                  _buildFilterBar(lang),
+                  if (_isSelecting) _buildSelectionBar(lang),
+                  const SizedBox(height: 4),
+                  Expanded(child: _buildBody(lang)),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(LanguageProvider lang) {
+  Widget _buildHeader(LanguageProvider lang, int allFavoritesLength) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Row(
@@ -258,7 +258,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               children: [
                 Text(lang.tr('favorite_title'),
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                Text('${_allFavorites.length} ${lang.tr('favorite_saved')}',
+                Text('${allFavoritesLength} ${lang.tr('favorite_saved')}',
                     style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               ],
             ),
@@ -339,7 +339,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     onTap: () {
                       _searchController.clear();
                       setState(() => _searchQuery = '');
-                      _applyFilter();
                     },
                     child: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
                   )
@@ -373,7 +372,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           return GestureDetector(
             onTap: () {
               setState(() => _selectedType = types[i]);
-              _applyFilter();
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
@@ -614,7 +612,14 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       onDismissed: (_) => _removeFromFavorite(room),
       child: RoomCard(
         room: room,
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RoomDetailScreen(room: room),
+            ),
+          );
+        },
         onFavoriteTap: () => _removeFromFavorite(room),
       ),
     );
