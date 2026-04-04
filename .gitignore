@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+Thumbs.db
 .atom/
 .build/
 .buildlog/
@@ -11,19 +12,34 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+
+# Local secrets / configs
 lib/core/config/google_oauth_config.dart
-# IntelliJ related
+
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code
+.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter / Dart / Pub
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+/build/
+/coverage/
+
+# Flutter generated plugin files
+**/generated_plugin_registrant.*
+**/generated_plugins.cmake
+**/GeneratedPluginRegistrant.*
+
 # Flutter platform ephemeral
 **/windows/flutter/ephemeral/
 **/linux/flutter/ephemeral/
@@ -31,12 +47,6 @@ lib/core/config/google_oauth_config.dart
 **/ios/Flutter/ephemeral/
 **/doc/api/
 **/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
 
 # Symbolication related
 app.*.symbols
@@ -44,7 +54,7 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android build outputs
 /android/app/debug
 /android/app/profile
 /android/app/release
