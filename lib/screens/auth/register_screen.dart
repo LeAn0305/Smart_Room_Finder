@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
+import 'package:smart_room_finder/providers/preference_provider.dart';
+import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
+//import 'package:smart_room_finder/services/local_auth_service.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -48,7 +53,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  Future<void> _onRegister() async {
+Future<void> _onRegister() async {
   if (!_formKey.currentState!.validate()) return;
 
   if (!_agreedToTerms) {
@@ -98,7 +103,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
-    Navigator.pop(context);
+
+    final pref = context.read<PreferenceProvider>();
+    if (!pref.completed) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+        (_) => false,
+      );
+    } else {
+      Navigator.pop(context);
+    }
   } on FirebaseAuthException catch (e) {
     if (!mounted) return;
 
