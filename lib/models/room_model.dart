@@ -96,6 +96,7 @@ class RoomModel {
   }
 
   RoomModel copyWith({
+    String? id,
     String? title,
     String? description,
     int? price,
@@ -118,7 +119,7 @@ class RoomModel {
     bool? isDraft,
   }) {
     return RoomModel(
-      id: id,
+      id: id ?? this.id,
       rating: rating,
       title: title ?? this.title,
       description: description ?? this.description,
@@ -155,7 +156,7 @@ class RoomModel {
         return 'Biệt thự';
     }
   }
-  static List<RoomModel> get sampleRooms => [
+  static List<RoomModel> sampleRooms = [
         RoomModel(
           id: '1',
           title: 'Phòng trọ gác gỗ đơn giản Quận 7',

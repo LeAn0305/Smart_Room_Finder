@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
@@ -65,6 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(seconds: 3), _autoScroll);
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _bannerCtrl.dispose();
+    super.dispose();
+  }
+
   void _autoScroll() {
     if (!mounted || !_bannerCtrl.hasClients) return;
     final next = (_bannerPage + 1) % _banners.length;
@@ -76,11 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(seconds: 3), _autoScroll);
   }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _bannerCtrl.dispose();
-    super.dispose();
+  void _toggleFavorite(RoomModel room) {
+    context.read<FavoriteProvider>().toggleFavorite(room.id);
   }
 
   List<RoomModel> _applyFilters(List<RoomModel> rooms, PreferenceProvider pref) {
@@ -116,244 +121,259 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = UserModel.currentUser;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
+    final favoriteProvider = context.watch<FavoriteProvider>();
     final filtered = _applyFilters(roomProvider.activePublicRooms, pref);
 
     return Scaffold(
       backgroundColor: AppColors.mintLight,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Chào buổi sáng,',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          user.name,
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.teal, width: 2),
-                      ),
-                      child: CircleAvatar(
-                        radius: 24,
-                        backgroundImage: NetworkImage(user.profileImageUrl),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.blue.withOpacity(0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'Tìm kiếm phòng trọ, khu vực...',
-                      hintStyle: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.teal,
-                        size: 22,
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? GestureDetector(
-                              onTap: () {
-                                _searchCtrl.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                              child: const Icon(
-                                Icons.close_rounded,
-                                color: AppColors.textSecondary,
-                                size: 20,
-                              ),
-                            )
-                          : GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SearchResultScreen(),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.tune_rounded,
-                                color: AppColors.teal,
-                                size: 20,
-                              ),
-                            ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on,
-                      color: AppColors.teal,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      user.location,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: AppColors.textSecondary,
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              _buildBannerCards(),
-
-              const SizedBox(height: 16),
-
-              _buildCategoryFilter(),
-
-              const SizedBox(height: 4),
-
-              SectionTitle(
-                title: pref.completed ? 'Gợi ý cho bạn ✨' : 'Gợi ý cho bạn',
-                actionText: 'Xem tất cả',
-                onActionTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SearchResultScreen(),
-                  ),
-                ),
-              ),
-
-              SizedBox(
-                height: 360,
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.search_off_rounded,
-                              size: 60,
-                              color: AppColors.teal.withOpacity(0.2),
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Không tìm thấy phòng nào',
+                            Text(
+                              'Chào buổi sáng,',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              user.name,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) => RoomCard(
-                          room: filtered[i],
-                          isHorizontal: true,
-                          onFavoriteTap: () => context
-                              .read<RoomProvider>()
-                              .toggleFavorite(filtered[i].id),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  RoomDetailScreen(room: filtered[i]),
-                            ),
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.teal, width: 2),
+                          ),
+                          child: CircleAvatar(
+                            radius: 24,
+                            backgroundImage: NetworkImage(user.profileImageUrl),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.blue.withOpacity(0.06),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Tìm kiếm phòng trọ, khu vực...',
+                          hintStyle: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.teal,
+                            size: 22,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? GestureDetector(
+                                  onTap: () {
+                                    _searchCtrl.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    color: AppColors.textSecondary,
+                                    size: 20,
+                                  ),
+                                )
+                              : GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const SearchResultScreen(),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.tune_rounded,
+                                    color: AppColors.teal,
+                                    size: 20,
+                                  ),
+                                ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
                         ),
                       ),
-              ),
+                    ),
+                  ),
 
-              SectionTitle(
-                title: 'Phòng gần đây',
-                actionText: 'Xem bản đồ',
-                onActionTap: () {},
-              ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: AppColors.teal,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          user.location,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: AppColors.textSecondary,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
 
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: filtered.length < 2 ? filtered.length : 2,
-                itemBuilder: (_, i) {
-                  final room = filtered[filtered.length - 1 - i];
-                  return RoomCard(
-                    room: room,
-                    onFavoriteTap: () =>
-                        context.read<RoomProvider>().toggleFavorite(room.id),
-                    onTap: () => Navigator.push(
+                  const SizedBox(height: 14),
+
+                  _buildBannerCards(),
+
+                  const SizedBox(height: 16),
+
+                  _buildCategoryFilter(),
+
+                  const SizedBox(height: 4),
+
+                  SectionTitle(
+                    title: pref.completed ? 'Gợi ý cho bạn ✨' : 'Gợi ý cho bạn',
+                    actionText: 'Xem tất cả',
+                    onActionTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => RoomDetailScreen(room: room),
+                        builder: (_) => const SearchResultScreen(),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
 
-              const SizedBox(height: 24),
-            ],
+                  SizedBox(
+                    height: 360,
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 60,
+                                  color: AppColors.teal.withOpacity(0.2),
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'Không tìm thấy phòng nào',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final room = filtered[i];
+                              final isFavorite = favoriteProvider.isFavorite(
+                                room.id,
+                              );
+
+                              return RoomCard(
+                                room: room.copyWith(isFavorite: isFavorite),
+                                isHorizontal: true,
+                                onFavoriteTap: () => _toggleFavorite(room),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RoomDetailScreen(room: room),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+
+                  SectionTitle(
+                    title: 'Phòng gần đây',
+                    actionText: 'Xem bản đồ',
+                    onActionTap: () {},
+                  ),
+
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: filtered.length < 3 ? filtered.length : 3,
+                    itemBuilder: (_, i) {
+                      final room = filtered[filtered.length - 1 - i];
+                      final isFavorite = favoriteProvider.isFavorite(room.id);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: RoomCard(
+                          room: room.copyWith(isFavorite: isFavorite),
+                          onFavoriteTap: () => _toggleFavorite(room),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RoomDetailScreen(room: room),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ),
         ),
       ),

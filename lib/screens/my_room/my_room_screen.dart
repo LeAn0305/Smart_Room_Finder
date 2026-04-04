@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
@@ -37,7 +39,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
 
   List<RoomModel> _applySort(List<RoomModel> list) {
     List<RoomModel> filtered = _searchQuery.isEmpty
-        ? list
+        ? List.from(list)
         : list
             .where(
               (r) =>
@@ -71,7 +73,9 @@ class _MyRoomScreenState extends State<MyRoomScreen>
     context.read<RoomProvider>().toggleActive(room.id);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(room.isActive ? 'Đã ẩn "${room.title}"' : 'Đã hiện "${room.title}"'),
+        content: Text(
+          room.isActive ? 'Đã ẩn "${room.title}"' : 'Đã hiện "${room.title}"',
+        ),
         backgroundColor: AppColors.tealDark,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -222,9 +226,8 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                     children: [
                       Icon(
                         o.$2,
-                        color: sel
-                            ? AppColors.teal
-                            : AppColors.textSecondary,
+                        color:
+                            sel ? AppColors.teal : AppColors.textSecondary,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -232,9 +235,8 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                         o.$3,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: sel
-                              ? AppColors.tealDark
-                              : AppColors.textPrimary,
+                          color:
+                              sel ? AppColors.tealDark : AppColors.textPrimary,
                         ),
                       ),
                       const Spacer(),
@@ -261,7 +263,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
     final allRooms = provider.allRooms;
     final activeRooms = _applySort(provider.myActiveRooms);
     final hiddenRooms = _applySort(provider.myHiddenRooms);
-    final draftRooms = provider.myDraftRooms;
+    final draftRooms = _applySort(provider.myDraftRooms);
 
     return Scaffold(
       body: Container(
@@ -402,9 +404,19 @@ class _MyRoomScreenState extends State<MyRoomScreen>
             AppColors.teal,
           ),
           const SizedBox(width: 8),
-          _statChip(Icons.visibility_rounded, '$totalViews', 'Lượt xem', Colors.blue),
+          _statChip(
+            Icons.visibility_rounded,
+            '$totalViews',
+            'Lượt xem',
+            Colors.blue,
+          ),
           const SizedBox(width: 8),
-          _statChip(Icons.phone_rounded, '$totalContacts', 'Liên hệ', Colors.green),
+          _statChip(
+            Icons.phone_rounded,
+            '$totalContacts',
+            'Liên hệ',
+            Colors.green,
+          ),
           const SizedBox(width: 8),
           _statChip(
             Icons.warning_amber_rounded,
@@ -610,21 +622,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
-                child: Image.asset(
-                  room.imageUrl,
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 150,
-                    color: AppColors.mintSoft,
-                    child: const Icon(
-                      Icons.image_not_supported_rounded,
-                      color: AppColors.teal,
-                      size: 40,
-                    ),
-                  ),
-                ),
+                child: _buildRoomImage(room.imageUrl),
               ),
               Positioned(
                 top: 10,
@@ -745,9 +743,17 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _miniStat(Icons.visibility_rounded, '${room.viewCount}', Colors.blue),
+                    _miniStat(
+                      Icons.visibility_rounded,
+                      '${room.viewCount}',
+                      Colors.blue,
+                    ),
                     const SizedBox(width: 12),
-                    _miniStat(Icons.phone_rounded, '${room.contactCount}', Colors.green),
+                    _miniStat(
+                      Icons.phone_rounded,
+                      '${room.contactCount}',
+                      Colors.green,
+                    ),
                     if (room.area != null) ...[
                       const SizedBox(width: 12),
                       _miniStat(
@@ -758,7 +764,11 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                     ],
                     if (room.bedrooms != null) ...[
                       const SizedBox(width: 12),
-                      _miniStat(Icons.bed_rounded, '${room.bedrooms} PN', Colors.purple),
+                      _miniStat(
+                        Icons.bed_rounded,
+                        '${room.bedrooms} PN',
+                        Colors.purple,
+                      ),
                     ],
                   ],
                 ),
@@ -813,6 +823,44 @@ class _MyRoomScreenState extends State<MyRoomScreen>
       ),
     );
   }
+
+  Widget _buildRoomImage(String imgPath) {
+    if (imgPath.startsWith('assets/')) {
+      return Image.asset(
+        imgPath,
+        height: 150,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    } else if (imgPath.startsWith('http') || kIsWeb) {
+      return Image.network(
+        imgPath,
+        height: 150,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    } else {
+      return Image.file(
+        File(imgPath),
+        height: 150,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    }
+  }
+
+  Widget _errorImage() => Container(
+        height: 150,
+        color: AppColors.mintSoft,
+        child: const Icon(
+          Icons.image_not_supported_rounded,
+          color: AppColors.teal,
+          size: 40,
+        ),
+      );
 
   Widget _miniStat(IconData icon, String value, Color color) {
     return Row(

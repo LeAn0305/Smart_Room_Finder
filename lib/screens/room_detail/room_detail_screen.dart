@@ -1,9 +1,12 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final RoomModel room;
+
   const RoomDetailScreen({super.key, required this.room});
 
   @override
@@ -21,12 +24,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       'assets/images/room_muji_studio.png',
       'assets/images/room_apartment_horizon.png',
     ].where((e) => e != widget.room.imageUrl).take(3).toList();
+
     return [...base, ...extras];
   }
 
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
+    final isWideScreen = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -37,189 +42,192 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildImageSection(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                _buildImageSection(isWideScreen),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isWideScreen ? 900 : double.infinity,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.mintSoft,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              room.typeString.toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.tealDark,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: Colors.orangeAccent,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                room.rating.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textPrimary,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.mintSoft,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  room.typeString.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppColors.tealDark,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.2,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '(124)',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary.withOpacity(0.7),
-                                  fontWeight: FontWeight.w600,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.orangeAccent,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    room.rating.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(124)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary.withOpacity(
+                                        0.7,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            room.title,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: AppColors.teal,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  room.address,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      Text(
-                        room.title,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            color: AppColors.teal,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              room.address,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          const SizedBox(height: 16),
+                          _buildQuickStats(room),
+                          const SizedBox(height: 20),
+                          const Divider(color: AppColors.mintSoft),
+                          const SizedBox(height: 20),
+                          _buildHostSection(),
+                          const SizedBox(height: 20),
+                          const Divider(color: AppColors.mintSoft),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Mô tả chi tiết',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          Text(
+                            room.description,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: AppColors.textSecondary.withOpacity(0.9),
+                              height: 1.7,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Divider(color: AppColors.mintSoft),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Tiện ích căn phòng',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: room.amenities
+                                .map(
+                                  (a) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: AppColors.mintSoft,
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.03),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _amenityIcon(a),
+                                          size: 18,
+                                          color: AppColors.teal,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          a,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-
-                      _buildQuickStats(room),
-                      const SizedBox(height: 20),
-                      const Divider(color: AppColors.mintSoft),
-                      const SizedBox(height: 20),
-
-                      _buildHostSection(),
-                      const SizedBox(height: 20),
-                      const Divider(color: AppColors.mintSoft),
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        'Mô tả chi tiết',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        room.description,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: AppColors.textSecondary.withOpacity(0.9),
-                          height: 1.7,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Divider(color: AppColors.mintSoft),
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        'Tiện ích căn phòng',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: room.amenities
-                            .map(
-                              (a) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: AppColors.mintSoft,
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.03),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _amenityIcon(a),
-                                      size: 18,
-                                      color: AppColors.teal,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      a,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -357,76 +365,126 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     );
   }
 
-  Widget _buildImageSection() {
+  Widget _buildImageSection(bool isWideScreen) {
     final images = _images;
+    final mainImage = images[_selectedImage];
 
     return Column(
       children: [
         Hero(
           tag: 'room_image_${widget.room.id}',
-          child: Container(
-            height: 300,
+          child: SizedBox(
+            height: isWideScreen ? 420 : 300,
             width: double.infinity,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: images[_selectedImage].startsWith('assets/')
-                    ? AssetImage(images[_selectedImage]) as ImageProvider
-                    : NetworkImage(images[_selectedImage]),
-                fit: BoxFit.cover,
-              ),
-            ),
+            child: _buildDisplayImage(mainImage),
           ),
         ),
         Container(
           color: AppColors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: List.generate(images.length, (i) {
-              final sel = _selectedImage == i;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedImage = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(right: 10),
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: sel ? AppColors.teal : Colors.transparent,
-                      width: 2.5,
-                    ),
-                    boxShadow: sel
-                        ? [
-                            BoxShadow(
-                              color: AppColors.teal.withOpacity(0.3),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
-                      images[i],
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: AppColors.mintSoft,
-                        child: const Icon(
-                          Icons.image_rounded,
-                          color: AppColors.teal,
-                        ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(images.length, (i) {
+                final sel = _selectedImage == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedImage = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 10),
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: sel ? AppColors.teal : Colors.transparent,
+                        width: 2.5,
                       ),
+                      boxShadow: sel
+                          ? [
+                              BoxShadow(
+                                color: AppColors.teal.withOpacity(0.3),
+                                blurRadius: 8,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: _buildThumbImage(images[i]),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ],
     );
   }
+
+  Widget _buildDisplayImage(String imgPath) {
+    if (imgPath.startsWith('assets/')) {
+      return Image.asset(
+        imgPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    } else if (imgPath.startsWith('http') || kIsWeb) {
+      return Image.network(
+        imgPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    } else {
+      return Image.file(
+        File(imgPath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorImage(),
+      );
+    }
+  }
+
+  Widget _buildThumbImage(String imgPath) {
+    if (imgPath.startsWith('assets/')) {
+      return Image.asset(
+        imgPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorThumb(),
+      );
+    } else if (imgPath.startsWith('http') || kIsWeb) {
+      return Image.network(
+        imgPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorThumb(),
+      );
+    } else {
+      return Image.file(
+        File(imgPath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _errorThumb(),
+      );
+    }
+  }
+
+  Widget _errorImage() => Container(
+        color: AppColors.mintSoft,
+        child: const Center(
+          child: Icon(
+            Icons.image_rounded,
+            color: AppColors.teal,
+            size: 42,
+          ),
+        ),
+      );
+
+  Widget _errorThumb() => Container(
+        color: AppColors.mintSoft,
+        child: const Icon(
+          Icons.image_rounded,
+          color: AppColors.teal,
+        ),
+      );
 
   Widget _buildQuickStats(RoomModel room) {
     final stats = [

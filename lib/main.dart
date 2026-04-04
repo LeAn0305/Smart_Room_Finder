@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/firebase_options.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => RoomProvider()),
         ChangeNotifierProvider(create: (_) => PreferenceProvider()),
+        ChangeNotifierProvider(create: (_) => FavoriteProvider()),
       ],
       child: const MyApp(),
     ),
@@ -36,25 +38,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final langProvider = context.watch<LanguageProvider>();
+
     return MaterialApp(
-  debugShowCheckedModeBanner: false,
-  locale: langProvider.locale,
-  supportedLocales: LanguageProvider.supportedLocales,
-  localizationsDelegates: const [
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  scrollBehavior: const MaterialScrollBehavior().copyWith(
-    dragDevices: {
-      PointerDeviceKind.touch,
-      PointerDeviceKind.mouse,
-      PointerDeviceKind.trackpad,
-    },
-  ),
-  home: SplashScreen(nextScreen: const WelcomeScreen()),
-);
+      debugShowCheckedModeBanner: false,
+      locale: langProvider.locale,
+      supportedLocales: LanguageProvider.supportedLocales,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+        },
+      ),
+      home: SplashScreen(nextScreen: const WelcomeScreen()),
+    );
   }
-
 }
-
