@@ -7,11 +7,8 @@ import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
-//import 'package:smart_room_finder/screens/main_navigation_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
-//import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-//import 'package:smart_room_finder/services/local_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -173,7 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const PreferenceScreen()),
         (route) => false,
       );
-
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +214,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 60),
-
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
@@ -241,9 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 40),
-
                     const Text(
                       'Chào mừng trở lại! 👋',
                       style: TextStyle(
@@ -261,9 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 1.5,
                       ),
                     ),
-
                     const SizedBox(height: 36),
-
                     _buildInputField(
                       controller: _emailController,
                       label: 'Email',
@@ -273,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       errorText: _emailError,
                     ),
                     const SizedBox(height: 20),
-
                     _buildInputField(
                       controller: _passwordController,
                       label: 'Mật khẩu',
@@ -288,9 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       errorText: _passwordError,
                     ),
-
                     const SizedBox(height: 8),
-
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -309,9 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -343,9 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey[300])),
@@ -362,9 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(child: Divider(color: Colors.grey[300])),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
                     Row(
                       children: [
                         Expanded(
@@ -393,7 +375,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-
                     if (!kIsWeb && Platform.isIOS) ...[
                       const SizedBox(height: 12),
                       GestureDetector(
@@ -408,8 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.apple,
-                                  color: Colors.white, size: 26),
+                              Icon(Icons.apple, color: Colors.white, size: 26),
                               SizedBox(width: 10),
                               Text(
                                 'Đăng nhập với Apple',
@@ -424,9 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
-
                     const SizedBox(height: 32),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -451,7 +429,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 40),
                   ],
                 ),

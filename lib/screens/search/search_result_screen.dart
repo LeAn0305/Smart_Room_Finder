@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
@@ -15,9 +17,9 @@ class SearchResultScreen extends StatefulWidget {
 
 class _SearchResultScreenState extends State<SearchResultScreen> {
   late TextEditingController _searchController;
-  List<RoomModel> _filteredRooms = RoomModel.sampleRooms;
+  List<RoomModel> _filteredRooms = [];
   String _selectedType = 'Tất cả';
-  final List<String> _types = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
+  final List<String> types = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
 
   @override
   void initState() {
@@ -27,8 +29,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   void _applyFilters() {
+    final allRooms = context.read<RoomProvider>().activePublicRooms;
     setState(() {
-      _filteredRooms = RoomModel.sampleRooms.where((room) {
+      _filteredRooms = allRooms.where((room) {
         final matchesSearch = room.title.toLowerCase().contains(_searchController.text.toLowerCase()) ||
             room.address.toLowerCase().contains(_searchController.text.toLowerCase());
         final matchesType = _selectedType == 'Tất cả' || room.typeString == _selectedType;
@@ -108,13 +111,13 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _types.length,
+              itemCount: types.length,
               itemBuilder: (context, index) {
-                final isSelected = _selectedType == _types[index];
+                final isSelected = _selectedType == types[index];
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _selectedType = _types[index];
+                      _selectedType = types[index];
                       _applyFilters();
                     });
                   },
@@ -132,7 +135,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      _types[index],
+                      types[index],
                       style: TextStyle(
                         color: isSelected ? AppColors.white : AppColors.textSecondary,
                         fontWeight: FontWeight.w700,

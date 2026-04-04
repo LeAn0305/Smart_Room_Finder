@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 
 class PostRoomScreen extends StatefulWidget {
   final RoomModel? editRoom;
@@ -61,6 +63,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     final room = _buildRoom(isDraft: true);
     setState(() => _isLoading = false);
     if (mounted) {
+      if (isEditing) {
+        context.read<RoomProvider>().updateRoom(room);
+      } else {
+        context.read<RoomProvider>().addRoom(room);
+      }
       Navigator.pop(context, room);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Da luu ban nhap'),
@@ -76,7 +83,19 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
     final room = _buildRoom(isDraft: false);
     setState(() => _isLoading = false);
-    if (mounted) Navigator.pop(context, room);
+    if (mounted) {
+      if (isEditing) {
+        context.read<RoomProvider>().updateRoom(room);
+      } else {
+        context.read<RoomProvider>().addRoom(room);
+      }
+      Navigator.pop(context, room);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isEditing ? 'Đã cập nhật phòng' : 'Đã đăng phòng thành công'),
+        backgroundColor: AppColors.teal,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   RoomModel _buildRoom({required bool isDraft}) {
