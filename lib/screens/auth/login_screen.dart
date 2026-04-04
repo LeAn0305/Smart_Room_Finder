@@ -6,6 +6,7 @@ import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/screens/main_navigation_screen.dart';
+import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_room_finder/services/google_auth_service.dart';
 import 'package:smart_room_finder/services/local_auth_service.dart';
@@ -68,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _goToHome() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
       (route) => false,
     );
   }
@@ -102,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
         (route) => false,
       );
     } catch (e) {

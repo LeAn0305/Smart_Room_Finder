@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
+import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/screens/splash/splash_screen.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => LanguageProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider(create: (_) => PreferenceProvider()),
+      ],
       child: const MyApp(),
     ),
   );
