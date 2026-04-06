@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:smart_room_finder/core/config/google_oauth_config.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
@@ -33,15 +34,16 @@ class AuthService {
   static Future<UserCredential> registerWithEmail(
     String email,
     String password,
-    String name,
-  ) async {
+    String name, {
+    UserRole role = UserRole.tenant,
+  }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
 
     await cred.user?.updateDisplayName(name);
-    await _saveUserToFirestore(cred.user!, name: name);
+    await _saveUserToFirestore(cred.user!, name: name, role: role);
     return cred;
   }
 
@@ -61,7 +63,7 @@ class AuthService {
   }
 
   // Lưu user vào Firestore
-  static Future<void> _saveUserToFirestore(User user, {String? name}) async {
+  static Future<void> _saveUserToFirestore(User user, {String? name, UserRole role = UserRole.tenant}) async {
     final doc = _firestore.collection('users').doc(user.uid);
     final snapshot = await doc.get();
 
@@ -71,6 +73,7 @@ class AuthService {
         'name': name ?? user.displayName ?? '',
         'email': user.email ?? '',
         'photoUrl': user.photoURL ?? '',
+        'role': role == UserRole.landlord ? 'landlord' : 'tenant',
         'createdAt': FieldValue.serverTimestamp(),
         'lastLogin': FieldValue.serverTimestamp(),
       });

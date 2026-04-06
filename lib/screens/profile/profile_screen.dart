@@ -11,12 +11,11 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
-import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
-//import 'package:smart_room_finder/screens/settings/settings_screen.dart';
 import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
-import 'package:smart_room_finder/screens/auth/verify_account_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
+import 'package:smart_room_finder/screens/chat/chat_screen.dart';
+import 'package:smart_room_finder/screens/application/application_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -36,10 +35,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   File? _avatarFile;
 
-  // Stats tính từ dữ liệu mẫu  
-  int get _totalFavorites =>
-      RoomModel.sampleRooms.where((r) => r.isFavorite).length;
+  int get _totalFavorites => RoomModel.sampleRooms.where((r) => r.isFavorite).length;
   int get _totalRooms => RoomModel.sampleRooms.length;
+  int get _totalViews => RoomModel.sampleRooms.fold(0, (s, r) => s + r.viewCount);
+  int get _totalContacts => RoomModel.sampleRooms.fold(0, (s, r) => s + r.contactCount);
 
   @override
   void initState() {
@@ -245,48 +244,35 @@ class _ProfileScreenState extends State<ProfileScreen>
                         subtitle: lang.tr('change_password_subtitle'),
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
                       ),
-                      _buildMenuItem(
-                        icon: Icons.shield_outlined,
-                        label: lang.tr('verify_account'),
-                        subtitle: lang.tr('verify_account_subtitle'),
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyAccountScreen())),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.teal.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(lang.tr('not_verified'),
-                              style: const TextStyle(fontSize: 11, color: AppColors.tealDark, fontWeight: FontWeight.w600)),
-                        ),
-                      ),
+
                     ]),
                     const SizedBox(height: 16),
                     _buildSectionLabel(lang.tr('section_activity')),
                     _buildMenuCard(children: [
+                      if (_user.isLandlord)
+                        _buildMenuItem(
+                          icon: Icons.home_work_outlined,
+                          label: lang.tr('my_rooms'),
+                          subtitle: '$_totalRooms ${lang.tr('profile_rooms_posted')}',
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen())),
+                        ),
                       _buildMenuItem(
-                        icon: Icons.home_work_outlined,
-                        label: lang.tr('my_rooms'),
-                        subtitle: '$_totalRooms ${lang.tr('profile_rooms_posted')}',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen()));
-                        },
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: lang.tr('chat'),
+                        subtitle: lang.tr('chat_subtitle'),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
                       ),
                       _buildMenuItem(
-                        icon: Icons.favorite_border_rounded,
-                        label: lang.tr('saved_rooms'),
-                        subtitle: '$_totalFavorites ${lang.tr('profile_favorites')}',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                        },
+                        icon: Icons.assignment_outlined,
+                        label: lang.tr('applications'),
+                        subtitle: lang.tr('applications_subtitle'),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplicationScreen())),
                       ),
                       _buildMenuItem(
                         icon: Icons.history_rounded,
                         label: lang.tr('view_history'),
                         subtitle: lang.tr('view_history_subtitle'),
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewHistoryScreen()));
-                        },
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewHistoryScreen())),
                       ),
                     ]),
                     const SizedBox(height: 16),
@@ -490,6 +476,41 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        // Role badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: _user.isLandlord
+                ? AppColors.teal.withOpacity(0.12)
+                : Colors.blue.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _user.isLandlord
+                  ? AppColors.teal.withOpacity(0.4)
+                  : Colors.blue.withOpacity(0.4),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _user.isLandlord ? Icons.home_work_rounded : Icons.person_search_rounded,
+                size: 14,
+                color: _user.isLandlord ? AppColors.tealDark : Colors.blue[700],
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _user.isLandlord ? 'Chủ phòng' : 'Người thuê',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _user.isLandlord ? AppColors.tealDark : Colors.blue[700],
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -505,21 +526,28 @@ class _ProfileScreenState extends State<ProfileScreen>
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white, width: 2),
           boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 15,
-                offset: const Offset(0, 6)),
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 6)),
           ],
         ),
-        child: Row(
-          children: [
-            _buildStatItem(value: '$_totalRooms', label: lang.tr('profile_rooms_posted')),
-            _buildStatDivider(),
-            _buildStatItem(value: '$_totalFavorites', label: lang.tr('profile_favorites')),
-            _buildStatDivider(),
-            _buildStatItem(value: '4.8 ★', label: lang.tr('profile_rating')),
-          ],
-        ),
+        child: _user.isLandlord
+            ? Row(
+                children: [
+                  _buildStatItem(value: '$_totalRooms', label: lang.tr('profile_rooms_posted')),
+                  _buildStatDivider(),
+                  _buildStatItem(value: '$_totalViews', label: 'Lượt xem'),
+                  _buildStatDivider(),
+                  _buildStatItem(value: '$_totalContacts', label: 'Liên hệ'),
+                ],
+              )
+            : Row(
+                children: [
+                  _buildStatItem(value: '$_totalRooms', label: lang.tr('profile_rooms_posted')),
+                  _buildStatDivider(),
+                  _buildStatItem(value: '$_totalFavorites', label: lang.tr('profile_favorites')),
+                  _buildStatDivider(),
+                  _buildStatItem(value: '4.8 ★', label: lang.tr('profile_rating')),
+                ],
+              ),
       ),
     );
   }

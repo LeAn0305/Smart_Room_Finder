@@ -9,22 +9,31 @@ import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
+import 'package:smart_room_finder/screens/onboarding/landlord_preference_screen.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? initialEmail;
+  const LoginScreen({super.key, this.initialEmail});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
   final _passwordController = TextEditingController();
 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   String? _emailError;
   String? _passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail ?? '');
+  }
 
   @override
   void dispose() {
@@ -34,9 +43,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _goToHome() {
+    final role = UserModel.currentUser.role;
+    final screen = role == UserRole.landlord
+        ? const LandlordPreferenceScreen()
+        : const PreferenceScreen();
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      MaterialPageRoute(builder: (_) => screen),
       (route) => false,
     );
   }
