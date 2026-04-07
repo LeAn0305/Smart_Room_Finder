@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+//import 'package:smart_room_finder/models/user_model.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PostRoomScreen extends StatefulWidget {
   final RoomModel? editRoom;
@@ -129,28 +131,41 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   }
 
   RoomModel _buildRoom({required bool isDraft}) {
-    return RoomModel(
-      id: isEditing ? widget.editRoom!.id : DateTime.now().millisecondsSinceEpoch.toString(),
-      title: _titleCtrl.text.trim(),
-      description: _descCtrl.text.trim(),
-      price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
-      address: _addressCtrl.text.trim(),
-      imageUrl: _images.isNotEmpty ? _images.first : 'assets/images/room_studio_luxury.png',
-      images: _images,
-      rating: isEditing ? widget.editRoom!.rating : 0.0,
-      type: _selectedType,
-      location: 'TP. Ho Chi Minh',
-      amenities: _selectedAmenities,
-      area: double.tryParse(_areaCtrl.text.trim()),
-      bedrooms: _bedrooms,
-      direction: _selectedDirection,
-      isVerified: false,
-      isActive: !isDraft,
-      isDraft: isDraft,
-      postedAt: DateTime.now(),
-      expiresAt: isDraft ? null : DateTime.now().add(Duration(days: _durationDays)),
-    );
-  }
+  final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  return RoomModel(
+    id: isEditing
+        ? widget.editRoom!.id
+        : DateTime.now().millisecondsSinceEpoch.toString(),
+    ownerId: isEditing
+        ? widget.editRoom!.ownerId
+        : currentUid,
+    title: _titleCtrl.text.trim(),
+    description: _descCtrl.text.trim(),
+    price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
+    address: _addressCtrl.text.trim(),
+    imageUrl: _images.isNotEmpty
+        ? _images.first
+        : 'assets/images/room_studio_luxury.png',
+    images: _images,
+    rating: isEditing ? widget.editRoom!.rating : 0.0,
+    type: _selectedType,
+    location: 'TP. Ho Chi Minh',
+    amenities: _selectedAmenities,
+    area: double.tryParse(_areaCtrl.text.trim()),
+    bedrooms: _bedrooms,
+    direction: _selectedDirection,
+    isVerified: isEditing ? widget.editRoom!.isVerified : false,
+    isActive: !isDraft,
+    viewCount: isEditing ? widget.editRoom!.viewCount : 0,
+    contactCount: isEditing ? widget.editRoom!.contactCount : 0,
+    isFavorite: isEditing ? widget.editRoom!.isFavorite : false,
+    isDraft: isDraft,
+    postedAt: isEditing ? widget.editRoom!.postedAt : DateTime.now(),
+    updatedAt: isEditing ? DateTime.now() : null,
+    expiresAt: isDraft ? null : DateTime.now().add(Duration(days: _durationDays)),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

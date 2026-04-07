@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
-import 'package:smart_room_finder/models/room_model.dart';
+//import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
@@ -17,6 +17,11 @@ import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/verify_account_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
+
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
+
+import 'package:smart_room_finder/services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,17 +36,46 @@ class _ProfileScreenState extends State<ProfileScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  final UserModel _user = UserModel.currentUser;
+  UserModel? _user;
+  bool _isLoadingUser = true;
   bool _notificationsEnabled = true;
 
   File? _avatarFile;
 
   // Stats tính từ dữ liệu mẫu  
-  int get _totalFavorites =>
-      RoomModel.sampleRooms.where((r) => r.isFavorite).length;
-  int get _totalRooms => RoomModel.sampleRooms.length;
+  int _getTotalFavorites(BuildContext context) {
+    return context.watch<FavoriteProvider>().favoriteIds.length;
+  }
 
-  @override
+  int _getTotalRooms(BuildContext context) {
+  final provider = context.watch<RoomProvider>();
+  return provider.myActiveRooms.length +
+      provider.myHiddenRooms.length +
+      provider.myDraftRooms.length;
+  }
+
+  Future<void> _loadUserProfile() async {
+  try {
+    final user = await AuthService.getCurrentUserData();
+
+    if (!mounted) return;
+
+    setState(() {
+      _user = user;
+      _isLoadingUser = false;
+    });
+  } catch (e) {
+    debugPrint('❌ Lỗi khi load user profile: $e');
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingUser = false;
+    });
+  }
+}
+
+ @override
   void initState() {
     super.initState();
     _animController = AnimationController(
@@ -52,6 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
+
+    _loadUserProfile();
   }
 
   @override
@@ -148,58 +184,117 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  void _onLogout() {
-    final lang = context.read<LanguageProvider>();
-    HapticFeedback.mediumImpact();
-    showDialog(
-      context: context,
-      barrierColor: Colors.black26,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: Colors.white,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
+void _onLogout() {
+  final lang = context.read<LanguageProvider>();
+  HapticFeedback.mediumImpact();
+
+  showDialog(
+    context: context,
+    barrierColor: Colors.black26,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      backgroundColor: Colors.white,
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 12),
-            Text(lang.tr('logout'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          ],
-        ),
-        content: Text(lang.tr('logout_confirm'),
-            style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black54)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(lang.tr('cancel'),
-                style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+            child: const Icon(
+              Icons.logout_rounded,
+              color: Colors.redAccent,
+              size: 22,
+            ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
+          const SizedBox(width: 12),
+          Text(
+            lang.tr('logout'),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
             ),
-            child: Text(lang.tr('logout'), style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
-    );
-  }
+      content: Text(
+        lang.tr('logout_confirm'),
+        style: const TextStyle(
+          fontSize: 15,
+          height: 1.5,
+          color: Colors.black54,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(
+            lang.tr('cancel'),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              Navigator.pop(dialogContext);
+
+              await AuthService.signOut();
+
+              if (!mounted) return;
+
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WelcomeScreen(),
+                ),
+                (route) => false,
+              );
+            } catch (e) {
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Đăng xuất thất bại: $e'),
+                  backgroundColor: Colors.redAccent,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.redAccent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+          child: Text(
+            lang.tr('logout'),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
+    final totalFavorites = _getTotalFavorites(context);
+    final totalRooms = _getTotalRooms(context);
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -229,7 +324,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const SizedBox(height: 24),
                     _buildAvatarSection(),
                     const SizedBox(height: 20),
-                    _buildStatsRow(),
+                    _buildStatsRow(
+                      totalRooms: totalRooms,
+                      totalFavorites: totalFavorites,
+                    ),
                     const SizedBox(height: 24),
                     _buildSectionLabel(lang.tr('section_account')),
                     _buildMenuCard(children: [
@@ -267,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildMenuItem(
                         icon: Icons.home_work_outlined,
                         label: lang.tr('my_rooms'),
-                        subtitle: '$_totalRooms ${lang.tr('profile_rooms_posted')}',
+                        subtitle: '$totalRooms ${lang.tr('profile_rooms_posted')}',
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen()));
                         },
@@ -275,7 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildMenuItem(
                         icon: Icons.favorite_border_rounded,
                         label: lang.tr('saved_rooms'),
-                        subtitle: '$_totalFavorites ${lang.tr('profile_favorites')}',
+                        subtitle: '$totalFavorites ${lang.tr('profile_favorites')}',
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
                         },
@@ -380,77 +478,111 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAvatarSection() {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            // Glow effect
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.teal.withOpacity(0.22),
-                      blurRadius: 40,
-                      spreadRadius: 8),
-                ],
+  final displayName =
+      (_user?.name != null && _user!.name.trim().isNotEmpty)
+          ? _user!.name
+          : 'Người dùng';
+
+  final displayEmail =
+      (_user?.email != null && _user!.email.trim().isNotEmpty)
+          ? _user!.email
+          : 'Chưa có email';
+
+  final displayLocation =
+      (_user?.location != null && _user!.location.trim().isNotEmpty)
+          ? _user!.location
+          : 'Chưa cập nhật';
+
+  final displayImageUrl = _user?.profileImageUrl ?? '';
+
+  return Column(
+    children: [
+      Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.teal.withOpacity(0.22),
+                  blurRadius: 40,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [AppColors.teal, AppColors.blue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
-            // Avatar border + image
-            Container(
-              width: 112,
-              height: 112,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.teal, AppColors.blue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: CircleAvatar(
+                backgroundImage: _avatarFile != null
+                    ? FileImage(_avatarFile!)
+                    : (displayImageUrl.isNotEmpty
+                        ? NetworkImage(displayImageUrl)
+                        : null),
+                child: _avatarFile == null && displayImageUrl.isEmpty
+                    ? Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: CircleAvatar(
-                  backgroundImage: _avatarFile != null
-                      ? FileImage(_avatarFile!) as ImageProvider
-                      : NetworkImage(_user.profileImageUrl),
-                  backgroundColor: AppColors.mintGreen,
-                  onBackgroundImageError: (_, __) {},
+            ),
+          ),
+          Positioned(
+            bottom: 4,
+            right: 100,
+            child: GestureDetector(
+              onTap: _showImageSourcePicker,
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.teal,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.teal.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: Colors.white,
+                  size: 16,
                 ),
               ),
             ),
-            // Camera button
-            Positioned(
-              bottom: 4,
-              right: 100,
-              child: GestureDetector(
-                onTap: _showImageSourcePicker,
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: AppColors.teal,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                          color: AppColors.teal.withOpacity(0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded,
-                      color: Colors.white, size: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
+          ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      if (_isLoadingUser)
+        const CircularProgressIndicator(color: AppColors.teal)
+      else ...[
         Text(
-          _user.name,
+          displayName,
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -462,15 +594,19 @@ class _ProfileScreenState extends State<ProfileScreen>
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.email_outlined,
-                size: 14, color: AppColors.textSecondary),
+            const Icon(
+              Icons.email_outlined,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(width: 4),
             Text(
-              _user.email,
+              displayEmail,
               style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary.withOpacity(0.85),
-                  fontWeight: FontWeight.w500),
+                fontSize: 14,
+                color: AppColors.textSecondary.withOpacity(0.85),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -478,51 +614,69 @@ class _ProfileScreenState extends State<ProfileScreen>
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.location_on_outlined,
-                size: 14, color: AppColors.textSecondary),
+            const Icon(
+              Icons.location_on_outlined,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(width: 4),
             Text(
-              _user.location,
+              displayLocation,
               style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary.withOpacity(0.85),
-                  fontWeight: FontWeight.w500),
+                fontSize: 14,
+                color: AppColors.textSecondary.withOpacity(0.85),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
       ],
-    );
-  }
+    ],
+  );
+}
 
-  Widget _buildStatsRow() {
-    final lang = context.read<LanguageProvider>();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.8),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 15,
-                offset: const Offset(0, 6)),
-          ],
-        ),
-        child: Row(
-          children: [
-            _buildStatItem(value: '$_totalRooms', label: lang.tr('profile_rooms_posted')),
-            _buildStatDivider(),
-            _buildStatItem(value: '$_totalFavorites', label: lang.tr('profile_favorites')),
-            _buildStatDivider(),
-            _buildStatItem(value: '4.8 ★', label: lang.tr('profile_rating')),
-          ],
-        ),
+  Widget _buildStatsRow({
+  required int totalRooms,
+  required int totalFavorites,
+}) {
+  final lang = context.read<LanguageProvider>();
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-    );
-  }
+      child: Row(
+        children: [
+          _buildStatItem(
+            value: '$totalRooms',
+            label: lang.tr('profile_rooms_posted'),
+          ),
+          _buildStatDivider(),
+          _buildStatItem(
+            value: '$totalFavorites',
+            label: lang.tr('profile_favorites'),
+          ),
+          _buildStatDivider(),
+          _buildStatItem(
+            value: '4.8 ★',
+            label: lang.tr('profile_rating'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildStatItem({required String value, required String label}) {
     return Expanded(
@@ -663,9 +817,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _showEditProfile() {
     final lang = context.read<LanguageProvider>();
-    final nameController = TextEditingController(text: _user.name);
-    final emailController = TextEditingController(text: _user.email);
-    final locationController = TextEditingController(text: _user.location);
+    final nameController = TextEditingController(text: _user?.name ?? '');
+    final emailController = TextEditingController(text: _user?.email ?? '');
+    final locationController = TextEditingController(text: _user?.location ?? '');
 
     showModalBottomSheet(
       context: context,

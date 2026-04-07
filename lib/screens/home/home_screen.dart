@@ -60,17 +60,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
     _searchCtrl.addListener(
       () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()),
     );
-    Future.delayed(const Duration(seconds: 3), _autoScroll);
-  }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _bannerCtrl.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RoomProvider>().fetchRooms();
+      context.read<FavoriteProvider>().fetchFavorites();
+    });
+
+    Future.delayed(const Duration(seconds: 3), _autoScroll);
   }
 
   void _autoScroll() {
@@ -118,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = UserModel.currentUser;
+    final user = UserModel.sampleUsers.first;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -169,7 +170,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           child: CircleAvatar(
                             radius: 24,
-                            backgroundImage: NetworkImage(user.profileImageUrl),
+                            backgroundColor: AppColors.mintGreen,
+                            backgroundImage: user.profileImageUrl.isNotEmpty
+                                ? NetworkImage(user.profileImageUrl)
+                                : null,
+                            child: user.profileImageUrl.isEmpty
+                                ? Text(
+                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
                           ),
                         ),
                       ],

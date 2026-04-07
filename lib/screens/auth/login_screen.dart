@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthService.signInWithEmail(email, password);
-
+      debugPrint('UID hiện tại: ${AuthService.currentUser?.uid}');
       if (!mounted) return;
       _goToHome();
     } on FirebaseAuthException catch (e) {

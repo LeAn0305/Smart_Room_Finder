@@ -260,10 +260,13 @@ class _MyRoomScreenState extends State<MyRoomScreen>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<RoomProvider>();
-    final allRooms = provider.allRooms;
     final activeRooms = _applySort(provider.myActiveRooms);
     final hiddenRooms = _applySort(provider.myHiddenRooms);
     final draftRooms = _applySort(provider.myDraftRooms);
+    final myRooms = <RoomModel>[];
+      myRooms.addAll(activeRooms);
+      myRooms.addAll(hiddenRooms);
+      myRooms.addAll(draftRooms);
 
     return Scaffold(
       body: Container(
@@ -284,7 +287,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
           child: Column(
             children: [
               _buildHeader(),
-              _buildStats(allRooms),
+              _buildStats(myRooms),
               _buildSearchBar(),
               _buildTabBar(
                 activeRooms.length,

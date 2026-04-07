@@ -7,6 +7,7 @@ import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/emty_state.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 
 enum FavoriteSortOption { newest, priceLow, priceHigh, rating }
 
@@ -37,8 +38,14 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   void initState() {
     super.initState();
+
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<FavoriteProvider>().fetchFavorites();
     });
   }
 
@@ -48,44 +55,60 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     super.dispose();
   }
 
-  void _removeFromFavorite(RoomModel room) {
+  Future<void> _removeFromFavorite(RoomModel room) async {
     final lang = context.read<LanguageProvider>();
     final provider = context.read<FavoriteProvider>();
+
     setState(() {
       _selectedIds.remove(room.id);
     });
-    provider.removeFavorite(room.id);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${lang.tr('favorite_removed')}: "${room.title}"'),
-      backgroundColor: AppColors.tealDark,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      action: SnackBarAction(
-        label: lang.tr('favorite_undo'),
-        textColor: Colors.white,
-        onPressed: () => provider.addFavorite(room.id),
+
+    await provider.removeFavorite(room.id);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${lang.tr('favorite_removed')}: "${room.title}"'),
+        backgroundColor: AppColors.tealDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: SnackBarAction(
+          label: lang.tr('favorite_undo'),
+          textColor: Colors.white,
+          onPressed: () {
+            provider.addFavorite(room.id);
+          },
+        ),
       ),
-    ));
+    );
   }
 
-  void _deleteSelected() {
-    final lang = context.read<LanguageProvider>();
-    final provider = context.read<FavoriteProvider>();
-    final count = _selectedIds.length;
-    for (var id in _selectedIds) {
-      provider.removeFavorite(id);
+    Future<void> _deleteSelected() async {
+      final lang = context.read<LanguageProvider>();
+      final provider = context.read<FavoriteProvider>();
+      final count = _selectedIds.length;
+
+      for (final id in _selectedIds) {
+        await provider.removeFavorite(id);
+      }
+
+      setState(() {
+        _selectedIds.clear();
+        _isSelecting = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${lang.tr('delete_selected')}: $count'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
     }
-    setState(() {
-      _selectedIds.clear();
-      _isSelecting = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${lang.tr('delete_selected')}: $count'),
-      backgroundColor: Colors.redAccent,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
-  }
 
   void _toggleSelect(String id) {
     setState(() {
@@ -169,8 +192,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LanguageProvider>();
-    final provider = context.watch<FavoriteProvider>();
-    final allFavs = RoomModel.sampleRooms.where((r) => provider.isFavorite(r.id)).toList();
+    final favoriteProvider = context.watch<FavoriteProvider>();
+    final roomProvider = context.watch<RoomProvider>();
+
+    final allFavs = roomProvider.allRooms
+        .where((r) => favoriteProvider.isFavorite(r.id))
+        .toList();
 
     _filtered = _selectedType == null
         ? List.from(allFavs)
