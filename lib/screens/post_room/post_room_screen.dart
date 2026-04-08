@@ -26,12 +26,19 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   late TextEditingController _areaCtrl;
   RoomType _selectedType = RoomType.studio;
   RoomDirection? _selectedDirection;
+  String _selectedLocation = 'TP. Hồ Chí Minh';
   int _bedrooms = 1;
   int _durationDays = 30;
   final List<String> _selectedAmenities = [];
   bool _isLoading = false;
   List<String> _images = [];
   final ImagePicker _picker = ImagePicker();
+
+  final List<String> _locations = [
+    'Quận 1', 'Quận 3', 'Quận 7', 'Quận 10',
+    'Bình Thạnh', 'Tân Bình', 'Gò Vấp', 'Thủ Đức',
+    'Bình Chánh', 'Nhà Bè',
+  ];
 
   bool get isEditing => widget.editRoom != null;
 
@@ -53,6 +60,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     if (r != null) {
       _selectedType = r.type;
       _selectedDirection = r.direction;
+      _selectedLocation = r.location.isNotEmpty ? r.location : 'TP. Hồ Chí Minh';
       _bedrooms = r.bedrooms ?? 1;
       _selectedAmenities.addAll(r.amenities);
       if (r.images.isNotEmpty) {
@@ -91,18 +99,17 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
     final room = _buildRoom(isDraft: true);
+    if (isEditing) {
+      await context.read<RoomProvider>().updateRoomToFirebase(room);
+    } else {
+      await context.read<RoomProvider>().addRoomToFirebase(room);
+    }
     setState(() => _isLoading = false);
     if (mounted) {
-      if (isEditing) {
-        context.read<RoomProvider>().updateRoom(room);
-      } else {
-        context.read<RoomProvider>().addRoom(room);
-      }
       Navigator.pop(context, room);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Da luu ban nhap'),
+        content: Text('Đã lưu bản nháp'),
         backgroundColor: AppColors.teal,
         behavior: SnackBarBehavior.floating,
       ));
@@ -112,15 +119,14 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
     final room = _buildRoom(isDraft: false);
+    if (isEditing) {
+      await context.read<RoomProvider>().updateRoomToFirebase(room);
+    } else {
+      await context.read<RoomProvider>().addRoomToFirebase(room);
+    }
     setState(() => _isLoading = false);
     if (mounted) {
-      if (isEditing) {
-        context.read<RoomProvider>().updateRoom(room);
-      } else {
-        context.read<RoomProvider>().addRoom(room);
-      }
       Navigator.pop(context, room);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(isEditing ? 'Đã cập nhật phòng' : 'Đã đăng phòng thành công'),
@@ -150,7 +156,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     images: _images,
     rating: isEditing ? widget.editRoom!.rating : 0.0,
     type: _selectedType,
-    location: 'TP. Ho Chi Minh',
+    location: _selectedLocation,
     amenities: _selectedAmenities,
     area: double.tryParse(_areaCtrl.text.trim()),
     bedrooms: _bedrooms,
@@ -188,34 +194,36 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _buildImagePicker(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Thong tin co ban'),
+                    _sectionTitle('Thông tin cơ bản'),
                     const SizedBox(height: 12),
-                    _field(_titleCtrl, 'Ten phong / tieu de', Icons.title_rounded,
-                        validator: (v) => v!.isEmpty ? 'Vui long nhap ten phong' : null),
+                    _field(_titleCtrl, 'Tên phòng / tiêu đề', Icons.title_rounded,
+                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập tên phòng' : null),
                     const SizedBox(height: 12),
-                    _field(_descCtrl, 'Mo ta chi tiet', Icons.description_rounded, maxLines: 3,
-                        validator: (v) => v!.isEmpty ? 'Vui long nhap mo ta' : null),
+                    _field(_descCtrl, 'Mô tả chi tiết', Icons.description_rounded, maxLines: 3,
+                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập mô tả' : null),
                     const SizedBox(height: 20),
-                    _sectionTitle('Loai phong'),
+                    _sectionTitle('Loại phòng'),
                     const SizedBox(height: 12),
                     _buildTypeSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Gia & Dia chi'),
+                    _sectionTitle('Giá & Địa chỉ'),
                     const SizedBox(height: 12),
-                    _field(_priceCtrl, 'Gia thue (VND/thang)', Icons.attach_money_rounded,
+                    _field(_priceCtrl, 'Giá thuê (VND/tháng)', Icons.attach_money_rounded,
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (v) => v!.isEmpty ? 'Vui long nhap gia' : null),
+                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập giá' : null),
                     const SizedBox(height: 12),
-                    _field(_addressCtrl, 'Dia chi', Icons.location_on_rounded,
-                        validator: (v) => v!.isEmpty ? 'Vui long nhap dia chi' : null),
+                    _field(_addressCtrl, 'Địa chỉ', Icons.location_on_rounded,
+                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập địa chỉ' : null),
+                    const SizedBox(height: 12),
+                    _buildLocationSelector(),
                     const SizedBox(height: 8),
                     _buildMapPlaceholder(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Chi tiet phong'),
+                    _sectionTitle('Chi tiết phòng'),
                     const SizedBox(height: 12),
                     Row(children: [
-                      Expanded(child: _field(_areaCtrl, 'Dien tich (m2)', Icons.square_foot_rounded,
+                      Expanded(child: _field(_areaCtrl, 'Diện tích (m²)', Icons.square_foot_rounded,
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly])),
                       const SizedBox(width: 12),
@@ -224,11 +232,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                     const SizedBox(height: 12),
                     _buildDirectionSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Tien ich'),
+                    _sectionTitle('Tiện ích'),
                     const SizedBox(height: 12),
                     _buildAmenitiesSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Thoi han dang tin'),
+                    _sectionTitle('Thời hạn đăng tin'),
                     const SizedBox(height: 12),
                     _buildDurationSelector(),
                     const SizedBox(height: 28),
@@ -270,7 +278,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
               child: const Row(children: [
                 Icon(Icons.drafts_rounded, color: AppColors.textSecondary, size: 16),
                 SizedBox(width: 4),
-                Text('Luu nhap', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+                Text('Lưu nháp', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
             ),
           ),
@@ -336,6 +344,45 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         ]),
       ),
     ]);
+  }
+
+  Widget _buildLocationSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Khu vực', style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: _locations.map((loc) {
+            final sel = _selectedLocation == loc;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedLocation = loc),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.teal : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: sel ? AppColors.teal : AppColors.mintGreen, width: 1.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.location_on_rounded, size: 13, color: sel ? Colors.white : AppColors.teal),
+                    const SizedBox(width: 4),
+                    Text(loc, style: TextStyle(
+                      color: sel ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    )),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   Widget _buildMapPlaceholder() {

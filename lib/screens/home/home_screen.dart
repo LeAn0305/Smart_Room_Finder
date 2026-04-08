@@ -13,16 +13,28 @@ import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final void Function(String city)? onCityChanged;
+  const HomeScreen({super.key, this.onCityChanged});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _selectedCategory = 'Tất cả';
+  String _selectedCity = 'TP. Hồ Chí Minh';
+
+  final List<String> _cities = [
+    'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng',
+    'Huế', 'Đồng Nai', 'Bình Dương', 'Bà Rịa - Vũng Tàu', 'Long An',
+    'Tiền Giang', 'Kiên Giang', 'An Giang', 'Đắk Lắk', 'Lâm Đồng',
+    'Khánh Hòa', 'Bình Định', 'Quảng Nam', 'Quảng Ngãi', 'Nghệ An',
+    'Thanh Hóa', 'Hà Tĩnh', 'Quảng Bình', 'Quảng Trị', 'Quảng Ninh',
+    'Hải Dương', 'Bắc Ninh', 'Thái Nguyên', 'Lào Cai', 'Sơn La',
+    'Điện Biên', 'Cao Bằng', 'Lạng Sơn', 'Gia Lai',
+  ];
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  String _selectedCategory = 'Tất cả';
   int _bannerPage = 0;
   final PageController _bannerCtrl = PageController();
 
@@ -96,6 +108,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<RoomModel> _applyFilters(List<RoomModel> rooms, PreferenceProvider pref) {
     List<RoomModel> result = rooms;
 
+    // Filter theo thành phố đang chọn
+    if (_selectedCity != 'TP. Hồ Chí Minh') {
+      final cityFiltered = result.where((r) =>
+          r.location.toLowerCase().contains(_selectedCity.toLowerCase()) ||
+          r.address.toLowerCase().contains(_selectedCity.toLowerCase())).toList();
+      // Chỉ filter nếu có kết quả, không fallback
+      result = cityFiltered;
+    }
+
     if (_selectedCategory != 'Tất cả') {
       final typeMap = {
         'Chung cư': RoomType.apartment,
@@ -103,22 +124,78 @@ class _HomeScreenState extends State<HomeScreen> {
         'Nhà riêng': RoomType.house,
         'Biệt thự': RoomType.villa,
       };
-      result =
-          result.where((r) => r.type == typeMap[_selectedCategory]).toList();
+      result = result.where((r) => r.type == typeMap[_selectedCategory]).toList();
     }
 
     if (_searchQuery.isNotEmpty) {
-      result = result
-          .where(
-            (r) =>
-                r.title.toLowerCase().contains(_searchQuery) ||
-                r.address.toLowerCase().contains(_searchQuery) ||
-                r.location.toLowerCase().contains(_searchQuery),
-          )
-          .toList();
+      result = result.where((r) =>
+          r.title.toLowerCase().contains(_searchQuery) ||
+          r.address.toLowerCase().contains(_searchQuery) ||
+          r.location.toLowerCase().contains(_searchQuery)).toList();
     }
 
     return pref.applyPreference(result);
+  }
+
+  void _showCityPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Chọn tỉnh / thành phố',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                physics: const BouncingScrollPhysics(),
+                itemCount: _cities.length,
+                itemBuilder: (_, i) {
+                  final city = _cities[i];
+                  final selected = city == _selectedCity;
+                  return ListTile(
+                    leading: Icon(
+                      Icons.location_on_rounded,
+                      color: selected ? AppColors.teal : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    title: Text(city,
+                        style: TextStyle(
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                          color: selected ? AppColors.tealDark : AppColors.textPrimary,
+                        )),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20)
+                        : null,
+                    tileColor: selected ? AppColors.mintSoft : null,
+                    onTap: () {
+                      setState(() => _selectedCity = city);
+                      widget.onCityChanged?.call(city);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _getGreeting() {
@@ -255,29 +332,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: AppColors.teal,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          user.location,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                    child: GestureDetector(
+                      onTap: _showCityPicker,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.location_on, color: AppColors.teal, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            _selectedCity,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: AppColors.textSecondary,
-                          size: 18,
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          const Icon(Icons.keyboard_arrow_down,
+                              color: AppColors.textSecondary, size: 18),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -315,9 +389,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   color: AppColors.teal.withOpacity(0.2),
                                 ),
                                 const SizedBox(height: 10),
-                                const Text(
-                                  'Không tìm thấy phòng nào',
-                                  style: TextStyle(
+                                Text(
+                                  filtered.isEmpty && _selectedCity != 'TP. Hồ Chí Minh'
+                                      ? 'Chưa có phòng tại $_selectedCity'
+                                      : 'Không tìm thấy phòng nào',
+                                  style: const TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
