@@ -41,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Ưu đãi tháng 4',
       subtitle: 'Giảm 20% phí dịch vụ\ncho lần đăng đầu tiên',
       badge: 'HOT',
+      image: 'assets/images/room_studio_luxury.png',
     ),
     _BannerData(
       gradient: [Color(0xFF3AA3E3), Color(0xFF2A7FBE)],
@@ -48,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Phòng đã xác minh',
       subtitle: 'Hơn 500+ phòng được\nkiểm duyệt chất lượng',
       badge: 'MỚI',
+      image: 'assets/images/room_apartment_horizon.png',
     ),
     _BannerData(
       gradient: [Color(0xFF7EDFD8), Color(0xFF52CFCB)],
@@ -55,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Hỗ trợ 24/7',
       subtitle: 'Đội ngũ tư vấn luôn\nsẵn sàng giúp bạn',
       badge: 'TIP',
+      image: 'assets/images/room_muji_studio.png',
     ),
   ];
 
@@ -238,20 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     size: 20,
                                   ),
                                 )
-                              : GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const SearchResultScreen(),
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.tune_rounded,
-                                    color: AppColors.teal,
-                                    size: 20,
-                                  ),
-                                ),
+                              : null,
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -406,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         SizedBox(
-          height: 130,
+          height: 160,
           child: PageView.builder(
             controller: _bannerCtrl,
             onPageChanged: (i) => setState(() => _bannerPage = i),
@@ -415,63 +405,79 @@ class _HomeScreenState extends State<HomeScreen> {
               final b = _banners[i];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: b.gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: b.gradient.first.withOpacity(0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
                   child: Stack(
+                    fit: StackFit.expand,
                     children: [
+                      // Ảnh nền thực tế
+                      Image.asset(
+                        b.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: b.gradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Lớp gradient phủ lên ảnh
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              b.gradient.first.withOpacity(0.82),
+                              b.gradient.last.withOpacity(0.65),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                      ),
+                      // Vòng tròn trang trí
                       Positioned(
-                        right: -20,
-                        top: -20,
+                        right: -24,
+                        top: -24,
                         child: Container(
-                          width: 120,
-                          height: 120,
+                          width: 130,
+                          height: 130,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withOpacity(0.1),
                           ),
                         ),
                       ),
                       Positioned(
-                        right: 30,
-                        bottom: -30,
+                        right: 40,
+                        bottom: -40,
                         child: Container(
-                          width: 80,
-                          height: 80,
+                          width: 90,
+                          height: 90,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.06),
+                            color: Colors.white.withOpacity(0.07),
                           ),
                         ),
                       ),
+                      // Nội dung
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(13),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(14),
+                                color: Colors.white.withOpacity(0.22),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
                               ),
-                              child: Icon(
-                                b.icon,
-                                color: Colors.white,
-                                size: 28,
-                              ),
+                              child: Icon(b.icon, color: Colors.white, size: 28),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -481,12 +487,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
+                                        horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.25),
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: Colors.white.withOpacity(0.28),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       b.badge,
@@ -494,26 +498,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.white,
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
+                                        letterSpacing: 1.2,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                                   Text(
                                     b.title,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 17,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.3,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     b.subtitle,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.85),
+                                      color: Colors.white.withOpacity(0.9),
                                       fontSize: 12,
-                                      height: 1.4,
+                                      height: 1.5,
                                     ),
                                   ),
                                 ],
@@ -599,6 +604,7 @@ class _BannerData {
   final String title;
   final String subtitle;
   final String badge;
+  final String image;
 
   const _BannerData({
     required this.gradient,
@@ -606,5 +612,6 @@ class _BannerData {
     required this.title,
     required this.subtitle,
     required this.badge,
+    required this.image,
   });
 }
