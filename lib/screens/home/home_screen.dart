@@ -10,6 +10,7 @@ import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -117,6 +118,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return pref.applyPreference(result);
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Chào buổi sáng,';
+    if (hour >= 12 && hour < 18) return 'Chào buổi chiều,';
+    if (hour >= 18 && hour < 22) return 'Chào buổi tối,';
+    return 'Xin chào,';
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = UserModel.sampleUsers.first;
@@ -145,16 +154,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Chào buổi sáng,',
-                              style: TextStyle(
+                              _getGreeting(),
+                              style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              user.name,
-                              style: TextStyle(
+                              AuthService.currentUser?.displayName ?? user.name,
+                              style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
