@@ -19,7 +19,17 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   String? _selectedLocation;
   RoomType? _selectedType;
   final Set<String> _selectedAmenities = {};
-  double _maxPrice = 5000000;
+  // Khoảng giá: (label, minPrice, maxPrice) — null maxPrice = không giới hạn
+  final List<(String, int, int?)> _priceRanges = const [
+    ('Tất cả', 0, null),
+    ('1 - 5 triệu', 1000000, 5000000),
+    ('5 - 10 triệu', 5000000, 10000000),
+    ('10 - 15 triệu', 10000000, 15000000),
+    ('15 - 20 triệu', 15000000, 20000000),
+    ('Trên 20 triệu', 20000000, null),
+  ];
+
+  int _selectedRangeIndex = 0; // mặc định "Tất cả"
 
   final List<String> _locations = [
     'Quận 1',
@@ -81,7 +91,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
       pref.setRoomType(_selectedType);
     }
 
-    pref.setMaxPrice(_maxPrice.toInt());
+    pref.setMaxPrice(_priceRanges[_selectedRangeIndex].$3 ?? 999999999);
+    pref.setMinPrice(_priceRanges[_selectedRangeIndex].$2);
 
     for (final a in _selectedAmenities) {
       pref.toggleAmenity(a);
@@ -478,111 +489,73 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
           _buildStepHeader(
             '💰',
             'Ngân sách hàng tháng?',
-            'Kéo thanh để chọn mức giá tối đa bạn muốn thuê.',
+            'Chọn khoảng giá phù hợp với bạn.',
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+              children: List.generate(_priceRanges.length, (i) {
+                final range = _priceRanges[i];
+                final sel = _selectedRangeIndex == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedRangeIndex = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: sel ? AppColors.teal : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: sel ? AppColors.teal : AppColors.mintGreen,
+                        width: 1.5,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${(_maxPrice / 1000000).toStringAsFixed(1)} triệu/tháng',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.teal,
+                      boxShadow: [
+                        BoxShadow(
+                          color: sel
+                              ? AppColors.teal.withOpacity(0.25)
+                              : Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: AppColors.teal,
-                          inactiveTrackColor: AppColors.mintGreen,
-                          thumbColor: AppColors.teal,
-                          overlayColor: AppColors.teal.withOpacity(0.15),
-                          trackHeight: 6,
-                          thumbShape:
-                              const RoundSliderThumbShape(enabledThumbRadius: 14),
-                        ),
-                        child: Slider(
-                          value: _maxPrice,
-                          min: 1000000,
-                          max: 20000000,
-                          divisions: 19,
-                          onChanged: (v) => setState(() => _maxPrice = v),
-                        ),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text(
-                            '1 triệu',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: sel
+                                ? Colors.white.withOpacity(0.2)
+                                : AppColors.mintSoft,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          Text(
-                            '20 triệu',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [2000000, 4000000, 6000000, 10000000].map((p) {
-                    final sel = _maxPrice == p.toDouble();
-                    return GestureDetector(
-                      onTap: () => setState(() => _maxPrice = p.toDouble()),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: sel ? AppColors.teal : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: sel ? AppColors.teal : AppColors.mintGreen,
-                            width: 1.5,
+                          child: Icon(
+                            i == 0
+                                ? Icons.all_inclusive_rounded
+                                : Icons.attach_money_rounded,
+                            color: sel ? Colors.white : AppColors.teal,
+                            size: 20,
                           ),
                         ),
-                        child: Text(
-                          '${(p / 1000000).toStringAsFixed(0)}tr',
+                        const SizedBox(width: 14),
+                        Text(
+                          range.$1,
                           style: TextStyle(
-                            color: sel ? Colors.white : AppColors.textPrimary,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
+                            color: sel ? Colors.white : AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
+                        const Spacer(),
+                        if (sel)
+                          const Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 22),
+                      ],
+                    ),
+                  ),
+                );
+              }),
             ),
           ),
         ],

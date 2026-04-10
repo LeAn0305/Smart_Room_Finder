@@ -15,6 +15,7 @@ migrate_working_dir/
 
 # Local secrets / configs
 lib/core/config/google_oauth_config.dart
+lib/core/config/ai_config.dart
 
 # IntelliJ / Android Studio
 *.iml

@@ -261,6 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       hint: 'example@email.com',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       errorText: _emailError,
                     ),
                     const SizedBox(height: 20),
@@ -271,11 +272,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: Icons.lock_outline_rounded,
                       isPassword: true,
                       isPasswordVisible: _isPasswordVisible,
-                      onTogglePassword: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
+                      onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: _onLogin,
                       errorText: _passwordError,
                     ),
                     const SizedBox(height: 8),
@@ -450,6 +449,8 @@ class _LoginScreenState extends State<LoginScreen> {
     VoidCallback? onTogglePassword,
     TextInputType keyboardType = TextInputType.text,
     String? errorText,
+    TextInputAction? textInputAction,
+    VoidCallback? onSubmitted,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,6 +483,8 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: controller,
             obscureText: isPassword && !isPasswordVisible,
             keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onSubmitted != null ? (_) => onSubmitted() : null,
             onChanged: (_) => setState(() {
               if (isPassword) {
                 _passwordError = null;
@@ -491,15 +494,8 @@ class _LoginScreenState extends State<LoginScreen> {
             }),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 16,
-              ),
-              prefixIcon: Icon(
-                icon,
-                color: AppColors.teal,
-                size: 22,
-              ),
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
+              prefixIcon: Icon(icon, color: AppColors.teal, size: 22),
               suffixIcon: isPassword
                   ? IconButton(
                       icon: Icon(
@@ -513,10 +509,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 18,
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             ),
           ),
         ),

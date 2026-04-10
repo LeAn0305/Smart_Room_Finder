@@ -26,395 +26,321 @@ class _RoomCardState extends State<RoomCard> {
   bool isHovered = false;
 
   IconData _getAmenityIcon(String amenity) {
-    switch (amenity.toLowerCase()) {
-      case 'wifi':
-        return Icons.wifi_rounded;
-      case 'máy lạnh':
-      case 'điều hòa':
-        return Icons.ac_unit_rounded;
-      case 'tủ lạnh':
-        return Icons.kitchen_rounded;
-      case 'máy giặt':
-        return Icons.local_laundry_service_rounded;
-      case 'bếp':
-        return Icons.outdoor_grill_rounded;
-      case 'chỗ để xe':
-        return Icons.directions_car_rounded;
-      case 'hồ bơi':
-        return Icons.pool_rounded;
-      case 'phòng gym':
-        return Icons.fitness_center_rounded;
-      case 'an ninh':
-        return Icons.security_rounded;
-      default:
-        return Icons.done_rounded;
-    }
+    final a = amenity.toLowerCase();
+    if (a.contains('wifi')) return Icons.wifi_rounded;
+    if (a.contains('lạnh') || a.contains('điều hòa')) return Icons.ac_unit_rounded;
+    if (a.contains('tủ lạnh')) return Icons.kitchen_rounded;
+    if (a.contains('giặt')) return Icons.local_laundry_service_rounded;
+    if (a.contains('bếp')) return Icons.outdoor_grill_rounded;
+    if (a.contains('xe')) return Icons.directions_car_rounded;
+    if (a.contains('hồ bơi')) return Icons.pool_rounded;
+    if (a.contains('gym')) return Icons.fitness_center_rounded;
+    if (a.contains('an ninh') || a.contains('bảo vệ')) return Icons.security_rounded;
+    return Icons.check_circle_outline_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isFavorite = context.watch<FavoriteProvider>().isFavorite(widget.room.id);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = widget.isHorizontal ? 280.0 : constraints.maxWidth;
-        final imageHeight = widget.isHorizontal ? 160.0 : 200.0;
+    final isFavorite = context.watch<FavoriteProvider>().isFavorite(widget.room.id);
+    final cardWidth = widget.isHorizontal ? 260.0 : double.infinity;
+    final imageHeight = widget.isHorizontal ? 150.0 : 195.0;
 
-        Widget cardContent = MouseRegion(
-          onEnter: (_) => setState(() => isHovered = true),
-          onExit: (_) => setState(() => isHovered = false),
-          child: AnimatedScale(
-            scale: isHovered ? 1.02 : 1.0,
-            duration: const Duration(milliseconds: 200),
-            child: Container(
-              width: cardWidth,
-              margin: EdgeInsets.only(
-                bottom: widget.isHorizontal ? 0 : 20,
-                right: widget.isHorizontal ? 16 : 0,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.blue.withOpacity(isHovered ? 0.15 : 0.08),
-                    blurRadius: isHovered ? 30 : 20,
-                    spreadRadius: isHovered ? 4 : 0,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: InkWell(
-                onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      children: [
-                        Hero(
-                          tag: 'room_image_${widget.room.id}',
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(28),
+    return MouseRegion(
+      onEnter: (_) => setState(() => isHovered = true),
+      onExit: (_) => setState(() => isHovered = false),
+      child: AnimatedScale(
+        scale: isHovered ? 1.02 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Container(
+            width: cardWidth,
+            margin: EdgeInsets.only(
+              bottom: widget.isHorizontal ? 0 : 16,
+              right: widget.isHorizontal ? 14 : 0,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isHovered ? 0.12 : 0.07),
+                  blurRadius: isHovered ? 24 : 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Ảnh ──────────────────────────────────────
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  child: Stack(
+                    children: [
+                      Hero(
+                        tag: 'room_image_${widget.room.id}',
+                        child: _buildImage(imageHeight),
+                      ),
+                      // Gradient phủ dưới ảnh
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.0),
+                                Colors.black.withValues(alpha: 0.38),
+                              ],
                             ),
-                            child: widget.room.imageUrl.startsWith('assets/')
-                                ? Image.asset(
-                                    widget.room.imageUrl,
-                                    height: imageHeight,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _buildPlaceholder(imageHeight),
-                                  )
-                                : Image.network(
-                                    widget.room.imageUrl,
-                                    height: imageHeight,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder:
-                                        (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return _buildPlaceholder(imageHeight);
-                                    },
-                                    errorBuilder: (_, __, ___) =>
-                                        _buildPlaceholder(imageHeight),
-                                  ),
                           ),
                         ),
-
-                        Positioned.fill(
+                      ),
+                      // Nút yêu thích
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: GestureDetector(
+                          onTap: widget.onFavoriteTap,
                           child: Container(
+                            padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.0),
-                                  Colors.black.withOpacity(0.4),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: GestureDetector(
-                            onTap: widget.onFavoriteTap,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.white.withOpacity(0.9),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                isFavorite
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                color: isFavorite
-                                    ? Colors.redAccent
-                                    : AppColors.textSecondary,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        if (widget.room.isVerified)
-                          Positioned(
-                            top: 12,
-                            left: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.blue.withOpacity(0.95),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(
-                                    Icons.verified_rounded,
-                                    color: AppColors.white,
-                                    size: 14,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Xác thực',
-                                    style: TextStyle(
-                                      color: AppColors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                        Positioned(
-                          bottom: 14,
-                          left: 14,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [AppColors.teal, AppColors.tealDark],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(18),
+                              color: Colors.white.withValues(alpha: 0.92),
+                              shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.teal.withOpacity(0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 6,
                                 ),
                               ],
                             ),
-                            child: Text(
-                              '${(widget.room.price / 1000000).toStringAsFixed(1)}tr / tháng',
-                              style: const TextStyle(
-                                color: AppColors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 15,
-                              ),
+                            child: Icon(
+                              isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              color: isFavorite ? Colors.redAccent : AppColors.textSecondary,
+                              size: 18,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.mintSoft,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  widget.room.typeString.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: AppColors.tealDark,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.star_rounded,
-                                      color: Colors.amber,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.room.rating.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            widget.room.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                              letterSpacing: -0.8,
+                      ),
+                      // Badge xác thực
+                      if (widget.room.isVerified)
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.teal.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                                SizedBox(width: 4),
+                                Text('Xác thực',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 10)),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                color: AppColors.teal,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  widget.room.address,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                        ),
+                      // Giá
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.teal, AppColors.tealDark],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.teal.withValues(alpha: 0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          child: Text(
+                            '${(widget.room.price / 1000000).toStringAsFixed(1)}tr / tháng',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Nội dung ─────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Loại phòng + Rating
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.mintSoft,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              widget.room.typeString.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.tealDark,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
                           Row(
                             children: [
-                              ...widget.room.amenities.take(3).map(
-                                    (amenity) => Padding(
-                                      padding: const EdgeInsets.only(right: 16),
-                                      child: Icon(
-                                        _getAmenityIcon(amenity),
-                                        size: 20,
-                                        color: AppColors.tealDark.withOpacity(
-                                          0.7,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              if (widget.room.amenities.length > 3)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: AppColors.mintSoft,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '+${widget.room.amenities.length - 3}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.teal,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
+                              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                              const SizedBox(width: 3),
+                              Text(
+                                widget.room.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
                                 ),
+                              ),
                             ],
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      // Tên phòng
+                      Text(
+                        widget.room.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      // Địa chỉ
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, color: AppColors.teal, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.room.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Diện tích + phòng ngủ nếu có
+                      if (widget.room.area != null || widget.room.bedrooms != null) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            if (widget.room.area != null) ...[
+                              const Icon(Icons.square_foot_rounded, color: AppColors.textSecondary, size: 13),
+                              const SizedBox(width: 3),
+                              Text('${widget.room.area!.toInt()}m²',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 12),
+                            ],
+                            if (widget.room.bedrooms != null) ...[
+                              const Icon(Icons.bed_rounded, color: AppColors.textSecondary, size: 13),
+                              const SizedBox(width: 3),
+                              Text('${widget.room.bedrooms} PN',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            ],
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      // Tiện ích
+                      Row(
+                        children: [
+                          ...widget.room.amenities.take(3).map(
+                                (a) => Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Icon(_getAmenityIcon(a),
+                                      size: 18,
+                                      color: AppColors.tealDark.withValues(alpha: 0.75)),
+                                ),
+                              ),
+                          if (widget.room.amenities.length > 3)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.mintSoft,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '+${widget.room.amenities.length - 3}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.teal,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        );
-        return widget.isHorizontal ? cardContent : Center(child: cardContent);
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildPlaceholder(double height) {
+  Widget _buildImage(double height) {
+    final url = widget.room.imageUrl;
+    if (url.startsWith('assets/')) {
+      return Image.asset(url,
+          height: height, width: double.infinity, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _placeholder(height));
+    }
+    return Image.network(url,
+        height: height, width: double.infinity, fit: BoxFit.cover,
+        loadingBuilder: (_, child, progress) =>
+            progress == null ? child : _placeholder(height),
+        errorBuilder: (_, __, ___) => _placeholder(height));
+  }
+
+  Widget _placeholder(double height) {
     return Container(
       height: height,
       width: double.infinity,
       color: AppColors.mintSoft,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.image_not_supported_rounded,
-              color: AppColors.teal.withOpacity(0.5),
-              size: 48,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Đang tải ảnh...',
-              style: TextStyle(
-                color: AppColors.teal.withOpacity(0.5),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+      child: const Center(
+        child: Icon(Icons.image_not_supported_rounded,
+            color: AppColors.teal, size: 40),
       ),
     );
   }
