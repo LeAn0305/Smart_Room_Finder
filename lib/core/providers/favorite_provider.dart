@@ -19,9 +19,7 @@ class FavoriteProvider extends ChangeNotifier {
   Future<void> fetchFavorites() async {
     try {
       if (_currentUserId.isEmpty) {
-        _favoriteIds.clear();
-        debugPrint('⚠️ Chưa có user đăng nhập nên favorite rỗng');
-        notifyListeners();
+        debugPrint('⚠️ Chưa có user đăng nhập. Dùng local favorites fallback.');
         return;
       }
 
@@ -64,8 +62,11 @@ class FavoriteProvider extends ChangeNotifier {
 
   Future<void> addFavorite(String roomId) async {
     try {
+      _favoriteIds.add(roomId);
+      notifyListeners();
+
       if (_currentUserId.isEmpty) {
-        debugPrint('⚠️ Không thể thêm favorite vì chưa đăng nhập');
+        debugPrint('⚠️ Đã thêm Favorite Local (mock). Cần đăng nhập để lưu Firestore.');
         return;
       }
 
@@ -83,9 +84,6 @@ class FavoriteProvider extends ChangeNotifier {
         });
       }
 
-      _favoriteIds.add(roomId);
-      notifyListeners();
-
       debugPrint('✅ Đã thêm favorite: $roomId cho user $_currentUserId');
     } catch (e) {
       debugPrint('❌ Lỗi khi thêm favorite: $e');
@@ -94,8 +92,11 @@ class FavoriteProvider extends ChangeNotifier {
 
   Future<void> removeFavorite(String roomId) async {
     try {
+      _favoriteIds.remove(roomId);
+      notifyListeners();
+
       if (_currentUserId.isEmpty) {
-        debugPrint('⚠️ Không thể xóa favorite vì chưa đăng nhập');
+        debugPrint('⚠️ Đã xoá Favorite Local (mock).');
         return;
       }
 
@@ -107,9 +108,6 @@ class FavoriteProvider extends ChangeNotifier {
       for (final doc in snapshot.docs) {
         await _favoritesRef.doc(doc.id).delete();
       }
-
-      _favoriteIds.remove(roomId);
-      notifyListeners();
 
       debugPrint('✅ Đã xóa favorite: $roomId của user $_currentUserId');
     } catch (e) {
