@@ -850,7 +850,7 @@ void _onLogout() {
             const SizedBox(height: 20),
             _buildEditField(controller: nameController, label: lang.tr('full_name'), icon: Icons.person_outline_rounded),
             const SizedBox(height: 14),
-            _buildEditField(controller: emailController, label: lang.tr('email'), icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+            _buildEditField(controller: emailController, label: lang.tr('email'), icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, readOnly: true,),
             const SizedBox(height: 14),
             _buildEditField(controller: locationController, label: lang.tr('address'), icon: Icons.location_on_outlined),
             const SizedBox(height: 24),
@@ -858,15 +858,64 @@ void _onLogout() {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () async {
+                  final name = nameController.text.trim();
+                  final location = locationController.text.trim();
+
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vui lòng nhập họ và tên')),
+                    );
+                    return;
+                  }
+
+                  if (location.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vui lòng nhập địa chỉ')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await AuthService.updateUserProfile(
+                      name: name,
+                      location: location,
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.pop(context);
+
+                    await _loadUserProfile();
+
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cập nhật thông tin thành công')),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Cập nhật thất bại: $e')),
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.teal,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
-                child: Text(lang.tr('save_changes'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                child: Text(
+                  lang.tr('save_changes'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],
@@ -953,11 +1002,12 @@ void _onLogout() {
     );
   }
 
-  Widget _buildEditField({
+    Widget _buildEditField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,9 +1021,9 @@ void _onLogout() {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           decoration: InputDecoration(
-            prefixIcon:
-                Icon(icon, color: AppColors.teal, size: 20),
+            prefixIcon: Icon(icon, color: AppColors.teal, size: 20),
             filled: true,
             fillColor: AppColors.mintLight,
             contentPadding:

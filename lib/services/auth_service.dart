@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:smart_room_finder/core/config/google_oauth_config.dart';
 import 'package:smart_room_finder/models/user_model.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -203,5 +204,53 @@ class AuthService {
   static Future<void> sendPasswordReset(String email) async {
     await _auth.setLanguageCode('en');
     await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  // =========================
+  // CHECK IF USER SIGNED IN WITH EMAIL
+  // =========================
+  static bool isPasswordProvider() {
+  final user = _auth.currentUser;
+  if (user == null) return false;
+
+  return user.providerData.any((info) => info.providerId == 'password');
+  }
+
+  // =========================
+  // CHANGE PASSWORD
+  // =========================
+  static Future<void> changePassword({
+  required String currentPassword,
+  required String newPassword,
+}) async {
+  final user = _auth.currentUser;
+
+  if (user == null) {
+    throw FirebaseAuthException(
+      code: 'no-current-user',
+      message: 'Không tìm thấy người dùng hiện tại',
+    );
+  }
+
+  if (user.email == null || user.email!.trim().isEmpty) {
+    throw FirebaseAuthException(
+      code: 'no-email',
+      message: 'Tài khoản hiện tại không có email',
+    );
+  }
+
+  final credential = EmailAuthProvider.credential(
+    email: user.email!.trim(),
+    password: currentPassword,
+  );
+
+  debugPrint('==> Reauthenticate bắt đầu');
+  await user.reauthenticateWithCredential(credential);
+
+  debugPrint('==> Reauthenticate xong, bắt đầu updatePassword');
+  await user.updatePassword(newPassword);
+
+  debugPrint('==> updatePassword xong, reload');
+  await user.reload();
   }
 }
