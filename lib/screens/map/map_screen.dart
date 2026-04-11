@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -34,15 +36,10 @@ class _MapScreenState extends State<MapScreen> {
   final List<String> _filters = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
 
   final Map<String, LatLng> _roomLocations = {
-    '1': LatLng(10.7769, 106.7009),
-    '2': LatLng(10.7300, 106.7200),
-    '3': LatLng(10.8100, 106.7100),
-    '4': LatLng(10.8300, 106.6900),
-    '5': LatLng(10.8500, 106.7700),
-    '6': LatLng(10.7800, 106.7500),
-    '7': LatLng(10.7950, 106.6650),
-    '8': LatLng(10.7700, 106.6900),
-  };
+  'room_1': LatLng(10.7769, 106.7009),
+  'room_2': LatLng(10.7300, 106.7200),
+  'room_3': LatLng(10.8100, 106.7100),
+};
 
   Future<void> _goToMyLocation() async {
     setState(() => _loadingLocation = true);
@@ -124,7 +121,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   List<RoomModel> get _filteredRooms {
-    final rooms = RoomModel.sampleRooms;
+    final rooms = context.watch<RoomProvider>().activePublicRooms;
     final typeMap = {
       'Chung cư': RoomType.apartment,
       'Phòng trọ': RoomType.studio,
@@ -133,13 +130,15 @@ class _MapScreenState extends State<MapScreen> {
     };
 
     List<RoomModel> result = _selectedFilter == 'Tất cả'
-        ? rooms
+        ? List<RoomModel>.from(rooms)
         : rooms.where((r) => r.type == typeMap[_selectedFilter]).toList();
 
     if (_searchQuery.isNotEmpty) {
       result = result.where((r) =>
-          r.title.toLowerCase().contains(_searchQuery) ||
-          r.address.toLowerCase().contains(_searchQuery)).toList();
+        r.title.toLowerCase().contains(_searchQuery) ||
+        r.address.toLowerCase().contains(_searchQuery) ||
+        r.location.toLowerCase().contains(_searchQuery)
+      ).toList();
     }
 
     if (_sortByDistance && _currentLocation != null) {

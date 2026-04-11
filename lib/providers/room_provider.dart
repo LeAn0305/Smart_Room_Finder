@@ -10,7 +10,7 @@ class RoomProvider extends ChangeNotifier {
 
   // 🔥 Danh sách phòng đang dùng trong app
   // Ban đầu vẫn để mock để app không bị trống nếu Firestore chưa load xong
-  List<RoomModel> _rooms = List.from(RoomModel.sampleRooms);
+  List<RoomModel> _rooms = [];
 
   // 🔥 Trạng thái loading để sau này nếu muốn có thể show loading UI
   bool _isLoading = false;
@@ -68,7 +68,7 @@ class RoomProvider extends ChangeNotifier {
       debugPrint('❌ Lỗi khi đọc rooms từ Firestore: $e');
 
       // Nếu lỗi thì giữ mock data hiện tại, không làm app bị trắng dữ liệu
-      _rooms = List.from(RoomModel.sampleRooms);
+      _rooms = [];
     } finally {
       _isLoading = false;
       notifyListeners();
