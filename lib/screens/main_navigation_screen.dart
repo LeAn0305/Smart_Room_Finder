@@ -16,10 +16,9 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
-  String _selectedCity = 'TP. Hồ Chí Minh';
 
   List<Widget> get _pages => [
-    HomeScreen(onCityChanged: (city) => setState(() => _selectedCity = city)),
+    HomeScreen(onCityChanged: (_) {}),
     const MapScreen(),
     const FavoriteScreen(),
     const ProfileScreen(),

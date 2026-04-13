@@ -222,7 +222,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         _sortByDistance = true;
       });
       // 4. Fly Camera to that room Marker smoothly
-      final loc = _roomLocations[nearestRoom!.id];
+      final loc = _roomLocations[nearestRoom.id];
       if (loc != null) _animatedMapMove(loc, 15);
     } else {
       _showLocationError('Không tìm thấy phòng nào phù hợp khu vực này');
