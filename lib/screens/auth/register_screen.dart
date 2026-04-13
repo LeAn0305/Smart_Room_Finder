@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/screens/auth/login_screen.dart';
-//import 'package:smart_room_finder/services/local_auth_service.dart';
+import 'package:smart_room_finder/screens/auth/role_select_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -23,7 +21,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   bool _agreedToTerms = true;
   bool _isLoading = false;
-  UserRole _selectedRole = UserRole.tenant;
 
   @override
   void dispose() {
@@ -73,7 +70,7 @@ Future<void> _onRegister() async {
   final password = _passwordController.text;
 
   try {
-    await AuthService.registerWithEmail(email, password, name, role: _selectedRole);
+    await AuthService.registerWithEmail(email, password, name);
 
     if (!mounted) return;
 
@@ -85,28 +82,26 @@ Future<void> _onRegister() async {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Đăng ký thành công! Vui lòng đăng nhập.',
+                'Đăng ký thành công!',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
         backgroundColor: AppColors.teal,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => LoginScreen(initialEmail: email)),
+      MaterialPageRoute(builder: (_) => const RoleSelectScreen()),
       (_) => false,
     );
   } on FirebaseAuthException catch (e) {
@@ -231,38 +226,6 @@ Future<void> _onRegister() async {
                       ),
 
                       const SizedBox(height: 32),
-
-                      // Role selection
-                      const Text(
-                        'Bạn là ai?',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _buildRoleCard(
-                            role: UserRole.tenant,
-                            icon: Icons.person_search_rounded,
-                            title: 'Người thuê',
-                            subtitle: 'Tìm & thuê phòng',
-                            color: Colors.blue,
-                          ),
-                          const SizedBox(width: 12),
-                          _buildRoleCard(
-                            role: UserRole.landlord,
-                            icon: Icons.home_work_rounded,
-                            title: 'Chủ phòng',
-                            subtitle: 'Đăng & quản lý phòng',
-                            color: AppColors.teal,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
 
                       // Full Name
                       _buildValidatedField(
@@ -544,71 +507,6 @@ Future<void> _onRegister() async {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRoleCard({
-    required UserRole role,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
-    final selected = _selectedRole == role;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedRole = role),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-          decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.1) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? color : Colors.grey[200]!,
-              width: selected ? 2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: selected ? color.withOpacity(0.15) : Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: selected ? color.withOpacity(0.15) : Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: selected ? color : Colors.grey[400], size: 26),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? color : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-              ),
-              if (selected) ...[
-                const SizedBox(height: 8),
-                Icon(Icons.check_circle_rounded, color: color, size: 18),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 

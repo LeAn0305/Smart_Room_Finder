@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -42,12 +43,33 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _goToHome() {
-    final role = UserModel.currentUser.role;
-    final screen = role == UserRole.landlord
-        ? const LandlordPreferenceScreen()
-        : const PreferenceScreen();
+  void _goToHome() async {
+    // Đọc role thật từ Firestore
+    try {
+      final uid = AuthService.currentUser?.uid;
+      if (uid != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final role = doc.data()?['role'] ?? 'tenant';
+        if (!mounted) return;
+        final screen = role == 'landlord'
+            ? const LandlordPreferenceScreen()
+            : const PreferenceScreen();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => screen),
+          (route) => false,
+        );
+        return;
+      }
+    } catch (_) {}
+    // Fallback
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      (route) => false,
+    );
+  }
       context,
       MaterialPageRoute(builder: (_) => screen),
       (route) => false,
