@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/auth/otp_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_room_finder/screens/main_navigation_screen.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
@@ -28,7 +31,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     super.dispose();
   }
 
-  void _onSendOtp() {
+  void _onSendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || phone.length < 9) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -36,13 +39,79 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       );
       return;
     }
-    final fullPhone = '$_selectedCountryCode$phone';
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OtpScreen(phoneNumber: fullPhone),
-      ),
+
+    String normalizedPhone = phone.replaceAll(RegExp(r'\s+'), '');
+
+    if (_selectedCountryCode == '+84' && normalizedPhone.startsWith('0')) {
+      normalizedPhone = normalizedPhone.substring(1);
+    }
+
+    final fullPhone = '$_selectedCountryCode$normalizedPhone';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      await AuthService.verifyPhoneNumber(
+        phoneNumber: fullPhone,
+        verificationCompleted: (credential) async {
+          try {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+
+            if (!mounted) return;
+            Navigator.of(context, rootNavigator: true).pop();
+
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+              (route) => false,
+            );
+          } catch (_) {
+            if (!mounted) return;
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+        },
+        verificationFailed: (e) {
+          if (!mounted) return;
+          Navigator.of(context, rootNavigator: true).pop();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gửi OTP thất bại: ${e.message ?? e.code}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        },
+        codeSent: (verificationId, resendToken) {
+          if (!mounted) return;
+          Navigator.of(context, rootNavigator: true).pop();
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OtpScreen(
+                phoneNumber: fullPhone,
+                verificationId: verificationId,
+              ),
+            ),
+          );
+        },
+        codeAutoRetrievalTimeout: (_) {},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Có lỗi xảy ra: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   void _showCountryCodePicker() {
@@ -69,7 +138,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               const SizedBox(height: 16),
               ..._countryCodes.map((c) {
                 return ListTile(
-                  leading: Text(c['flag']!, style: const TextStyle(fontSize: 24)),
+                  leading:
+                      Text(c['flag']!, style: const TextStyle(fontSize: 24)),
                   title: Text(c['name']!),
                   trailing: Text(
                     c['code']!,
@@ -111,7 +181,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Decorative glows
               Positioned(
                 top: -60,
                 left: -40,
@@ -122,7 +191,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                 right: -40,
                 child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
               ),
-
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
@@ -130,7 +198,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                   children: [
                     const SizedBox(height: 60),
 
-                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
@@ -156,7 +223,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
                     const SizedBox(height: 40),
 
-                    // Icon
                     Container(
                       width: 72,
                       height: 72,
@@ -178,7 +244,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Header
                     const Text(
                       'Số điện thoại',
                       style: TextStyle(
@@ -199,7 +264,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
                     const SizedBox(height: 40),
 
-                    // Phone input label
                     const Text(
                       'Số điện thoại',
                       style: TextStyle(
@@ -210,7 +274,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Phone input with country code
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -225,7 +288,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          // Country code picker
                           GestureDetector(
                             onTap: _showCountryCodePicker,
                             child: Container(
@@ -261,8 +323,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                               ),
                             ),
                           ),
-
-                          // Phone number input
                           Expanded(
                             child: TextFormField(
                               controller: _phoneController,
@@ -294,7 +354,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Notice  
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -328,7 +387,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
                     const SizedBox(height: 40),
 
-                    // Send OTP button
                     SizedBox(
                       width: double.infinity,
                       height: 56,

@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/screens/home/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_room_finder/screens/main_navigation_screen.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
+  final String verificationId;
 
-  const OtpScreen({super.key, required this.phoneNumber});
+  const OtpScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.verificationId,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -17,16 +24,43 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
   bool _isVerifying = false;
+  bool _isResending = false;
   int _resendSeconds = 60;
 
   @override
   void initState() {
     super.initState();
+    _log('OtpScreen opened with phone=${widget.phoneNumber}');
+    _log('Initial verificationId=${widget.verificationId}');
     _startResendTimer();
-    // Auto-focus first cell
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNodes[0].requestFocus();
     });
+  }
+
+  void _log(String message) {
+    debugPrint('[OtpScreen] $message');
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   void _startResendTimer() {
@@ -34,9 +68,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return false;
+
       setState(() {
         if (_resendSeconds > 0) _resendSeconds--;
       });
+
       return _resendSeconds > 0;
     });
   }
@@ -54,39 +90,135 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
   String get _otpCode => _controllers.map((c) => c.text).join();
 
-  void _onVerify() async {
+  Future<void> _onVerify() async {
+    if (_isVerifying) return;
+
     if (_otpCode.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập đủ 6 chữ số')),
-      );
+      _showError('Vui lòng nhập đủ 6 chữ số');
       return;
     }
 
+    _log('Start verify OTP');
+    _log('verificationId=${widget.verificationId}');
+    _log('otp=$_otpCode');
+
     setState(() => _isVerifying = true);
 
-    // Demo: simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final userCredential = await AuthService.signInWithPhoneOtp(
+        verificationId: widget.verificationId,
+        smsCode: _otpCode,
+      );
 
-    if (!mounted) return;
-    setState(() => _isVerifying = false);
+      _log(
+        'OTP verify success. uid=${userCredential.user?.uid}, phone=${userCredential.user?.phoneNumber}',
+      );
 
-    // Navigate to home (demo)
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (route) => false,
-    );
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+
+      _showSuccess('Xác minh OTP thành công');
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e, st) {
+      _log('FirebaseAuthException on verify: code=${e.code}, message=${e.message}');
+      debugPrintStack(stackTrace: st);
+
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+
+      String message = 'Xác minh OTP thất bại';
+
+      if (e.code == 'invalid-verification-code') {
+        message = 'Mã OTP không đúng';
+      } else if (e.code == 'session-expired') {
+        message = 'Mã OTP đã hết hạn';
+      } else if (e.code == 'invalid-verification-id') {
+        message = 'Verification ID không hợp lệ';
+      } else if (e.code == 'network-request-failed') {
+        message = 'Lỗi mạng, vui lòng thử lại';
+      } else {
+        message = 'Xác minh OTP thất bại: ${e.code} - ${e.message}';
+      }
+
+      _showError(message);
+    } catch (e, st) {
+      _log('Other error on verify: $e');
+      debugPrintStack(stackTrace: st);
+
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+
+      _showError('Có lỗi xảy ra: $e');
+    }
+  }
+
+  Future<void> _onResendOtp() async {
+    if (_isResending || _resendSeconds > 0) return;
+
+    _log('Start resend OTP to ${widget.phoneNumber}');
+    setState(() => _isResending = true);
+
+    try {
+      await AuthService.verifyPhoneNumber(
+        phoneNumber: widget.phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          _log('Resend verificationCompleted triggered');
+          _log('resend credential.smsCode=${credential.smsCode}');
+          _log('resend credential.verificationId=${credential.verificationId}');
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          _log('Resend verificationFailed: code=${e.code}, message=${e.message}');
+          _showError('Gửi lại OTP thất bại: ${e.code} - ${e.message}');
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          _log('Resend codeSent triggered');
+          _log('new verificationId=$verificationId');
+          _log('new resendToken=$resendToken');
+          _showSuccess('Đã gửi lại mã OTP');
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          _log('Resend timeout verificationId=$verificationId');
+        },
+      );
+
+      if (!mounted) return;
+      setState(() => _isResending = false);
+      _startResendTimer();
+    } on FirebaseAuthException catch (e, st) {
+      _log('Resend outer FirebaseAuthException: code=${e.code}, message=${e.message}');
+      debugPrintStack(stackTrace: st);
+
+      if (!mounted) return;
+      setState(() => _isResending = false);
+
+      _showError('Gửi lại OTP lỗi: ${e.code} - ${e.message}');
+    } catch (e, st) {
+      _log('Resend outer other error: $e');
+      debugPrintStack(stackTrace: st);
+
+      if (!mounted) return;
+      setState(() => _isResending = false);
+
+      _showError('Gửi lại OTP lỗi: $e');
+    }
   }
 
   void _onFieldChanged(String value, int index) {
+    _log('OTP field[$index] changed: "$value"');
+
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
     if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
     }
-    // Auto-verify when all filled
-    if (_otpCode.length == 6) {
+
+    if (_otpCode.length == 6 && !_isVerifying) {
       _onVerify();
     }
   }
@@ -121,15 +253,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                 right: -40,
                 child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
               ),
-
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 60),
-
-                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
@@ -152,10 +281,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 40),
-
-                    // Icon
                     Container(
                       width: 72,
                       height: 72,
@@ -174,10 +300,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         child: Text('🔐', style: TextStyle(fontSize: 36)),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
-                    // Header
                     const Text(
                       'Xác minh OTP',
                       style: TextStyle(
@@ -208,21 +331,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 40),
-
-                    // OTP cells
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(
-                        6,
-                        (index) => _buildOtpCell(index),
-                      ),
+                      children: List.generate(6, (index) => _buildOtpCell(index)),
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Resend timer
                     Center(
                       child: _resendSeconds > 0
                           ? Text(
@@ -233,10 +347,10 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                               ),
                             )
                           : GestureDetector(
-                              onTap: _startResendTimer,
-                              child: const Text(
-                                'Gửi lại mã OTP',
-                                style: TextStyle(
+                              onTap: _isResending ? null : _onResendOtp,
+                              child: Text(
+                                _isResending ? 'Đang gửi lại OTP...' : 'Gửi lại mã OTP',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   color: AppColors.teal,
                                   fontWeight: FontWeight.w700,
@@ -244,10 +358,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                               ),
                             ),
                     ),
-
                     const SizedBox(height: 40),
-
-                    // Verify button
                     SizedBox(
                       width: double.infinity,
                       height: 56,

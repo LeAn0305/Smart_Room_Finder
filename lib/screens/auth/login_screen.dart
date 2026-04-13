@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
-import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
@@ -178,6 +177,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showPhoneComingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Chức năng đăng nhập bằng số điện thoại đang được phát triển',
+        ),
+        backgroundColor: AppColors.teal,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,7 +287,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: Icons.lock_outline_rounded,
                       isPassword: true,
                       isPasswordVisible: _isPasswordVisible,
-                      onTogglePassword: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      onTogglePassword: () => setState(
+                        () => _isPasswordVisible = !_isPasswordVisible,
+                      ),
                       textInputAction: TextInputAction.done,
                       onSubmitted: _onLogin,
                       errorText: _passwordError,
@@ -364,12 +381,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             iconColor: AppColors.teal,
                             iconSize: 22,
                             label: 'Điện thoại',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PhoneLoginScreen(),
-                              ),
-                            ),
+                            onTap: _showPhoneComingSoon,
                           ),
                         ),
                       ],
@@ -509,7 +521,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
             ),
           ),
         ),
