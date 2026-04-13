@@ -23,6 +23,8 @@ import 'package:smart_room_finder/providers/room_provider.dart';
 
 import 'package:smart_room_finder/services/auth_service.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -88,6 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _animController.forward();
 
     _loadUserProfile();
+    _loadNotificationSetting();
   }
 
   @override
@@ -104,14 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          ),
+        await _showControlledSnackBar(
+          'Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.',
+          backgroundColor: Colors.redAccent,
         );
       }
     }
@@ -168,20 +166,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  void _showComingSoon() {
+  Future<void> _showComingSoon() async {
     final lang = context.read<LanguageProvider>();
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(lang.tr('coming_soon'),
-            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-        backgroundColor: AppColors.teal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    await _showControlledSnackBar(lang.tr('coming_soon'));
   }
 
 void _onLogout() {
@@ -257,16 +245,9 @@ void _onLogout() {
               );
             } catch (e) {
               if (!mounted) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Đăng xuất thất bại: $e'),
+                await _showControlledSnackBar(
+                  'Đăng xuất thất bại: $e',
                   backgroundColor: Colors.redAccent,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
               );
             }
           },
@@ -394,10 +375,10 @@ void _onLogout() {
                         icon: Icons.notifications_outlined,
                         label: lang.tr('notifications'),
                         subtitle: lang.tr('notifications_subtitle'),
-                        onTap: () => setState(() => _notificationsEnabled = !_notificationsEnabled),
+                        onTap: () => _saveNotificationSetting(!_notificationsEnabled),
                         trailing: Switch(
                           value: _notificationsEnabled,
-                          onChanged: (val) => setState(() => _notificationsEnabled = val),
+                          onChanged: (val) => _saveNotificationSetting(val),
                           activeColor: AppColors.teal,
                           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
@@ -422,7 +403,7 @@ void _onLogout() {
                         icon: Icons.info_outline_rounded,
                         label: lang.tr('about_app'),
                         subtitle: lang.tr('about_app_subtitle'),
-                        onTap: _showComingSoon,
+                        onTap: () => _showComingSoon(),
                       ),
                       _buildMenuItem(
                         icon: Icons.logout_rounded,
@@ -863,15 +844,17 @@ void _onLogout() {
                   final location = locationController.text.trim();
 
                   if (name.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Vui lòng nhập họ và tên')),
+                    await _showControlledSnackBar(
+                      'Vui lòng nhập họ và tên',
+                      backgroundColor: Colors.redAccent,
                     );
                     return;
                   }
 
                   if (location.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Vui lòng nhập địa chỉ')),
+                    await _showControlledSnackBar(
+                      'Vui lòng nhập địa chỉ',
+                      backgroundColor: Colors.redAccent,
                     );
                     return;
                   }
@@ -890,14 +873,13 @@ void _onLogout() {
 
                     if (!mounted) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Cập nhật thông tin thành công')),
-                    );
+                    await _showControlledSnackBar('Cập nhật thông tin thành công');
                   } catch (e) {
                     if (!mounted) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Cập nhật thất bại: $e')),
+                    await _showControlledSnackBar(
+                      'Cập nhật thất bại: $e',
+                      backgroundColor: Colors.redAccent,
                     );
                   }
                 },
@@ -955,18 +937,11 @@ void _onLogout() {
                 ...LanguageProvider.languages.map((lang) {
                   final selected = provider.locale.languageCode == lang.$1;
                   return GestureDetector(
-                    onTap: () {
+                    onTap: () async{
                       provider.setLocale(lang.$1);
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${provider.tr('language_changed')} ${lang.$2}'),
-                          backgroundColor: AppColors.teal,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          duration: const Duration(seconds: 2),
-                        ),
+                      await _showControlledSnackBar(
+                        '${provider.tr('language_changed')} ${lang.$2}',
                       );
                     },
                     child: Container(
@@ -1041,4 +1016,49 @@ void _onLogout() {
       ],
     );
   }
+
+  Future<void> _loadNotificationSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    });
+  }
+
+Future<void> _saveNotificationSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+
+    if (!mounted) return;
+
+    setState(() {
+      _notificationsEnabled = value;
+    });
+  }
+
+  Future<bool> _isNotificationEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notifications_enabled') ?? true;
+  }
+
+  Future<void> _showControlledSnackBar(
+    String message, {
+    Color backgroundColor = AppColors.teal,
+    }) async {
+        final enabled = await _isNotificationEnabled();
+        if (!enabled || !mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+        );
+      }
+
+
 }
