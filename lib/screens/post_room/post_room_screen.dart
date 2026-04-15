@@ -9,6 +9,7 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_room_finder/services/image_service.dart';
 
 class PostRoomScreen extends StatefulWidget {
   final RoomModel? editRoom;
@@ -91,8 +92,8 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    final room = _buildRoom(isDraft: true);
+    final uploadedUrls = await ImageService().uploadImagesList(_images);
+    final room = _buildRoom(isDraft: true, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
       if (isEditing) {
@@ -112,8 +113,8 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    final room = _buildRoom(isDraft: false);
+    final uploadedUrls = await ImageService().uploadImagesList(_images);
+    final room = _buildRoom(isDraft: false, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
       if (isEditing) {
@@ -130,8 +131,9 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
-  RoomModel _buildRoom({required bool isDraft}) {
+  RoomModel _buildRoom({required bool isDraft, List<String>? uploadedUrls}) {
   final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final finalImages = (uploadedUrls != null && uploadedUrls.isNotEmpty) ? uploadedUrls : _images;
 
   return RoomModel(
     id: isEditing
@@ -144,10 +146,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     description: _descCtrl.text.trim(),
     price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
     address: _addressCtrl.text.trim(),
-    imageUrl: _images.isNotEmpty
-        ? _images.first
+    imageUrl: finalImages.isNotEmpty
+        ? finalImages.first
         : 'assets/images/room_studio_luxury.png',
-    images: _images,
+    images: finalImages,
     rating: isEditing ? widget.editRoom!.rating : 0.0,
     type: _selectedType,
     location: 'TP. Ho Chi Minh',
