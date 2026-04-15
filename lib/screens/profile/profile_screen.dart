@@ -264,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const SizedBox(height: 16),
                     _buildSectionLabel(lang.tr('section_activity')),
                     _buildMenuCard(children: [
-                      if (_user.isLandlord)
+                      if (_isLandlord)
                         _buildMenuItem(
                           icon: Icons.home_work_outlined,
                           label: lang.tr('my_rooms'),
@@ -500,12 +500,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
-            color: _user.isLandlord
+            color: _isLandlord
                 ? AppColors.teal.withOpacity(0.12)
                 : Colors.blue.withOpacity(0.12),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: _user.isLandlord
+              color: _isLandlord
                   ? AppColors.teal.withOpacity(0.4)
                   : Colors.blue.withOpacity(0.4),
             ),
@@ -514,17 +514,17 @@ class _ProfileScreenState extends State<ProfileScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _user.isLandlord ? Icons.home_work_rounded : Icons.person_search_rounded,
+                _isLandlord ? Icons.home_work_rounded : Icons.person_search_rounded,
                 size: 14,
-                color: _user.isLandlord ? AppColors.tealDark : Colors.blue[700],
+                color: _isLandlord ? AppColors.tealDark : Colors.blue[700],
               ),
               const SizedBox(width: 6),
               Text(
-                _user.isLandlord ? 'Chủ phòng' : 'Người thuê',
+                _isLandlord ? 'Chủ phòng' : 'Người thuê',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: _user.isLandlord ? AppColors.tealDark : Colors.blue[700],
+                  color: _isLandlord ? AppColors.tealDark : Colors.blue[700],
                 ),
               ),
             ],
@@ -548,7 +548,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 6)),
           ],
         ),
-        child: _user.isLandlord
+        child: _isLandlord
             ? Row(
                 children: [
                   _buildStatItem(value: '$_totalRooms', label: lang.tr('profile_rooms_posted')),
@@ -710,9 +710,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   void _showEditProfile() {
     final lang = context.read<LanguageProvider>();
-    final nameController = TextEditingController(text: _user.name);
-    final emailController = TextEditingController(text: _user.email);
-    final locationController = TextEditingController(text: _user.location);
+    final nameController = TextEditingController(text: _displayName);
+    final emailController = TextEditingController(text: _email);
+    final locationController = TextEditingController(text: 'TP. Hồ Chí Minh');
 
     showModalBottomSheet(
       context: context,
