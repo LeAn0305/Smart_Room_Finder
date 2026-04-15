@@ -121,4 +121,11 @@ class FavoriteProvider extends ChangeNotifier {
     _favoriteIds.clear();
     notifyListeners();
   }
+
+  // For testing purposes
+  void addTestFavorites(List<String> roomIds) {
+    _favoriteIds.addAll(roomIds);
+    notifyListeners();
+    debugPrint('✅ Đã thêm ${roomIds.length} test favorites');
+  }
 }

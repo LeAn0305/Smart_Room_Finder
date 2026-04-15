@@ -46,6 +46,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<FavoriteProvider>().fetchFavorites();
+      // Add test favorites từ sampleRooms để test giao diện
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        final testFavIds = ['1', '2', '3']; // Sample room IDs
+        context.read<FavoriteProvider>().addTestFavorites(testFavIds);
+      });
     });
   }
 
