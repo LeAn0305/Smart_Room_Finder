@@ -17,11 +17,11 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    MapScreen(),
-    FavoriteScreen(),
-    ProfileScreen(),
+  List<Widget> get _pages => [
+    HomeScreen(onCityChanged: (_) {}),
+    const MapScreen(),
+    const FavoriteScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -33,9 +33,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         decoration: BoxDecoration(
           color: AppColors.mintSoft,
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, -2)),
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, -2)),
           ],
-          border: Border(top: BorderSide(color: AppColors.teal.withOpacity(0.08), width: 1)),
+          border: Border(
+              top: BorderSide(
+                  color: AppColors.teal.withValues(alpha: 0.08), width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
@@ -48,10 +53,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           unselectedFontSize: 12,
           elevation: 0,
           items: [
-            BottomNavigationBarItem(icon: const Icon(Icons.home_rounded), label: lang.tr('nav_home')),
-            BottomNavigationBarItem(icon: const Icon(Icons.map_rounded), label: lang.tr('nav_map')),
-            BottomNavigationBarItem(icon: const Icon(Icons.favorite_rounded), label: lang.tr('nav_favorite')),
-            BottomNavigationBarItem(icon: const Icon(Icons.person_rounded), label: lang.tr('nav_profile')),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.home_rounded),
+                label: lang.tr('nav_home')),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.map_rounded),
+                label: lang.tr('nav_map')),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.favorite_rounded),
+                label: lang.tr('nav_favorite')),
+            BottomNavigationBarItem(
+                icon: const Icon(Icons.person_rounded),
+                label: lang.tr('nav_profile')),
           ],
         ),
       ),

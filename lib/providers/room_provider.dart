@@ -75,6 +75,64 @@ class RoomProvider extends ChangeNotifier {
     }
   }
 
+  // ==================== FIREBASE WRITE ====================
+
+  /// 🔥 Đăng phòng mới lên Firestore + local
+  Future<void> addRoomToFirebase(RoomModel room) async {
+    try {
+      final docRef = await _roomsRef.add(room.toFirebase());
+      final newRoom = RoomModel(
+        id: docRef.id,
+        ownerId: room.ownerId,
+        title: room.title,
+        description: room.description,
+        price: room.price,
+        address: room.address,
+        imageUrl: room.imageUrl,
+        images: room.images,
+        rating: room.rating,
+        type: room.type,
+        location: room.location,
+        amenities: room.amenities,
+        isVerified: room.isVerified,
+        isActive: room.isActive,
+        isDraft: room.isDraft,
+        viewCount: room.viewCount,
+        contactCount: room.contactCount,
+        area: room.area,
+        bedrooms: room.bedrooms,
+        direction: room.direction,
+        postedAt: room.postedAt,
+        updatedAt: room.updatedAt,
+        expiresAt: room.expiresAt,
+      );
+      _rooms.add(newRoom);
+      notifyListeners();
+      debugPrint('✅ Đã đăng phòng lên Firestore: ${docRef.id}');
+    } catch (e) {
+      debugPrint('❌ Lỗi đăng phòng: $e');
+      // Fallback: thêm local
+      _rooms.add(room);
+      notifyListeners();
+    }
+  }
+
+  /// 🔥 Cập nhật phòng lên Firestore + local
+  Future<void> updateRoomToFirebase(RoomModel updated) async {
+    try {
+      await _roomsRef.doc(updated.id).update(updated.toFirebaseForUpdate());
+      final idx = _rooms.indexWhere((r) => r.id == updated.id);
+      if (idx != -1) {
+        _rooms[idx] = updated;
+        notifyListeners();
+      }
+      debugPrint('✅ Đã cập nhật phòng: ${updated.id}');
+    } catch (e) {
+      debugPrint('❌ Lỗi cập nhật phòng: $e');
+      updateRoom(updated);
+    }
+  }
+
   // ==================== LOCAL METHODS ====================
 
   /// Đăng phòng mới hoặc lưu nháp
