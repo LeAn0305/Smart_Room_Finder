@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,19 +9,16 @@ import 'package:smart_room_finder/screens/auth/phone_login_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
-import 'package:smart_room_finder/screens/onboarding/landlord_preference_screen.dart';
-import 'package:smart_room_finder/models/user_model.dart';
 
 class LoginScreen extends StatefulWidget {
-  final String? initialEmail;
-  const LoginScreen({super.key, this.initialEmail});
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final TextEditingController _emailController;
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _isPasswordVisible = false;
@@ -31,47 +27,16 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _passwordError;
 
   @override
-  void initState() {
-    super.initState();
-    _emailController = TextEditingController(text: widget.initialEmail ?? '');
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _goToHome() async {
-    // Đọc role thật từ Firestore
-    try {
-      final uid = AuthService.currentUser?.uid;
-      if (uid != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-        final role = doc.data()?['role'] ?? 'tenant';
-        if (!mounted) return;
-        final screen = role == 'landlord'
-            ? const LandlordPreferenceScreen()
-            : const PreferenceScreen();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => screen),
-          (route) => false,
-        );
-        return;
-      }
-    } catch (_) {}
-    // Fallback
-    if (!mounted) return;
+  void _goToHome() {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-      (route) => false,
-    );
-  }
-      context,
-      MaterialPageRoute(builder: (_) => screen),
       (route) => false,
     );
   }
@@ -109,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await AuthService.signInWithEmail(email, password);
-
+      debugPrint('UID hiện tại: ${AuthService.currentUser?.uid}');
       if (!mounted) return;
       _goToHome();
     } on FirebaseAuthException catch (e) {

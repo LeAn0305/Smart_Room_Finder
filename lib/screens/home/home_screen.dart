@@ -3,13 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
-import 'package:smart_room_finder/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -60,17 +60,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
     _searchCtrl.addListener(
       () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()),
     );
-    Future.delayed(const Duration(seconds: 3), _autoScroll);
-  }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _bannerCtrl.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RoomProvider>().fetchRooms();
+    });
+
+    Future.delayed(const Duration(seconds: 3), _autoScroll);
   }
 
   void _autoScroll() {
@@ -116,27 +116,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return pref.applyPreference(result);
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return 'Chào buổi sáng,';
-    if (hour >= 12 && hour < 18) return 'Chào buổi chiều,';
-    if (hour >= 18 && hour < 22) return 'Chào buổi tối,';
-    return 'Xin chào,';
-  }
-
-  String _getDisplayName(UserModel user) {
-    // Ưu tiên tên từ Firebase Auth nếu có
-  String _getDisplayName() {
-    final firebaseName = AuthService.currentUser?.displayName;
-    if (firebaseName != null && firebaseName.trim().isNotEmpty) {
-      return firebaseName.trim();
-    }
-    return 'Người dùng';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final firebaseUser = AuthService.currentUser;
+    final user = UserModel.currentUser;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -162,16 +144,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _getGreeting(),
-                              style: const TextStyle(
+                              'Chào buổi sáng,',
+                              style: TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              _getDisplayName(),
-                              style: const TextStyle(
+                              user.name,
+                              style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
@@ -188,13 +170,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: CircleAvatar(
                             radius: 24,
                             backgroundColor: AppColors.mintGreen,
-                            backgroundImage: (firebaseUser?.photoURL ?? '').isNotEmpty
-                                ? NetworkImage(firebaseUser!.photoURL!)
+                            backgroundImage: user.profileImageUrl.isNotEmpty
+                                ? NetworkImage(user.profileImageUrl)
                                 : null,
-                            child: (firebaseUser?.photoURL ?? '').isEmpty
+                            child: user.profileImageUrl.isEmpty
                                 ? Text(
-                                    _getDisplayName().isNotEmpty ? _getDisplayName()[0].toUpperCase() : 'U',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   )
                                 : null,
                           ),

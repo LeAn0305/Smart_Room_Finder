@@ -25,4 +25,15 @@ class UserModel {
         email: 'vana@example.com',
         role: UserRole.landlord, // đổi thành tenant để test vai trò người thuê
       );
+
+  factory UserModel.fromFirebase(Map<String, dynamic> json, String docId) {
+    return UserModel(
+      id: docId,
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      profileImageUrl: json['profileImageUrl'] ?? '',
+      location: json['location'] ?? 'TP. Hồ Chí Minh',
+      role: json['role'] == 'landlord' ? UserRole.landlord : UserRole.tenant,
+    );
+  }
 }
