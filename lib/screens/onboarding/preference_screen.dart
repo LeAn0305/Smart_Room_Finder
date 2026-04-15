@@ -92,7 +92,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
     }
 
     pref.setMaxPrice(_priceRanges[_selectedRangeIndex].$3 ?? 999999999);
-    pref.setMinPrice(_priceRanges[_selectedRangeIndex].$2);
 
     for (final a in _selectedAmenities) {
       pref.toggleAmenity(a);
