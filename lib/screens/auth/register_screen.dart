@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
-//import 'package:smart_room_finder/services/local_auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -85,35 +82,28 @@ Future<void> _onRegister() async {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Đăng ký thành công! Vui lòng đăng nhập.',
+                'Đăng ký thành công!',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
         backgroundColor: AppColors.teal,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
-    final pref = context.read<PreferenceProvider>();
-    if (!pref.completed) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-        (_) => false,
-      );
-    } else {
-      Navigator.pop(context);
-    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      (_) => false,
+    );
   } on FirebaseAuthException catch (e) {
     if (!mounted) return;
 

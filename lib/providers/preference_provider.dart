@@ -3,21 +3,33 @@ import 'package:smart_room_finder/models/room_model.dart';
 
 class PreferenceProvider extends ChangeNotifier {
   String? _location;
+  Set<String> _selectedLocations = {};
+  Set<RoomType> _selectedRoomTypes = {};
   final Set<String> _amenities = {};
   RoomType? _roomType;
   int? _maxPrice;
-  int _minPrice = 0;
   bool _completed = false;
 
   String? get location => _location;
+  Set<String> get selectedLocations => Set.unmodifiable(_selectedLocations);
+  Set<RoomType> get selectedRoomTypes => Set.unmodifiable(_selectedRoomTypes);
   Set<String> get amenities => Set.unmodifiable(_amenities);
   RoomType? get roomType => _roomType;
   int? get maxPrice => _maxPrice;
-  int get minPrice => _minPrice;
   bool get completed => _completed;
 
   void setLocation(String loc) {
     _location = loc;
+    notifyListeners();
+  }
+
+  void setSelectedLocations(Set<String> locs) {
+    _selectedLocations = Set.from(locs);
+    notifyListeners();
+  }
+
+  void setSelectedRoomTypes(Set<RoomType> types) {
+    _selectedRoomTypes = Set.from(types);
     notifyListeners();
   }
 
@@ -28,11 +40,6 @@ class PreferenceProvider extends ChangeNotifier {
 
   void setMaxPrice(int price) {
     _maxPrice = price;
-    notifyListeners();
-  }
-
-  void setMinPrice(int price) {
-    _minPrice = price;
     notifyListeners();
   }
 
@@ -50,51 +57,32 @@ class PreferenceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Ưu tiên phòng đúng khu vực lên đầu, các khu vực khác xuống sau
+  /// Sắp xếp phòng theo độ phù hợp với sở thích
   List<RoomModel> applyPreference(List<RoomModel> rooms) {
     if (!_completed) return rooms;
-
-    // Nếu user đã chọn khu vực → chỉ hiện phòng đúng khu vực đó
-    if (_location != null) {
-      final matched = rooms.where((r) => _isMatchLocation(r)).toList();
-      // Nếu có phòng đúng khu vực thì chỉ hiện phòng đó
-      if (matched.isNotEmpty) {
-        matched.sort((a, b) => _score(b).compareTo(_score(a)));
-        return matched;
-      }
-      // Nếu không có phòng nào đúng khu vực thì hiện tất cả (fallback)
-    }
-
     return List.from(rooms)..sort((a, b) => _score(b).compareTo(_score(a)));
-  }
-
-  bool _isMatchLocation(RoomModel r) {
-    if (_location == null) return false;
-    final loc = _location!.toLowerCase();
-    return r.location.toLowerCase().contains(loc) ||
-        r.address.toLowerCase().contains(loc);
   }
 
   int _score(RoomModel r) {
     int s = 0;
 
-    if (_location != null &&
-        r.location.toLowerCase().contains(_location!.toLowerCase())) {
-      s += 3;
+    // Multi-location support
+    final locs = _selectedLocations.isNotEmpty ? _selectedLocations : (_location != null ? {_location!} : <String>{});
+    for (final loc in locs) {
+      if (r.location.toLowerCase().contains(loc.toLowerCase())) {
+        s += 3;
+        break;
+      }
     }
 
-    if (_roomType != null && r.type == _roomType) {
-      s += 3;
-    }
+    // Multi-type support
+    final types = _selectedRoomTypes.isNotEmpty ? _selectedRoomTypes : (_roomType != null ? {_roomType!} : <RoomType>{});
+    if (types.contains(r.type)) s += 3;
 
-    if (_maxPrice != null && r.price <= _maxPrice! && r.price >= _minPrice) {
-      s += 2;
-    }
+    if (_maxPrice != null && r.price <= _maxPrice!) s += 2;
 
     for (final a in _amenities) {
-      if (r.amenities.any(
-        (ra) => ra.toLowerCase().contains(a.toLowerCase()),
-      )) {
+      if (r.amenities.any((ra) => ra.toLowerCase().contains(a.toLowerCase()))) {
         s += 1;
       }
     }
