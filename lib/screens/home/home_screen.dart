@@ -118,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = UserModel.currentUser;
+    final user = UserModel.sampleUsers.first;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
