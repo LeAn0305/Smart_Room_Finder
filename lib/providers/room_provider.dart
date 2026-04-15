@@ -1,64 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 
 class RoomProvider extends ChangeNotifier {
-  final List<RoomModel> _rooms = List.from(RoomModel.sampleRooms);
+  final CollectionReference _roomsRef =
+      FirebaseFirestore.instance.collection('rooms');
+
+  List<RoomModel> _rooms = List.from(RoomModel.sampleRooms);
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
 
   List<RoomModel> get allRooms => List.unmodifiable(_rooms);
 
-  /// Phòng hiển thị trên Home: isActive=true, isDraft=false
   List<RoomModel> get activePublicRooms =>
       _rooms.where((r) => r.isActive && !r.isDraft).toList();
 
-  /// Phòng của user (My Room)
-  List<RoomModel> get myActiveRooms =>
-      _rooms.where((r) => r.isActive && !r.isDraft).toList();
-
-  List<RoomModel> get myHiddenRooms =>
-      _rooms.where((r) => !r.isActive && !r.isDraft).toList();
-
-  List<RoomModel> get myDraftRooms =>
-      _rooms.where((r) => r.isDraft).toList();
-
-  /// Đăng phòng mới hoặc lưu nháp
-  void addRoom(RoomModel room) {
-    _rooms.add(room);
-    notifyListeners();
+  List<RoomModel> get myActiveRooms {
+    final uid = currentUserId;
+    if (uid == null) return [];
+    return _rooms.where((r) => r.ownerId == uid && r.isActive && !r.isDraft).toList();
   }
 
-  /// Cập nhật phòng (chỉnh sửa)
-  void updateRoom(RoomModel updated) {
-    final idx = _rooms.indexWhere((r) => r.id == updated.id);
-    if (idx != -1) {
-      _rooms[idx] = updated;
+  List<RoomModel> get myHiddenRooms {
+    final uid = currentUserId;
+    if (uid == null) return [];
+    return _rooms.where((r) => r.ownerId == uid && !r.isActive && !r.isDraft).toList();
+  }
+
+  List<RoomModel> get myDraftRooms {
+    final uid = currentUserId;
+    if (uid == null) return [];
+    return _rooms.where((r) => r.ownerId == uid && r.isDraft).toList();
+  }
+
+  // ── FIREBASE READ ────────────────────────────────────────
+
+  Future<void> fetchRooms() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      final snapshot = await _roomsRef.get();
+      if (snapshot.docs.isNotEmpty) {
+        _rooms = snapshot.docs.map((doc) {
+          return RoomModel.fromFirebase(doc.data() as Map<String, dynamic>, doc.id);
+        }).toList();
+        debugPrint('✅ Load ${_rooms.length} phòng từ Firestore');
+      } else {
+        debugPrint('⚠️ Firestore rỗng, dùng mock tạm');
+        _rooms = List.from(RoomModel.sampleRooms);
+      }
+    } catch (e) {
+      debugPrint('❌ Lỗi fetchRooms: $e');
+      _rooms = List.from(RoomModel.sampleRooms);
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Ẩn / Hiện phòng
-  void toggleActive(String roomId) {
+  // ── FIREBASE WRITE ───────────────────────────────────────
+
+  Future<void> addRoom(RoomModel room) async {
+    try {
+      final docRef = await _roomsRef.add(room.toFirebase());
+      final newRoom = room.copyWith(id: docRef.id);
+      _rooms.add(newRoom);
+      notifyListeners();
+      debugPrint('✅ Đăng phòng: ${docRef.id}');
+    } catch (e) {
+      debugPrint('❌ Lỗi addRoom: $e');
+      _rooms.add(room);
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateRoom(RoomModel updated) async {
+    try {
+      await _roomsRef.doc(updated.id).update(updated.toFirebaseForUpdate());
+      final idx = _rooms.indexWhere((r) => r.id == updated.id);
+      if (idx != -1) {
+        _rooms[idx] = updated;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Lỗi updateRoom: $e');
+      final idx = _rooms.indexWhere((r) => r.id == updated.id);
+      if (idx != -1) {
+        _rooms[idx] = updated;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> toggleActive(String roomId) async {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
     if (idx != -1) {
-      _rooms[idx] = _rooms[idx].copyWith(isActive: !_rooms[idx].isActive);
+      final newActive = !_rooms[idx].isActive;
+      _rooms[idx] = _rooms[idx].copyWith(isActive: newActive);
       notifyListeners();
+      try {
+        await _roomsRef.doc(roomId).update({'isActive': newActive});
+      } catch (e) {
+        debugPrint('❌ Lỗi toggleActive: $e');
+      }
     }
   }
 
-  /// Xóa phòng
-  void deleteRoom(String roomId) {
+  Future<void> deleteRoom(String roomId) async {
     _rooms.removeWhere((r) => r.id == roomId);
     notifyListeners();
+    try {
+      await _roomsRef.doc(roomId).delete();
+    } catch (e) {
+      debugPrint('❌ Lỗi deleteRoom: $e');
+    }
   }
 
-  /// Nhân bản phòng
   void duplicateRoom(RoomModel room) {
-    final copy = room.copyWith(
-      postedAt: DateTime.now(),
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
-    );
-    // tạo id mới
     final newRoom = RoomModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      ownerId: room.ownerId,
       title: '${room.title} (bản sao)',
       description: room.description,
       price: room.price,
@@ -81,7 +145,6 @@ class RoomProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Gia hạn phòng thêm 30 ngày
   void renewRoom(String roomId) {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
     if (idx != -1) {
@@ -94,7 +157,6 @@ class RoomProvider extends ChangeNotifier {
     }
   }
 
-  /// Toggle favorite
   void toggleFavorite(String roomId) {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
     if (idx != -1) {

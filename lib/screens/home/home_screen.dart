@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
-import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
@@ -127,16 +126,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _getDisplayName(UserModel user) {
     // Ưu tiên tên từ Firebase Auth nếu có
+  String _getDisplayName() {
     final firebaseName = AuthService.currentUser?.displayName;
     if (firebaseName != null && firebaseName.trim().isNotEmpty) {
       return firebaseName.trim();
     }
-    return user.name;
+    return 'Người dùng';
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = UserModel.currentUser;
+    final firebaseUser = AuthService.currentUser;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Text(
-                              _getDisplayName(user),
+                              _getDisplayName(),
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
@@ -187,7 +187,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           child: CircleAvatar(
                             radius: 24,
-                            backgroundImage: NetworkImage(user.profileImageUrl),
+                            backgroundColor: AppColors.mintGreen,
+                            backgroundImage: (firebaseUser?.photoURL ?? '').isNotEmpty
+                                ? NetworkImage(firebaseUser!.photoURL!)
+                                : null,
+                            child: (firebaseUser?.photoURL ?? '').isEmpty
+                                ? Text(
+                                    _getDisplayName().isNotEmpty ? _getDisplayName()[0].toUpperCase() : 'U',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  )
+                                : null,
                           ),
                         ),
                       ],

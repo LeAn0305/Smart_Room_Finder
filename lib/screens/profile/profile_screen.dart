@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,8 +9,8 @@ import 'package:provider/provider.dart';
 
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/l10n/language_provider.dart';
-import 'package:smart_room_finder/models/room_model.dart';
-import 'package:smart_room_finder/models/user_model.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
+import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
 import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
@@ -30,15 +32,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  final UserModel _user = UserModel.currentUser;
   bool _notificationsEnabled = true;
-
+  bool _isLandlord = false;
   File? _avatarFile;
 
-  int get _totalFavorites => RoomModel.sampleRooms.where((r) => r.isFavorite).length;
-  int get _totalRooms => RoomModel.sampleRooms.length;
-  int get _totalViews => RoomModel.sampleRooms.fold(0, (s, r) => s + r.viewCount);
-  int get _totalContacts => RoomModel.sampleRooms.fold(0, (s, r) => s + r.contactCount);
+  User? get _firebaseUser => FirebaseAuth.instance.currentUser;
+  String get _displayName => _firebaseUser?.displayName ?? 'Người dùng';
+  String get _email => _firebaseUser?.email ?? '';
+  String get _photoUrl => _firebaseUser?.photoURL ?? '';
+
+  int get _totalRooms => context.read<RoomProvider>().myActiveRooms.length;
+  int get _totalFavorites => context.read<FavoriteProvider>().favoriteIds.length;
 
   @override
   void initState() {
@@ -51,6 +55,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
+    _loadRole();
+  }
+
+  Future<void> _loadRole() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final role = doc.data()?['role'] ?? 'tenant';
+      if (mounted) setState(() => _isLandlord = role == 'landlord');
+    } catch (_) {}
   }
 
   @override
@@ -402,9 +417,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                 child: CircleAvatar(
                   backgroundImage: _avatarFile != null
                       ? FileImage(_avatarFile!) as ImageProvider
-                      : NetworkImage(_user.profileImageUrl),
+                      : (_photoUrl.isNotEmpty ? NetworkImage(_photoUrl) : null),
                   backgroundColor: AppColors.mintGreen,
                   onBackgroundImageError: (_, __) {},
+                  child: _avatarFile == null && _photoUrl.isEmpty
+                      ? Text(_displayName.isNotEmpty ? _displayName[0].toUpperCase() : 'U',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28))
+                      : null,
                 ),
               ),
             ),
@@ -436,7 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         const SizedBox(height: 14),
         Text(
-          _user.name,
+          _displayName,
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -452,7 +471,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 size: 14, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Text(
-              _user.email,
+              _email,
               style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary.withOpacity(0.85),
@@ -468,7 +487,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 size: 14, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Text(
-              _user.location,
+              'TP. Hồ Chí Minh',
               style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary.withOpacity(0.85),

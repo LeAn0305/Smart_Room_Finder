@@ -18,6 +18,7 @@ enum RoomDirection {
 
 class RoomModel {
   final String id;
+  final String ownerId;
   final String title;
   final String description;
   final int price;
@@ -42,6 +43,7 @@ class RoomModel {
 
   RoomModel({
     required this.id,
+    this.ownerId = '',
     required this.title,
     required this.description,
     required this.price,
@@ -97,6 +99,7 @@ class RoomModel {
 
   RoomModel copyWith({
     String? id,
+    String? ownerId,
     String? title,
     String? description,
     int? price,
@@ -120,6 +123,7 @@ class RoomModel {
   }) {
     return RoomModel(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       rating: rating,
       title: title ?? this.title,
       description: description ?? this.description,
@@ -146,16 +150,77 @@ class RoomModel {
 
   String get typeString {
     switch (type) {
-      case RoomType.apartment:
-        return 'Chung cư';
-      case RoomType.studio:
-        return 'Phòng trọ';
-      case RoomType.house:
-        return 'Nhà nguyên căn';
-      case RoomType.villa:
-        return 'Biệt thự';
+      case RoomType.apartment: return 'Chung cư';
+      case RoomType.studio: return 'Phòng trọ';
+      case RoomType.house: return 'Nhà nguyên căn';
+      case RoomType.villa: return 'Biệt thự';
     }
   }
+
+  factory RoomModel.fromFirebase(Map<String, dynamic> json, String docId) {
+    return RoomModel(
+      id: docId,
+      ownerId: json['ownerId'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      price: (json['price'] as num?)?.toInt() ?? 0,
+      address: json['address'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
+      images: List<String>.from(json['images'] ?? []),
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      type: _parseType(json['type'] ?? 'studio'),
+      location: json['location'] ?? '',
+      amenities: List<String>.from(json['amenities'] ?? []),
+      isFavorite: json['isFavorite'] ?? false,
+      isVerified: json['isVerified'] ?? false,
+      isActive: json['isActive'] ?? true,
+      viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
+      contactCount: (json['contactCount'] as num?)?.toInt() ?? 0,
+      area: json['area'] != null ? (json['area'] as num).toDouble() : null,
+      bedrooms: json['bedrooms'] != null ? (json['bedrooms'] as num).toInt() : null,
+      postedAt: json['postedAt'] != null ? DateTime.tryParse(json['postedAt']) : null,
+      expiresAt: json['expiresAt'] != null ? DateTime.tryParse(json['expiresAt']) : null,
+      isDraft: json['isDraft'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toFirebase() {
+    return {
+      'ownerId': ownerId,
+      'title': title,
+      'description': description,
+      'price': price,
+      'address': address,
+      'imageUrl': imageUrl,
+      'images': images,
+      'rating': rating,
+      'type': type.toString().split('.').last,
+      'location': location,
+      'amenities': amenities,
+      'isVerified': isVerified,
+      'isActive': isActive,
+      'isDraft': isDraft,
+      'viewCount': viewCount,
+      'contactCount': contactCount,
+      'area': area,
+      'bedrooms': bedrooms,
+      'postedAt': postedAt?.toIso8601String(),
+      'expiresAt': expiresAt?.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toFirebaseForUpdate() => toFirebase()
+    ..['updatedAt'] = DateTime.now().toIso8601String();
+
+  static RoomType _parseType(String t) {
+    switch (t) {
+      case 'apartment': return RoomType.apartment;
+      case 'house': return RoomType.house;
+      case 'villa': return RoomType.villa;
+      default: return RoomType.studio;
+    }
+  }
+
   static List<RoomModel> sampleRooms = [
         RoomModel(
           id: '1',
