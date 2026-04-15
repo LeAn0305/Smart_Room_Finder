@@ -104,7 +104,7 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
                                     ClipRRect(
                                       borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
                                       child: Image.asset(room.imageUrl, width: 100, height: 90, fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(width: 100, height: 90, color: AppColors.mintGreen,
+                                          errorBuilder: (_, _, _) => Container(width: 100, height: 90, color: AppColors.mintGreen,
                                               child: const Icon(Icons.home_outlined, color: AppColors.teal, size: 32))),
                                     ),
                                     const SizedBox(width: 12),

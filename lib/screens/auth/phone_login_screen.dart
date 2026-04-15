@@ -115,12 +115,12 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
 
               SingleChildScrollView(
@@ -140,7 +140,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -165,7 +165,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.teal.withOpacity(0.15),
+                            color: AppColors.teal.withValues(alpha: 0.15),
                             blurRadius: 20,
                             offset: const Offset(0, 6),
                           ),
@@ -217,7 +217,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color: Colors.black.withValues(alpha: 0.03),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -298,10 +298,10 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.teal.withOpacity(0.08),
+                        color: AppColors.teal.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppColors.teal.withOpacity(0.25),
+                          color: AppColors.teal.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Row(

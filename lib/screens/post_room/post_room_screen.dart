@@ -9,6 +9,7 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:smart_room_finder/services/image_service.dart';
 
 class PostRoomScreen extends StatefulWidget {
   final RoomModel? editRoom;
@@ -26,19 +27,12 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   late TextEditingController _areaCtrl;
   RoomType _selectedType = RoomType.studio;
   RoomDirection? _selectedDirection;
-  String _selectedLocation = 'TP. Hồ Chí Minh';
   int _bedrooms = 1;
   int _durationDays = 30;
   final List<String> _selectedAmenities = [];
   bool _isLoading = false;
   List<String> _images = [];
   final ImagePicker _picker = ImagePicker();
-
-  final List<String> _locations = [
-    'Quận 1', 'Quận 3', 'Quận 7', 'Quận 10',
-    'Bình Thạnh', 'Tân Bình', 'Gò Vấp', 'Thủ Đức',
-    'Bình Chánh', 'Nhà Bè',
-  ];
 
   bool get isEditing => widget.editRoom != null;
 
@@ -60,7 +54,6 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     if (r != null) {
       _selectedType = r.type;
       _selectedDirection = r.direction;
-      _selectedLocation = r.location.isNotEmpty ? r.location : 'TP. Hồ Chí Minh';
       _bedrooms = r.bedrooms ?? 1;
       _selectedAmenities.addAll(r.amenities);
       if (r.images.isNotEmpty) {
@@ -99,17 +92,18 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
-    final room = _buildRoom(isDraft: true);
-    if (isEditing) {
-      await context.read<RoomProvider>().updateRoomToFirebase(room);
-    } else {
-      await context.read<RoomProvider>().addRoomToFirebase(room);
-    }
+    final uploadedUrls = await ImageService().uploadImagesList(_images);
+    final room = _buildRoom(isDraft: true, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
+      if (isEditing) {
+        context.read<RoomProvider>().updateRoom(room);
+      } else {
+        context.read<RoomProvider>().addRoom(room);
+      }
       Navigator.pop(context, room);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Đã lưu bản nháp'),
+        content: Text('Da luu ban nhap'),
         backgroundColor: AppColors.teal,
         behavior: SnackBarBehavior.floating,
       ));
@@ -119,14 +113,15 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    final room = _buildRoom(isDraft: false);
-    if (isEditing) {
-      await context.read<RoomProvider>().updateRoomToFirebase(room);
-    } else {
-      await context.read<RoomProvider>().addRoomToFirebase(room);
-    }
+    final uploadedUrls = await ImageService().uploadImagesList(_images);
+    final room = _buildRoom(isDraft: false, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
+      if (isEditing) {
+        context.read<RoomProvider>().updateRoom(room);
+      } else {
+        context.read<RoomProvider>().addRoom(room);
+      }
       Navigator.pop(context, room);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(isEditing ? 'Đã cập nhật phòng' : 'Đã đăng phòng thành công'),
@@ -136,8 +131,9 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
-  RoomModel _buildRoom({required bool isDraft}) {
+  RoomModel _buildRoom({required bool isDraft, List<String>? uploadedUrls}) {
   final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final finalImages = (uploadedUrls != null && uploadedUrls.isNotEmpty) ? uploadedUrls : _images;
 
   return RoomModel(
     id: isEditing
@@ -150,13 +146,13 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     description: _descCtrl.text.trim(),
     price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
     address: _addressCtrl.text.trim(),
-    imageUrl: _images.isNotEmpty
-        ? _images.first
+    imageUrl: finalImages.isNotEmpty
+        ? finalImages.first
         : 'assets/images/room_studio_luxury.png',
-    images: _images,
+    images: finalImages,
     rating: isEditing ? widget.editRoom!.rating : 0.0,
     type: _selectedType,
-    location: _selectedLocation,
+    location: 'TP. Ho Chi Minh',
     amenities: _selectedAmenities,
     area: double.tryParse(_areaCtrl.text.trim()),
     bedrooms: _bedrooms,
@@ -194,36 +190,34 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _buildImagePicker(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Thông tin cơ bản'),
+                    _sectionTitle('Thong tin co ban'),
                     const SizedBox(height: 12),
-                    _field(_titleCtrl, 'Tên phòng / tiêu đề', Icons.title_rounded,
-                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập tên phòng' : null),
+                    _field(_titleCtrl, 'Ten phong / tieu de', Icons.title_rounded,
+                        validator: (v) => v!.isEmpty ? 'Vui long nhap ten phong' : null),
                     const SizedBox(height: 12),
-                    _field(_descCtrl, 'Mô tả chi tiết', Icons.description_rounded, maxLines: 3,
-                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập mô tả' : null),
+                    _field(_descCtrl, 'Mo ta chi tiet', Icons.description_rounded, maxLines: 3,
+                        validator: (v) => v!.isEmpty ? 'Vui long nhap mo ta' : null),
                     const SizedBox(height: 20),
-                    _sectionTitle('Loại phòng'),
+                    _sectionTitle('Loai phong'),
                     const SizedBox(height: 12),
                     _buildTypeSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Giá & Địa chỉ'),
+                    _sectionTitle('Gia & Dia chi'),
                     const SizedBox(height: 12),
-                    _field(_priceCtrl, 'Giá thuê (VND/tháng)', Icons.attach_money_rounded,
+                    _field(_priceCtrl, 'Gia thue (VND/thang)', Icons.attach_money_rounded,
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập giá' : null),
+                        validator: (v) => v!.isEmpty ? 'Vui long nhap gia' : null),
                     const SizedBox(height: 12),
-                    _field(_addressCtrl, 'Địa chỉ', Icons.location_on_rounded,
-                        validator: (v) => v!.isEmpty ? 'Vui lòng nhập địa chỉ' : null),
-                    const SizedBox(height: 12),
-                    _buildLocationSelector(),
+                    _field(_addressCtrl, 'Dia chi', Icons.location_on_rounded,
+                        validator: (v) => v!.isEmpty ? 'Vui long nhap dia chi' : null),
                     const SizedBox(height: 8),
                     _buildMapPlaceholder(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Chi tiết phòng'),
+                    _sectionTitle('Chi tiet phong'),
                     const SizedBox(height: 12),
                     Row(children: [
-                      Expanded(child: _field(_areaCtrl, 'Diện tích (m²)', Icons.square_foot_rounded,
+                      Expanded(child: _field(_areaCtrl, 'Dien tich (m2)', Icons.square_foot_rounded,
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly])),
                       const SizedBox(width: 12),
@@ -232,11 +226,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                     const SizedBox(height: 12),
                     _buildDirectionSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Tiện ích'),
+                    _sectionTitle('Tien ich'),
                     const SizedBox(height: 12),
                     _buildAmenitiesSelector(),
                     const SizedBox(height: 20),
-                    _sectionTitle('Thời hạn đăng tin'),
+                    _sectionTitle('Thoi han dang tin'),
                     const SizedBox(height: 12),
                     _buildDurationSelector(),
                     const SizedBox(height: 28),
@@ -260,7 +254,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
             child: const Padding(padding: EdgeInsets.only(left: 4),
                 child: Icon(Icons.arrow_back_ios, color: AppColors.textPrimary, size: 18)),
           ),
@@ -274,11 +268,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
               child: const Row(children: [
                 Icon(Icons.drafts_rounded, color: AppColors.textSecondary, size: 16),
                 SizedBox(width: 4),
-                Text('Lưu nháp', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+                Text('Luu nhap', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
               ]),
             ),
           ),
@@ -300,7 +294,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.teal.withOpacity(0.4), width: 2),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 2),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Container(padding: const EdgeInsets.all(10),
@@ -325,10 +319,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(fit: StackFit.expand, children: [
                   isAsset 
-                      ? Image.asset(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
+                      ? Image.asset(imgPath, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft))
                       : isNetwork || kIsWeb 
-                          ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
-                          : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft)),
+                          ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft))
+                          : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft)),
                   Positioned(top: 4, right: 4, child: GestureDetector(
                     onTap: () => _removeImage(index),
                     child: Container(
@@ -340,49 +334,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                 ]),
               ),
             );
-          }).toList(),
+          }),
         ]),
       ),
     ]);
-  }
-
-  Widget _buildLocationSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Khu vực', style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8, runSpacing: 8,
-          children: _locations.map((loc) {
-            final sel = _selectedLocation == loc;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedLocation = loc),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: sel ? AppColors.teal : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: sel ? AppColors.teal : AppColors.mintGreen, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.location_on_rounded, size: 13, color: sel ? Colors.white : AppColors.teal),
-                    const SizedBox(width: 4),
-                    Text(loc, style: TextStyle(
-                      color: sel ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.w600, fontSize: 13,
-                    )),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
   }
 
   Widget _buildMapPlaceholder() {
@@ -392,7 +347,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         height: 120, width: double.infinity,
         decoration: BoxDecoration(
           color: AppColors.mintSoft, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.teal.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: AppColors.teal.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Stack(children: [
           ClipRRect(
@@ -506,7 +461,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: sel ? AppColors.teal.withOpacity(0.1) : Colors.white,
+            color: sel ? AppColors.teal.withValues(alpha: 0.1) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: sel ? AppColors.teal : AppColors.mintGreen, width: 1.5),
           ),

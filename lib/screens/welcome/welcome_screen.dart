@@ -36,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
                 left: -40,
                 child: _buildGlow(
                   size: 180,
-                  color: AppColors.teal.withOpacity(0.12),
+                  color: AppColors.teal.withValues(alpha: 0.12),
                 ),
               ),
               Positioned(
@@ -44,7 +44,7 @@ class WelcomeScreen extends StatelessWidget {
                 right: -40,
                 child: _buildGlow(
                   size: 210,
-                  color: AppColors.blue.withOpacity(0.12),
+                  color: AppColors.blue.withValues(alpha: 0.12),
                 ),
               ),
               Positioned(
@@ -52,7 +52,7 @@ class WelcomeScreen extends StatelessWidget {
                 right: 28,
                 child: Icon(
                   Icons.auto_awesome,
-                  color: AppColors.teal.withOpacity(0.65),
+                  color: AppColors.teal.withValues(alpha: 0.65),
                   size: 24,
                 ),
               ),
@@ -61,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                 right: 52,
                 child: Icon(
                   Icons.auto_awesome,
-                  color: AppColors.tealLight.withOpacity(0.70),
+                  color: AppColors.tealLight.withValues(alpha: 0.70),
                   size: 14,
                 ),
               ),
@@ -70,7 +70,7 @@ class WelcomeScreen extends StatelessWidget {
                 left: 26,
                 child: Icon(
                   Icons.auto_awesome,
-                  color: AppColors.white.withOpacity(0.70),
+                  color: AppColors.white.withValues(alpha: 0.70),
                   size: 18,
                 ),
               ),
@@ -107,7 +107,7 @@ class WelcomeScreen extends StatelessWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.blue.withOpacity(0.12),
+                                      color: AppColors.blue.withValues(alpha: 0.12),
                                       blurRadius: 20,
                                       spreadRadius: 2,
                                       offset: const Offset(0, 8),
@@ -127,7 +127,7 @@ class WelcomeScreen extends StatelessWidget {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: AppColors.white.withOpacity(0.95),
+                                      color: AppColors.white.withValues(alpha: 0.95),
                                     ),
                                     child: ClipOval(
                                       child: SizedBox.expand(
@@ -140,7 +140,7 @@ class WelcomeScreen extends StatelessWidget {
                                               fit: BoxFit.cover,
                                               alignment: Alignment.center,
                                               errorBuilder:
-                                                  (_, __, ___) => const Icon(
+                                                  (_, _, _) => const Icon(
                                                     Icons.home_work_rounded,
                                                     size: 56,
                                                     color: AppColors.blueDark,
@@ -192,10 +192,10 @@ class WelcomeScreen extends StatelessWidget {
                                   vertical: 14,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.72),
+                                  color: Colors.white.withValues(alpha: 0.72),
                                   borderRadius: BorderRadius.circular(22),
                                   border: Border.all(
-                                    color: AppColors.teal.withOpacity(0.18),
+                                    color: AppColors.teal.withValues(alpha: 0.18),
                                   ),
                                 ),
                                 child: Row(
@@ -312,7 +312,7 @@ class _FeatureItem extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppColors.blue.withOpacity(0.08),
+                color: AppColors.blue.withValues(alpha: 0.08),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

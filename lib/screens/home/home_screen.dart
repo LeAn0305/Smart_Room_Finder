@@ -10,31 +10,18 @@ import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
-import 'package:smart_room_finder/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  final void Function(String city)? onCityChanged;
-  const HomeScreen({super.key, this.onCityChanged});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _selectedCity = 'TP. Hồ Chí Minh';
-
-  final List<String> _cities = [
-    'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng',
-    'Huế', 'Đồng Nai', 'Bình Dương', 'Bà Rịa - Vũng Tàu', 'Long An',
-    'Tiền Giang', 'Kiên Giang', 'An Giang', 'Đắk Lắk', 'Lâm Đồng',
-    'Khánh Hòa', 'Bình Định', 'Quảng Nam', 'Quảng Ngãi', 'Nghệ An',
-    'Thanh Hóa', 'Hà Tĩnh', 'Quảng Bình', 'Quảng Trị', 'Quảng Ninh',
-    'Hải Dương', 'Bắc Ninh', 'Thái Nguyên', 'Lào Cai', 'Sơn La',
-    'Điện Biên', 'Cao Bằng', 'Lạng Sơn', 'Gia Lai',
-  ];
+  String _selectedCategory = 'Tất cả';
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  String _selectedCategory = 'Tất cả';
   int _bannerPage = 0;
   final PageController _bannerCtrl = PageController();
 
@@ -53,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Ưu đãi tháng 4',
       subtitle: 'Giảm 20% phí dịch vụ\ncho lần đăng đầu tiên',
       badge: 'HOT',
-      image: 'assets/images/room_studio_luxury.png',
     ),
     _BannerData(
       gradient: [Color(0xFF3AA3E3), Color(0xFF2A7FBE)],
@@ -61,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Phòng đã xác minh',
       subtitle: 'Hơn 500+ phòng được\nkiểm duyệt chất lượng',
       badge: 'MỚI',
-      image: 'assets/images/room_apartment_horizon.png',
     ),
     _BannerData(
       gradient: [Color(0xFF7EDFD8), Color(0xFF52CFCB)],
@@ -69,7 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
       title: 'Hỗ trợ 24/7',
       subtitle: 'Đội ngũ tư vấn luôn\nsẵn sàng giúp bạn',
       badge: 'TIP',
-      image: 'assets/images/room_muji_studio.png',
     ),
   ];
 
@@ -81,10 +65,16 @@ class _HomeScreenState extends State<HomeScreen> {
       () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()),
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      context.read<RoomProvider>().fetchRooms();
-      context.read<FavoriteProvider>().fetchFavorites();
+
+      final roomProvider = context.read<RoomProvider>();
+      final favoriteProvider = context.read<FavoriteProvider>();
+
+      await roomProvider.fetchRooms();
+      if (!mounted) return;
+
+      await favoriteProvider.syncFavoritesForCurrentUser();
     });
 
     Future.delayed(const Duration(seconds: 3), _autoScroll);
@@ -108,15 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<RoomModel> _applyFilters(List<RoomModel> rooms, PreferenceProvider pref) {
     List<RoomModel> result = rooms;
 
-    // Filter theo thành phố đang chọn
-    if (_selectedCity != 'TP. Hồ Chí Minh') {
-      final cityFiltered = result.where((r) =>
-          r.location.toLowerCase().contains(_selectedCity.toLowerCase()) ||
-          r.address.toLowerCase().contains(_selectedCity.toLowerCase())).toList();
-      // Chỉ filter nếu có kết quả, không fallback
-      result = cityFiltered;
-    }
-
     if (_selectedCategory != 'Tất cả') {
       final typeMap = {
         'Chung cư': RoomType.apartment,
@@ -124,86 +105,22 @@ class _HomeScreenState extends State<HomeScreen> {
         'Nhà riêng': RoomType.house,
         'Biệt thự': RoomType.villa,
       };
-      result = result.where((r) => r.type == typeMap[_selectedCategory]).toList();
+      result =
+          result.where((r) => r.type == typeMap[_selectedCategory]).toList();
     }
 
     if (_searchQuery.isNotEmpty) {
-      result = result.where((r) =>
-          r.title.toLowerCase().contains(_searchQuery) ||
-          r.address.toLowerCase().contains(_searchQuery) ||
-          r.location.toLowerCase().contains(_searchQuery)).toList();
+      result = result
+          .where(
+            (r) =>
+                r.title.toLowerCase().contains(_searchQuery) ||
+                r.address.toLowerCase().contains(_searchQuery) ||
+                r.location.toLowerCase().contains(_searchQuery),
+          )
+          .toList();
     }
 
     return pref.applyPreference(result);
-  }
-
-  void _showCityPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Chọn tỉnh / thành phố',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: _cities.length,
-                itemBuilder: (_, i) {
-                  final city = _cities[i];
-                  final selected = city == _selectedCity;
-                  return ListTile(
-                    leading: Icon(
-                      Icons.location_on_rounded,
-                      color: selected ? AppColors.teal : AppColors.textSecondary,
-                      size: 20,
-                    ),
-                    title: Text(city,
-                        style: TextStyle(
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                          color: selected ? AppColors.tealDark : AppColors.textPrimary,
-                        )),
-                    trailing: selected
-                        ? const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20)
-                        : null,
-                    tileColor: selected ? AppColors.mintSoft : null,
-                    onTap: () {
-                      setState(() => _selectedCity = city);
-                      widget.onCityChanged?.call(city);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return 'Chào buổi sáng,';
-    if (hour >= 12 && hour < 18) return 'Chào buổi chiều,';
-    if (hour >= 18 && hour < 22) return 'Chào buổi tối,';
-    return 'Xin chào,';
   }
 
   @override
@@ -234,16 +151,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _getGreeting(),
-                              style: const TextStyle(
+                              'Chào buổi sáng,',
+                              style: TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
-                              AuthService.currentUser?.displayName ?? user.name,
-                              style: const TextStyle(
+                              user.name,
+                              style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
@@ -287,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.blue.withOpacity(0.06),
+                            color: AppColors.blue.withValues(alpha: 0.06),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -318,7 +235,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                     size: 20,
                                   ),
                                 )
-                              : null,
+                              : GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const SearchResultScreen(),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.tune_rounded,
+                                    color: AppColors.teal,
+                                    size: 20,
+                                  ),
+                                ),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -332,26 +262,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    child: GestureDetector(
-                      onTap: _showCityPicker,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, color: AppColors.teal, size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            _selectedCity,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: AppColors.teal,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          user.location,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.keyboard_arrow_down,
-                              color: AppColors.textSecondary, size: 18),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: AppColors.textSecondary,
+                          size: 18,
+                        ),
+                      ],
                     ),
                   ),
 
@@ -386,14 +319,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Icon(
                                   Icons.search_off_rounded,
                                   size: 60,
-                                  color: AppColors.teal.withOpacity(0.2),
+                                  color: AppColors.teal.withValues(alpha: 0.2),
                                 ),
                                 const SizedBox(height: 10),
-                                Text(
-                                  filtered.isEmpty && _selectedCity != 'TP. Hồ Chí Minh'
-                                      ? 'Chưa có phòng tại $_selectedCity'
-                                      : 'Không tìm thấy phòng nào',
-                                  style: const TextStyle(
+                                const Text(
+                                  'Không tìm thấy phòng nào',
+                                  style: TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
@@ -472,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         SizedBox(
-          height: 160,
+          height: 130,
           child: PageView.builder(
             controller: _bannerCtrl,
             onPageChanged: (i) => setState(() => _bannerPage = i),
@@ -481,79 +412,63 @@ class _HomeScreenState extends State<HomeScreen> {
               final b = _banners[i];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: b.gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: b.gradient.first.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
                   child: Stack(
-                    fit: StackFit.expand,
                     children: [
-                      // Ảnh nền thực tế
-                      Image.asset(
-                        b.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: b.gradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Lớp gradient phủ lên ảnh
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              b.gradient.first.withOpacity(0.82),
-                              b.gradient.last.withOpacity(0.65),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                        ),
-                      ),
-                      // Vòng tròn trang trí
                       Positioned(
-                        right: -24,
-                        top: -24,
+                        right: -20,
+                        top: -20,
                         child: Container(
-                          width: 130,
-                          height: 130,
+                          width: 120,
+                          height: 120,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.08),
                           ),
                         ),
                       ),
                       Positioned(
-                        right: 40,
-                        bottom: -40,
+                        right: 30,
+                        bottom: -30,
                         child: Container(
-                          width: 90,
-                          height: 90,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.07),
+                            color: Colors.white.withValues(alpha: 0.06),
                           ),
                         ),
                       ),
-                      // Nội dung
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(13),
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.22),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1,
-                                ),
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              child: Icon(b.icon, color: Colors.white, size: 28),
+                              child: Icon(
+                                b.icon,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -563,10 +478,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.28),
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.white.withValues(alpha: 0.25),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       b.badge,
@@ -574,27 +491,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.white,
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
-                                        letterSpacing: 1.2,
+                                        letterSpacing: 1,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6),
                                   Text(
                                     b.title,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 18,
+                                      fontSize: 17,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.3,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     b.subtitle,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withValues(alpha: 0.85),
                                       fontSize: 12,
-                                      height: 1.5,
+                                      height: 1.4,
                                     ),
                                   ),
                                 ],
@@ -651,7 +567,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -680,7 +596,6 @@ class _BannerData {
   final String title;
   final String subtitle;
   final String badge;
-  final String image;
 
   const _BannerData({
     required this.gradient,
@@ -688,6 +603,5 @@ class _BannerData {
     required this.title,
     required this.subtitle,
     required this.badge,
-    required this.image,
   });
 }

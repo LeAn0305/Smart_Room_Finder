@@ -11,10 +11,7 @@ import 'package:smart_room_finder/core/l10n/language_provider.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
-import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
-//import 'package:smart_room_finder/screens/settings/settings_screen.dart';
 import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
-import 'package:smart_room_finder/screens/auth/verify_account_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
 
@@ -141,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.photo_library_outlined, color: AppColors.teal),
               ),
               title: const Text('Thư viện ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -153,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.camera_alt_outlined, color: AppColors.teal),
               ),
               title: const Text('Chụp ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -201,7 +198,7 @@ void _onLogout() {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -329,7 +326,7 @@ void _onLogout() {
                       totalFavorites: totalFavorites,
                     ),
                     const SizedBox(height: 24),
-                    _buildSectionLabel(lang.tr('section_account')),
+                    _buildSectionLabel('📋 ${lang.tr('section_account')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.person_outline_rounded,
@@ -344,39 +341,40 @@ void _onLogout() {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
                       ),
                       _buildMenuItem(
-                        icon: Icons.shield_outlined,
-                        label: lang.tr('verify_account'),
-                        subtitle: lang.tr('verify_account_subtitle'),
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyAccountScreen())),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.teal.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(lang.tr('not_verified'),
-                              style: const TextStyle(fontSize: 11, color: AppColors.tealDark, fontWeight: FontWeight.w600)),
-                        ),
+                        icon: Icons.credit_card_rounded,
+                        label: 'Phương thức thanh toán',
+                        subtitle: 'Quản lý thẻ và tài khoản',
+                        onTap: () => _showComingSoon(),
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.receipt_long_rounded,
+                        label: 'Lịch sử giao dịch',
+                        subtitle: 'Xem các giao dịch trước',
+                        onTap: () => _showComingSoon(),
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_activity')),
+                    _buildSectionLabel('🎯 ${lang.tr('section_activity')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.home_work_outlined,
-                        label: lang.tr('my_rooms'),
-                        subtitle: '$totalRooms ${lang.tr('profile_rooms_posted')}',
+                        label: 'Phòng trọ của tôi',
+                        subtitle: '$totalRooms phòng đã đăng',
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen()));
                         },
                       ),
                       _buildMenuItem(
-                        icon: Icons.favorite_border_rounded,
-                        label: lang.tr('saved_rooms'),
-                        subtitle: '$totalFavorites ${lang.tr('profile_favorites')}',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                        },
+                        icon: Icons.message_outlined,
+                        label: 'Tin nhắn / Chat',
+                        subtitle: 'Nhắn tin với chủ phòng',
+                        onTap: () => _showComingSoon(),
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.assignment_outlined,
+                        label: 'Đơn yêu cầu / Applications',
+                        subtitle: 'Xem đơn yêu cầu',
+                        onTap: () => _showComingSoon(),
                       ),
                       _buildMenuItem(
                         icon: Icons.history_rounded,
@@ -388,7 +386,7 @@ void _onLogout() {
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_settings')),
+                    _buildSectionLabel('⚙️ ${lang.tr('section_settings')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.notifications_outlined,
@@ -398,7 +396,7 @@ void _onLogout() {
                         trailing: Switch(
                           value: _notificationsEnabled,
                           onChanged: (val) => setState(() => _notificationsEnabled = val),
-                          activeColor: AppColors.teal,
+                          activeThumbColor: AppColors.teal,
                           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
@@ -416,12 +414,12 @@ void _onLogout() {
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_other')),
+                    _buildSectionLabel('⭐ ${lang.tr('section_other')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.info_outline_rounded,
-                        label: lang.tr('about_app'),
-                        subtitle: lang.tr('about_app_subtitle'),
+                        label: 'Về ứng dụng',
+                        subtitle: 'Phiên bản 1.0.0',
                         onTap: _showComingSoon,
                       ),
                       _buildMenuItem(
@@ -457,11 +455,11 @@ void _onLogout() {
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 4)),
               ],
@@ -507,7 +505,7 @@ void _onLogout() {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.teal.withOpacity(0.22),
+                  color: AppColors.teal.withValues(alpha: 0.22),
                   blurRadius: 40,
                   spreadRadius: 8,
                 ),
@@ -561,7 +559,7 @@ void _onLogout() {
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.teal.withOpacity(0.4),
+                      color: AppColors.teal.withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     )
@@ -604,7 +602,7 @@ void _onLogout() {
               displayEmail,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: AppColors.textSecondary.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -624,7 +622,7 @@ void _onLogout() {
               displayLocation,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: AppColors.textSecondary.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -645,12 +643,12 @@ void _onLogout() {
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 6),
           ),
@@ -724,12 +722,12 @@ void _onLogout() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.82),
+        color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.035),
+              color: Colors.black.withValues(alpha: 0.035),
               blurRadius: 14,
               offset: const Offset(0, 6)),
         ],
@@ -775,7 +773,7 @@ void _onLogout() {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: ic.withOpacity(0.1),
+                  color: ic.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(icon, color: ic, size: 21),
@@ -804,7 +802,7 @@ void _onLogout() {
                   ],
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
               if (trailing == null && showChevron)
                 const Icon(Icons.chevron_right_rounded,
                     color: AppColors.textSecondary, size: 20),

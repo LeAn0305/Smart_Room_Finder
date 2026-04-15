@@ -106,9 +106,9 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
             ),
@@ -127,7 +127,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
           child: const Row(
             children: [
               Icon(Icons.verified_user_outlined, color: AppColors.teal, size: 20),
@@ -168,16 +168,16 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.85),
+          color: Colors.white.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.white, width: 2),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
               child: Icon(icon, color: AppColors.teal, size: 26),
             ),
             const SizedBox(width: 16),
@@ -319,7 +319,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [AppColors.teal, AppColors.blue]),
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: AppColors.teal.withOpacity(0.3), blurRadius: 30, spreadRadius: 5)],
+            boxShadow: [BoxShadow(color: AppColors.teal.withValues(alpha: 0.3), blurRadius: 30, spreadRadius: 5)],
           ),
           child: const Icon(Icons.verified_rounded, color: Colors.white, size: 56),
         ),
@@ -357,7 +357,7 @@ class _VerifyAccountScreenState extends State<VerifyAccountScreen> {
     hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
     prefixIcon: Icon(icon, color: AppColors.teal, size: 20),
     filled: true,
-    fillColor: Colors.white.withOpacity(0.85),
+    fillColor: Colors.white.withValues(alpha: 0.85),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.teal, width: 1.5)),

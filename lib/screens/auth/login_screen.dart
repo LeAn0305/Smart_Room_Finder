@@ -201,12 +201,12 @@ class _LoginScreenState extends State<LoginScreen> {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
               SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -223,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -473,7 +473,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 : null,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -545,7 +545,7 @@ class _LoginScreenState extends State<LoginScreen> {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

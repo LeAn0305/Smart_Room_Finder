@@ -112,12 +112,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
 
               SingleChildScrollView(
@@ -137,7 +137,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -163,7 +163,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.teal.withOpacity(0.15),
+                              color: AppColors.teal.withValues(alpha: 0.15),
                               blurRadius: 24,
                               offset: const Offset(0, 8),
                             ),
@@ -220,10 +220,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: AppColors.teal.withOpacity(0.18),
+                            color: AppColors.teal.withValues(alpha: 0.18),
                           ),
                         ),
                         child: Row(
@@ -272,7 +272,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha: 0.03),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -317,7 +317,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             backgroundColor: AppColors.teal,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor:
-                                AppColors.teal.withOpacity(0.5),
+                                AppColors.teal.withValues(alpha: 0.5),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),

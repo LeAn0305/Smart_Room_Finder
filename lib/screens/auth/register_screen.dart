@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
-//import 'package:smart_room_finder/services/local_auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -85,35 +82,28 @@ Future<void> _onRegister() async {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Đăng ký thành công! Vui lòng đăng nhập.',
+                'Đăng ký thành công!',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
         backgroundColor: AppColors.teal,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
-    final pref = context.read<PreferenceProvider>();
-    if (!pref.completed) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-        (_) => false,
-      );
-    } else {
-      Navigator.pop(context);
-    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      (_) => false,
+    );
   } on FirebaseAuthException catch (e) {
     if (!mounted) return;
 
@@ -173,12 +163,12 @@ Future<void> _onRegister() async {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
 
               Form(
@@ -200,7 +190,7 @@ Future<void> _onRegister() async {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -295,10 +285,10 @@ Future<void> _onRegister() async {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.teal.withOpacity(0.07),
+                          color: AppColors.teal.withValues(alpha: 0.07),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: AppColors.teal.withOpacity(0.2)),
+                              color: AppColors.teal.withValues(alpha: 0.2)),
                         ),
                         child: const Row(
                           children: [
@@ -386,7 +376,7 @@ Future<void> _onRegister() async {
                             backgroundColor: AppColors.teal,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor:
-                                AppColors.teal.withOpacity(0.5),
+                                AppColors.teal.withValues(alpha: 0.5),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -470,7 +460,7 @@ Future<void> _onRegister() async {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

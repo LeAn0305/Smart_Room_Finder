@@ -14,12 +14,16 @@ class FavoriteProvider extends ChangeNotifier {
 
   bool isFavorite(String id) => _favoriteIds.contains(id);
 
+  String? _lastLoadedUserId;
   // ==================== READ ====================
 
   Future<void> fetchFavorites() async {
     try {
       if (_currentUserId.isEmpty) {
-        debugPrint('⚠️ Chưa có user đăng nhập. Dùng local favorites fallback.');
+        _favoriteIds.clear();
+        _lastLoadedUserId = null;
+        notifyListeners();
+        debugPrint('⚠️ Chưa có user đăng nhập. Đã clear favorites.');
         return;
       }
 
@@ -119,4 +123,35 @@ class FavoriteProvider extends ChangeNotifier {
     _favoriteIds.clear();
     notifyListeners();
   }
+
+  // For testing purposes
+  void addTestFavorites(List<String> roomIds) {
+    _favoriteIds.addAll(roomIds);
+    notifyListeners();
+    debugPrint('✅ Đã thêm ${roomIds.length} test favorites');
+  }
+
+  Future<void> syncFavoritesForCurrentUser() async {
+  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  if (uid.isEmpty) {
+    if (_favoriteIds.isNotEmpty) {
+      _favoriteIds.clear();
+      _lastLoadedUserId = null;
+      notifyListeners();
+    }
+    debugPrint('⚠️ Chưa có user đăng nhập, đã clear favorites trong bộ nhớ');
+    return;
+  }
+
+  if (_lastLoadedUserId != uid) {
+    _favoriteIds.clear();
+    _lastLoadedUserId = uid;
+    notifyListeners();
+    debugPrint('🔄 Đổi user favorite sang: $uid, đã clear dữ liệu cũ');
+  }
+
+  await fetchFavorites();
+  }
+
 }

@@ -195,7 +195,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
     }
   }
-  
+
 
   void _updateLocation(Position pos, {bool animateSelected = false}) {
     if (!mounted) return;
@@ -323,7 +323,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 12,
-              onTap: (_, __) => setState(() => _selectedRoom = null),
+              onTap: (_, _) => setState(() => _selectedRoom = null),
             ),
             children: [
               TileLayer(
@@ -359,7 +359,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.blue.withOpacity(0.4),
+                              color: Colors.blue.withValues(alpha: 0.4),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -426,13 +426,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 4))],
                 ),
                 child: _loadingLocation
                     ? const SizedBox(
@@ -497,13 +491,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4))],
           ),
           child: Row(
             children: [
@@ -626,141 +614,144 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRoomCard(RoomModel room) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              room.imageUrl,
+  return Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.12),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(
+            room.imageUrl,
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
               width: 80,
               height: 80,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 80,
-                height: 80,
-                color: AppColors.mintSoft,
-                child: const Icon(
-                  Icons.image_rounded,
-                  color: AppColors.teal,
-                ),
+              color: AppColors.mintSoft,
+              child: const Icon(
+                Icons.image_rounded,
+                color: AppColors.teal,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  room.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                room.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.textSecondary,
+                    size: 13,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_rounded,
-                      color: AppColors.textSecondary,
-                      size: 13,
-                    ),
-                    const SizedBox(width: 2),
-                    Expanded(
-                      child: Text(
-                        room.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.teal, AppColors.tealDark],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${(room.price / 1000000).toStringAsFixed(1)}tr/tháng',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.star_rounded,
-                      color: Colors.orangeAccent,
-                      size: 14,
-                    ),
-                    Text(
-                      room.rating.toString(),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: Text(
+                      room.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    if (_currentLocation != null) ...[
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.near_me_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.teal, AppColors.tealDark],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${(room.price / 1000000).toStringAsFixed(1)}tr/tháng',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.star_rounded,
+                    color: Colors.orangeAccent,
+                    size: 14,
+                  ),
+                  Text(
+                    room.rating.toString(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (_currentLocation != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.near_me_rounded,
+                      color: AppColors.teal,
+                      size: 13,
+                    ),
+                    Text(
+                      '${_distanceToRoom(room).toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                        fontSize: 12,
                         color: AppColors.teal,
-                        size: 13,
+                        fontWeight: FontWeight.w600,
                       ),
-                      Text(
-                        '${_distanceToRoom(room).toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.teal,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-          GestureDetector(
-            onTap: () => setState(() => _selectedRoom = null),
-            child: const Icon(
-              Icons.close_rounded,
-              color: AppColors.textSecondary,
-              size: 20,
-            ),
+        ),
+        GestureDetector(
+          onTap: () => setState(() => _selectedRoom = null),
+          child: const Icon(
+            Icons.close_rounded,
+            color: AppColors.textSecondary,
+            size: 20,
           ),
-        ],
-      ),
-    );
+        ),
+      ],
+    ),
+  );
   }
 }

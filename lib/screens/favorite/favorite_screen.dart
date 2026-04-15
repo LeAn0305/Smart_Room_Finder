@@ -46,6 +46,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<FavoriteProvider>().fetchFavorites();
+      // Add test favorites từ sampleRooms để test giao diện
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        final testFavIds = ['1', '2', '3']; // Sample room IDs
+        context.read<FavoriteProvider>().addTestFavorites(testFavIds);
+      });
     });
   }
 
@@ -270,7 +276,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.white, shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
                   child: const Padding(
                     padding: EdgeInsets.only(left: 4),
@@ -285,7 +291,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               children: [
                 Text(lang.tr('favorite_title'),
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                Text('${allFavoritesLength} ${lang.tr('favorite_saved')}',
+                Text('$allFavoritesLength ${lang.tr('favorite_saved')}',
                     style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               ],
             ),
@@ -299,7 +305,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               decoration: BoxDecoration(
                 color: _groupByType ? AppColors.teal : Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
               ),
               child: Icon(Icons.category_rounded,
                   color: _groupByType ? Colors.white : AppColors.teal, size: 20),
@@ -317,7 +323,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               decoration: BoxDecoration(
                 color: _isSelecting ? AppColors.teal : Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
               ),
               child: Icon(Icons.checklist_rounded,
                   color: _isSelecting ? Colors.white : AppColors.teal, size: 20),
@@ -331,7 +337,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
               ),
               child: Row(children: [
                 const Icon(Icons.sort_rounded, color: AppColors.teal, size: 18),
@@ -353,7 +359,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: TextField(
           controller: _searchController,
@@ -407,7 +413,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               decoration: BoxDecoration(
                 color: selected ? AppColors.teal : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
               ),
               child: Text(labels[i],
                   style: TextStyle(
@@ -426,9 +432,9 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       margin: const EdgeInsets.fromLTRB(24, 8, 24, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.teal.withOpacity(0.1),
+        color: AppColors.teal.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.teal.withOpacity(0.3)),
+        border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -585,7 +591,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   color: isSelected ? AppColors.teal : Colors.white,
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.teal, width: 2),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)],
                 ),
                 child: isSelected
                     ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)

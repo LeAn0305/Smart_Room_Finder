@@ -80,7 +80,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         if (query.isNotEmpty &&
             !r.title.toLowerCase().contains(query) &&
             !r.address.toLowerCase().contains(query) &&
-            !r.location.toLowerCase().contains(query)) return false;
+            !r.location.toLowerCase().contains(query)) {
+          return false;
+        }
 
         // Loại phòng
         if (_selectedType != 'Tất cả' && r.type != typeMap[_selectedType]) return false;
@@ -88,7 +90,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         // Khu vực
         if (_selectedLocation != 'Tất cả' &&
             !r.location.toLowerCase().contains(_selectedLocation.toLowerCase()) &&
-            !r.address.toLowerCase().contains(_selectedLocation.toLowerCase())) return false;
+            !r.address.toLowerCase().contains(_selectedLocation.toLowerCase())) {
+          return false;
+        }
 
         // Giá
         if (priceRange.$2 > 0 && r.price < priceRange.$2) return false;
@@ -228,8 +232,11 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                           final sel = _selectedAmenities.contains(a.$1);
                           return GestureDetector(
                             onTap: () => setSheetState(() {
-                              if (sel) _selectedAmenities.remove(a.$1);
-                              else _selectedAmenities.add(a.$1);
+                              if (sel) {
+                                _selectedAmenities.remove(a.$1);
+                              } else {
+                                _selectedAmenities.add(a.$1);
+                              }
                             }),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 180),

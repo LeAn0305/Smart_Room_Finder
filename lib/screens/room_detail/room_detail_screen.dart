@@ -97,7 +97,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                     '(124)',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: AppColors.textSecondary.withOpacity(
+                                      color: AppColors.textSecondary.withValues(alpha: 
                                         0.7,
                                       ),
                                       fontWeight: FontWeight.w600,
@@ -161,7 +161,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                             room.description,
                             style: TextStyle(
                               fontSize: 15,
-                              color: AppColors.textSecondary.withOpacity(0.9),
+                              color: AppColors.textSecondary.withValues(alpha: 0.9),
                               height: 1.7,
                               fontWeight: FontWeight.w500,
                             ),
@@ -197,7 +197,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
+                                          color: Colors.black.withValues(alpha: 0.03),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
@@ -283,7 +283,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 24,
                     offset: const Offset(0, -8),
                   ),
@@ -414,7 +414,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                       boxShadow: sel
                           ? [
                               BoxShadow(
-                                color: AppColors.teal.withOpacity(0.3),
+                                color: AppColors.teal.withValues(alpha: 0.3),
                                 blurRadius: 8,
                               ),
                             ]
@@ -439,19 +439,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       return Image.asset(
         imgPath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     } else if (imgPath.startsWith('http') || kIsWeb) {
       return Image.network(
         imgPath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     } else {
       return Image.file(
         File(imgPath),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     }
   }
@@ -461,19 +461,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       return Image.asset(
         imgPath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorThumb(),
+        errorBuilder: (_, _, _) => _errorThumb(),
       );
     } else if (imgPath.startsWith('http') || kIsWeb) {
       return Image.network(
         imgPath,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorThumb(),
+        errorBuilder: (_, _, _) => _errorThumb(),
       );
     } else {
       return Image.file(
         File(imgPath),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorThumb(),
+        errorBuilder: (_, _, _) => _errorThumb(),
       );
     }
   }
@@ -573,7 +573,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 'Chủ nhà siêu cấp • 5 năm kinh nghiệm',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary.withOpacity(0.8),
+                  color: AppColors.textSecondary.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -582,7 +582,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         ),
         _actionBtn(
           Icons.chat_bubble_rounded,
-          AppColors.teal.withOpacity(0.1),
+          AppColors.teal.withValues(alpha: 0.1),
           AppColors.teal,
         ),
         const SizedBox(width: 10),
@@ -606,11 +606,11 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.92),
+          color: Colors.white.withValues(alpha: 0.92),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),

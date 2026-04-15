@@ -89,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
             left: -80,
             child: _buildGlow(
               size: 260,
-              color: AppColors.teal.withOpacity(0.18),
+              color: AppColors.teal.withValues(alpha: 0.18),
             ),
           ),
 
@@ -98,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
             right: -80,
             child: _buildGlow(
               size: 280,
-              color: AppColors.blue.withOpacity(0.16),
+              color: AppColors.blue.withValues(alpha: 0.16),
             ),
           ),
 
@@ -106,7 +106,7 @@ class _SplashScreenState extends State<SplashScreen>
             alignment: Alignment.center,
             child: _buildGlow(
               size: 330,
-              color: AppColors.mintGreen.withOpacity(0.22),
+              color: AppColors.mintGreen.withValues(alpha: 0.22),
             ),
           ),
 
@@ -139,7 +139,7 @@ class _SplashScreenState extends State<SplashScreen>
             left: 42,
             child: _Sparkle(
               size: 18,
-              color: AppColors.white.withOpacity(0.75),
+              color: AppColors.white.withValues(alpha: 0.75),
             ),
           ),
           Positioned(
@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen>
             left: 62,
             child: _Sparkle(
               size: 30,
-              color: AppColors.white.withOpacity(0.75),
+              color: AppColors.white.withValues(alpha: 0.75),
             ),
           ),
           Positioned(
@@ -155,7 +155,7 @@ class _SplashScreenState extends State<SplashScreen>
             right: 34,
             child: _Sparkle(
               size: 38,
-              color: AppColors.mintSoft.withOpacity(0.65),
+              color: AppColors.mintSoft.withValues(alpha: 0.65),
             ),
           ),
           Positioned(
@@ -163,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
             right: 90,
             child: _Sparkle(
               size: 22,
-              color: AppColors.mintSoft.withOpacity(0.45),
+              color: AppColors.mintSoft.withValues(alpha: 0.45),
             ),
           ),
 
@@ -210,7 +210,7 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.blue.withOpacity(0.18),
+                                color: AppColors.blue.withValues(alpha: 0.18),
                                 blurRadius: 28,
                                 spreadRadius: 3,
                                 offset: const Offset(0, 10),
@@ -230,7 +230,7 @@ class _SplashScreenState extends State<SplashScreen>
                             child: Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.white.withOpacity(0.95),
+                                color: AppColors.white.withValues(alpha: 0.95),
                               ),
                               child: ClipOval(
                                 child: SizedBox.expand(
@@ -274,7 +274,7 @@ class _SplashScreenState extends State<SplashScreen>
                           letterSpacing: 0.3,
                           shadows: [
                             Shadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               offset: const Offset(0, 3),
                               blurRadius: 10,
                             ),
@@ -290,10 +290,10 @@ class _SplashScreenState extends State<SplashScreen>
                         style: TextStyle(
                           fontSize: subtitleSize,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.white.withOpacity(0.92),
+                          color: AppColors.white.withValues(alpha: 0.92),
                           shadows: [
                             Shadow(
-                              color: Colors.black.withOpacity(0.06),
+                              color: Colors.black.withValues(alpha: 0.06),
                               offset: const Offset(0, 2),
                               blurRadius: 8,
                             ),
@@ -367,7 +367,7 @@ class _RotatingDots extends StatelessWidget {
 
                 final Color color = index == 7
                     ? AppColors.blueDark
-                    : AppColors.white.withOpacity(0.45 + index * 0.05);
+                    : AppColors.white.withValues(alpha: 0.45 + index * 0.05);
 
                 return Positioned(
                   left: x,
