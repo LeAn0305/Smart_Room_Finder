@@ -291,7 +291,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       boxShadow: sel
                           ? [
                               BoxShadow(
-                                color: AppColors.teal.withOpacity(0.3),
+                                color: AppColors.teal.withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -360,7 +360,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -372,7 +372,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: sel
-                                ? Colors.white.withOpacity(0.2)
+                                ? Colors.white.withValues(alpha: 0.2)
                                 : AppColors.mintSoft,
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -443,7 +443,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: sel ? AppColors.teal.withOpacity(0.1) : Colors.white,
+                      color: sel ? AppColors.teal.withValues(alpha: 0.1) : Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: sel ? AppColors.teal : AppColors.mintGreen,
@@ -512,8 +512,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       boxShadow: [
                         BoxShadow(
                           color: sel
-                              ? AppColors.teal.withOpacity(0.25)
-                              : Colors.black.withOpacity(0.04),
+                              ? AppColors.teal.withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -525,7 +525,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: sel
-                                ? Colors.white.withOpacity(0.2)
+                                ? Colors.white.withValues(alpha: 0.2)
                                 : AppColors.mintSoft,
                             borderRadius: BorderRadius.circular(10),
                           ),

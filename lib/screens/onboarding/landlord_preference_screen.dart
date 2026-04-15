@@ -161,7 +161,7 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
           onPressed: canNext ? _next : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.teal,
-            disabledBackgroundColor: AppColors.teal.withOpacity(0.4),
+            disabledBackgroundColor: AppColors.teal.withValues(alpha: 0.4),
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -213,8 +213,11 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                 final sel = _selectedLocations.contains(loc);
                 return GestureDetector(
                   onTap: () => setState(() {
-                    if (sel) _selectedLocations.remove(loc);
-                    else _selectedLocations.add(loc);
+                    if (sel) {
+                      _selectedLocations.remove(loc);
+                    } else {
+                      _selectedLocations.add(loc);
+                    }
                   }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -227,7 +230,7 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                         width: 1.5,
                       ),
                       boxShadow: sel
-                          ? [BoxShadow(color: AppColors.teal.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                          ? [BoxShadow(color: AppColors.teal.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))]
                           : [],
                     ),
                     child: Row(
@@ -260,9 +263,9 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.teal.withOpacity(0.08),
+                  color: AppColors.teal.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.teal.withOpacity(0.2)),
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -300,8 +303,11 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                 final sel = _selectedTypes.contains(t.$1);
                 return GestureDetector(
                   onTap: () => setState(() {
-                    if (sel) _selectedTypes.remove(t.$1);
-                    else _selectedTypes.add(t.$1);
+                    if (sel) {
+                      _selectedTypes.remove(t.$1);
+                    } else {
+                      _selectedTypes.add(t.$1);
+                    }
                   }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -315,7 +321,7 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                         width: 1.5,
                       ),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 4)),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4)),
                       ],
                     ),
                     child: Row(
@@ -323,7 +329,7 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: sel ? Colors.white.withOpacity(0.2) : AppColors.mintSoft,
+                            color: sel ? Colors.white.withValues(alpha: 0.2) : AppColors.mintSoft,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(t.$3, color: sel ? Colors.white : AppColors.teal, size: 24),
@@ -343,7 +349,7 @@ class _LandlordPreferenceScreenState extends State<LandlordPreferenceScreen> {
                               Text(t.$4,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: sel ? Colors.white.withOpacity(0.8) : AppColors.textSecondary,
+                                    color: sel ? Colors.white.withValues(alpha: 0.8) : AppColors.textSecondary,
                                   )),
                             ],
                           ),

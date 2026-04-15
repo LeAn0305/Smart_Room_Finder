@@ -171,7 +171,7 @@ class _MapScreenState extends State<MapScreen> {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 12,
-              onTap: (_, __) => setState(() => _selectedRoom = null),
+              onTap: (_, _) => setState(() => _selectedRoom = null),
             ),
             children: [
               TileLayer(
@@ -205,7 +205,7 @@ class _MapScreenState extends State<MapScreen> {
                           color: Colors.blue,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.4), blurRadius: 8, spreadRadius: 2)],
+                          boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 2)],
                         ),
                         child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 20),
                       ),
@@ -231,7 +231,7 @@ class _MapScreenState extends State<MapScreen> {
               decoration: BoxDecoration(
                 color: AppColors.teal,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4))],
               ),
               child: Text('${_filteredRooms.length} phòng',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
@@ -248,7 +248,7 @@ class _MapScreenState extends State<MapScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 4))],
                 ),
                 child: _loadingLocation
                     ? const SizedBox(width: 22, height: 22,
@@ -276,7 +276,7 @@ class _MapScreenState extends State<MapScreen> {
         color: isSelected ? AppColors.teal : Colors.white,
         borderRadius: BorderRadius.circular(isSelected ? 12 : 24),
         border: Border.all(color: AppColors.teal, width: 2),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 3))],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: isSelected
@@ -295,7 +295,7 @@ class _MapScreenState extends State<MapScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4))],
           ),
           child: Row(children: [
             const Icon(Icons.search_rounded, color: AppColors.teal, size: 20),
@@ -365,7 +365,7 @@ class _MapScreenState extends State<MapScreen> {
               decoration: BoxDecoration(
                 color: sel ? AppColors.teal : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))],
               ),
               child: Text(_filters[i],
                   style: TextStyle(
@@ -384,13 +384,13 @@ class _MapScreenState extends State<MapScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Row(children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.asset(room.imageUrl, width: 80, height: 80, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(width: 80, height: 80, color: AppColors.mintSoft,
+              errorBuilder: (_, _, _) => Container(width: 80, height: 80, color: AppColors.mintSoft,
                   child: const Icon(Icons.image_rounded, color: AppColors.teal))),
         ),
         const SizedBox(width: 12),

@@ -138,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.photo_library_outlined, color: AppColors.teal),
               ),
               title: const Text('Thư viện ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -150,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.camera_alt_outlined, color: AppColors.teal),
               ),
               title: const Text('Chụp ảnh', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -198,7 +198,7 @@ void _onLogout() {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -396,7 +396,7 @@ void _onLogout() {
                         trailing: Switch(
                           value: _notificationsEnabled,
                           onChanged: (val) => setState(() => _notificationsEnabled = val),
-                          activeColor: AppColors.teal,
+                          activeThumbColor: AppColors.teal,
                           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
@@ -455,11 +455,11 @@ void _onLogout() {
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 4)),
               ],
@@ -505,7 +505,7 @@ void _onLogout() {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.teal.withOpacity(0.22),
+                  color: AppColors.teal.withValues(alpha: 0.22),
                   blurRadius: 40,
                   spreadRadius: 8,
                 ),
@@ -559,7 +559,7 @@ void _onLogout() {
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.teal.withOpacity(0.4),
+                      color: AppColors.teal.withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     )
@@ -602,7 +602,7 @@ void _onLogout() {
               displayEmail,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: AppColors.textSecondary.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -622,7 +622,7 @@ void _onLogout() {
               displayLocation,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary.withOpacity(0.85),
+                color: AppColors.textSecondary.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -643,12 +643,12 @@ void _onLogout() {
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 6),
           ),
@@ -722,12 +722,12 @@ void _onLogout() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.82),
+        color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.035),
+              color: Colors.black.withValues(alpha: 0.035),
               blurRadius: 14,
               offset: const Offset(0, 6)),
         ],
@@ -773,7 +773,7 @@ void _onLogout() {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: ic.withOpacity(0.1),
+                  color: ic.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(icon, color: ic, size: 21),
@@ -802,7 +802,7 @@ void _onLogout() {
                   ],
                 ),
               ),
-              if (trailing != null) trailing,
+              ?trailing,
               if (trailing == null && showChevron)
                 const Icon(Icons.chevron_right_rounded,
                     color: AppColors.textSecondary, size: 20),

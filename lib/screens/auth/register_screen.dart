@@ -163,12 +163,12 @@ Future<void> _onRegister() async {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
 
               Form(
@@ -190,7 +190,7 @@ Future<void> _onRegister() async {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -285,10 +285,10 @@ Future<void> _onRegister() async {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.teal.withOpacity(0.07),
+                          color: AppColors.teal.withValues(alpha: 0.07),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: AppColors.teal.withOpacity(0.2)),
+                              color: AppColors.teal.withValues(alpha: 0.2)),
                         ),
                         child: const Row(
                           children: [
@@ -376,7 +376,7 @@ Future<void> _onRegister() async {
                             backgroundColor: AppColors.teal,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor:
-                                AppColors.teal.withOpacity(0.5),
+                                AppColors.teal.withValues(alpha: 0.5),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -460,7 +460,7 @@ Future<void> _onRegister() async {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

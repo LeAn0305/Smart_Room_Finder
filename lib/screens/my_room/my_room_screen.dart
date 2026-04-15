@@ -340,7 +340,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                       ),
                     ],
@@ -375,7 +375,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                   ),
                 ],
@@ -441,7 +441,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
             ),
           ],
@@ -480,7 +480,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
             ),
           ],
@@ -530,7 +530,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
           ),
         ],
@@ -568,7 +568,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                       ? Icons.visibility_off_outlined
                       : Icons.drafts_outlined,
               size: 64,
-              color: AppColors.textSecondary.withOpacity(0.3),
+              color: AppColors.textSecondary.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 12),
             Text(
@@ -610,7 +610,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -834,7 +834,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
         height: 150,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     } else if (imgPath.startsWith('http') || kIsWeb) {
       return Image.network(
@@ -842,7 +842,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
         height: 150,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     } else {
       return Image.file(
@@ -850,7 +850,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
         height: 150,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorImage(),
+        errorBuilder: (_, _, _) => _errorImage(),
       );
     }
   }
@@ -894,9 +894,9 @@ class _MyRoomScreenState extends State<MyRoomScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [

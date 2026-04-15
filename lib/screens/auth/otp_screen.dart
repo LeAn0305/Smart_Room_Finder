@@ -114,12 +114,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
               Positioned(
                 top: -60,
                 left: -40,
-                child: _buildGlow(180, AppColors.teal.withOpacity(0.12)),
+                child: _buildGlow(180, AppColors.teal.withValues(alpha: 0.12)),
               ),
               Positioned(
                 bottom: -70,
                 right: -40,
-                child: _buildGlow(210, AppColors.blue.withOpacity(0.12)),
+                child: _buildGlow(210, AppColors.blue.withValues(alpha: 0.12)),
               ),
 
               SingleChildScrollView(
@@ -139,7 +139,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -164,7 +164,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.teal.withOpacity(0.15),
+                            color: AppColors.teal.withValues(alpha: 0.15),
                             blurRadius: 20,
                             offset: const Offset(0, 6),
                           ),
@@ -257,7 +257,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                           backgroundColor: AppColors.teal,
                           foregroundColor: Colors.white,
                           disabledBackgroundColor:
-                              AppColors.teal.withOpacity(0.5),
+                              AppColors.teal.withValues(alpha: 0.5),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),

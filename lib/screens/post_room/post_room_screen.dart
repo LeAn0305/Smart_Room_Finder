@@ -254,7 +254,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
             child: const Padding(padding: EdgeInsets.only(left: 4),
                 child: Icon(Icons.arrow_back_ios, color: AppColors.textPrimary, size: 18)),
           ),
@@ -268,7 +268,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
               child: const Row(children: [
                 Icon(Icons.drafts_rounded, color: AppColors.textSecondary, size: 16),
                 SizedBox(width: 4),
@@ -294,7 +294,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.teal.withOpacity(0.4), width: 2),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 2),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Container(padding: const EdgeInsets.all(10),
@@ -319,10 +319,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(fit: StackFit.expand, children: [
                   isAsset 
-                      ? Image.asset(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
+                      ? Image.asset(imgPath, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft))
                       : isNetwork || kIsWeb 
-                          ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft))
-                          : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.mintSoft)),
+                          ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft))
+                          : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft)),
                   Positioned(top: 4, right: 4, child: GestureDetector(
                     onTap: () => _removeImage(index),
                     child: Container(
@@ -334,7 +334,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                 ]),
               ),
             );
-          }).toList(),
+          }),
         ]),
       ),
     ]);
@@ -347,7 +347,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         height: 120, width: double.infinity,
         decoration: BoxDecoration(
           color: AppColors.mintSoft, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.teal.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: AppColors.teal.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Stack(children: [
           ClipRRect(
@@ -461,7 +461,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: sel ? AppColors.teal.withOpacity(0.1) : Colors.white,
+            color: sel ? AppColors.teal.withValues(alpha: 0.1) : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: sel ? AppColors.teal : AppColors.mintGreen, width: 1.5),
           ),

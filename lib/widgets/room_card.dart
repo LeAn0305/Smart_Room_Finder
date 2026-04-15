@@ -324,13 +324,13 @@ class _RoomCardState extends State<RoomCard> {
     if (url.startsWith('assets/')) {
       return Image.asset(url,
           height: height, width: double.infinity, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _placeholder(height));
+          errorBuilder: (_, _, _) => _placeholder(height));
     }
     return Image.network(url,
         height: height, width: double.infinity, fit: BoxFit.cover,
         loadingBuilder: (_, child, progress) =>
             progress == null ? child : _placeholder(height),
-        errorBuilder: (_, __, ___) => _placeholder(height));
+        errorBuilder: (_, _, _) => _placeholder(height));
   }
 
   Widget _placeholder(double height) {
