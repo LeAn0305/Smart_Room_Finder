@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
-import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
@@ -208,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = UserModel.sampleUsers.first;
+    final firebaseUser = AuthService.currentUser;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -242,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Text(
-                              AuthService.currentUser?.displayName ?? user.name,
+                              firebaseUser?.displayName ?? 'Người dùng',
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
@@ -260,12 +259,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: CircleAvatar(
                             radius: 24,
                             backgroundColor: AppColors.mintGreen,
-                            backgroundImage: user.profileImageUrl.isNotEmpty
-                                ? NetworkImage(user.profileImageUrl)
+                            backgroundImage: (firebaseUser?.photoURL ?? '').isNotEmpty
+                                ? NetworkImage(firebaseUser!.photoURL!)
                                 : null,
-                            child: user.profileImageUrl.isEmpty
+                            child: (firebaseUser?.photoURL ?? '').isEmpty
                                 ? Text(
-                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                    (firebaseUser?.displayName ?? 'U').isNotEmpty
+                                        ? (firebaseUser?.displayName ?? 'U')[0].toUpperCase()
+                                        : 'U',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,

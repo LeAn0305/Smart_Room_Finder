@@ -58,16 +58,20 @@ class RoomProvider extends ChangeNotifier {
 
       final snapshot = await _roomsRef.get();
 
-      _rooms = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return RoomModel.fromFirebase(data, doc.id);
-      }).toList();
-
-      debugPrint('✅ Đã load ${_rooms.length} phòng từ Firestore');
+      // Nếu Firestore có data → dùng data thật, bỏ mock
+      if (snapshot.docs.isNotEmpty) {
+        _rooms = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return RoomModel.fromFirebase(data, doc.id);
+        }).toList();
+        debugPrint('✅ Đã load ${_rooms.length} phòng từ Firestore');
+      } else {
+        // Firestore rỗng → giữ mock để app không trắng
+        debugPrint('⚠️ Firestore chưa có phòng, dùng mock data tạm');
+        _rooms = List.from(RoomModel.sampleRooms);
+      }
     } catch (e) {
       debugPrint('❌ Lỗi khi đọc rooms từ Firestore: $e');
-
-      // Nếu lỗi thì giữ mock data hiện tại, không làm app bị trắng dữ liệu
       _rooms = List.from(RoomModel.sampleRooms);
     } finally {
       _isLoading = false;
@@ -152,22 +156,30 @@ class RoomProvider extends ChangeNotifier {
     }
   }
 
-  /// Ẩn / Hiện phòng
-  void toggleActive(String roomId) {
+  /// Ẩn / Hiện phòng — đồng bộ Firestore
+  void toggleActive(String roomId) async {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
     if (idx != -1) {
-      _rooms[idx] = _rooms[idx].copyWith(
-        isActive: !_rooms[idx].isActive,
-        updatedAt: DateTime.now(),
-      );
+      final newActive = !_rooms[idx].isActive;
+      _rooms[idx] = _rooms[idx].copyWith(isActive: newActive, updatedAt: DateTime.now());
       notifyListeners();
+      try {
+        await _roomsRef.doc(roomId).update({'isActive': newActive, 'updatedAt': DateTime.now().toIso8601String()});
+      } catch (e) {
+        debugPrint('❌ Lỗi toggleActive: $e');
+      }
     }
   }
 
-  /// Xóa phòng
-  void deleteRoom(String roomId) {
+  /// Xóa phòng — đồng bộ Firestore
+  void deleteRoom(String roomId) async {
     _rooms.removeWhere((r) => r.id == roomId);
     notifyListeners();
+    try {
+      await _roomsRef.doc(roomId).delete();
+    } catch (e) {
+      debugPrint('❌ Lỗi deleteRoom: $e');
+    }
   }
 
   /// Nhân bản phòng
