@@ -82,6 +82,14 @@ class RoomProvider extends ChangeNotifier {
   /// Sau này có thể đổi thành add lên Firestore
   void addRoom(RoomModel room) {
     _rooms.add(room);
+    
+    // 🔥 Đẩy lên Firestore luôn để fetchRooms không bị mất phòng vừa tạo
+    try {
+      _roomsRef.doc(room.id).set(room.toFirebase());
+    } catch (e) {
+      debugPrint('Lỗi đẩy Firebase addRoom: $e');
+    }
+    
     notifyListeners();
   }
 
