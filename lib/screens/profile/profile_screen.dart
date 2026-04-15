@@ -11,10 +11,7 @@ import 'package:smart_room_finder/core/l10n/language_provider.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
 import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
-import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
-//import 'package:smart_room_finder/screens/settings/settings_screen.dart';
 import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
-import 'package:smart_room_finder/screens/auth/verify_account_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
 
@@ -329,7 +326,7 @@ void _onLogout() {
                       totalFavorites: totalFavorites,
                     ),
                     const SizedBox(height: 24),
-                    _buildSectionLabel(lang.tr('section_account')),
+                    _buildSectionLabel('📋 ${lang.tr('section_account')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.person_outline_rounded,
@@ -344,39 +341,40 @@ void _onLogout() {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
                       ),
                       _buildMenuItem(
-                        icon: Icons.shield_outlined,
-                        label: lang.tr('verify_account'),
-                        subtitle: lang.tr('verify_account_subtitle'),
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VerifyAccountScreen())),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.teal.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(lang.tr('not_verified'),
-                              style: const TextStyle(fontSize: 11, color: AppColors.tealDark, fontWeight: FontWeight.w600)),
-                        ),
+                        icon: Icons.credit_card_rounded,
+                        label: 'Phương thức thanh toán',
+                        subtitle: 'Quản lý thẻ và tài khoản',
+                        onTap: () => _showComingSoon(),
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.receipt_long_rounded,
+                        label: 'Lịch sử giao dịch',
+                        subtitle: 'Xem các giao dịch trước',
+                        onTap: () => _showComingSoon(),
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_activity')),
+                    _buildSectionLabel('🎯 ${lang.tr('section_activity')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.home_work_outlined,
-                        label: lang.tr('my_rooms'),
-                        subtitle: '$totalRooms ${lang.tr('profile_rooms_posted')}',
+                        label: 'Phòng trọ của tôi',
+                        subtitle: '$totalRooms phòng đã đăng',
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen()));
                         },
                       ),
                       _buildMenuItem(
-                        icon: Icons.favorite_border_rounded,
-                        label: lang.tr('saved_rooms'),
-                        subtitle: '$totalFavorites ${lang.tr('profile_favorites')}',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoriteScreen()));
-                        },
+                        icon: Icons.message_outlined,
+                        label: 'Tin nhắn / Chat',
+                        subtitle: 'Nhắn tin với chủ phòng',
+                        onTap: () => _showComingSoon(),
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.assignment_outlined,
+                        label: 'Đơn yêu cầu / Applications',
+                        subtitle: 'Xem đơn yêu cầu',
+                        onTap: () => _showComingSoon(),
                       ),
                       _buildMenuItem(
                         icon: Icons.history_rounded,
@@ -388,7 +386,7 @@ void _onLogout() {
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_settings')),
+                    _buildSectionLabel('⚙️ ${lang.tr('section_settings')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.notifications_outlined,
@@ -416,12 +414,12 @@ void _onLogout() {
                       ),
                     ]),
                     const SizedBox(height: 16),
-                    _buildSectionLabel(lang.tr('section_other')),
+                    _buildSectionLabel('⭐ ${lang.tr('section_other')}'),
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.info_outline_rounded,
-                        label: lang.tr('about_app'),
-                        subtitle: lang.tr('about_app_subtitle'),
+                        label: 'Về ứng dụng',
+                        subtitle: 'Phiên bản 1.0.0',
                         onTap: _showComingSoon,
                       ),
                       _buildMenuItem(
