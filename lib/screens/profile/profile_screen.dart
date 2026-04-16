@@ -22,6 +22,8 @@ import 'package:smart_room_finder/services/auth_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:smart_room_finder/services/storage_service.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -29,8 +31,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -40,7 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _notificationsEnabled = true;
 
   File? _avatarFile;
-
+  final StorageService _storageService = StorageService();
+  
   // Stats tính từ dữ liệu mẫu  
   int _getTotalFavorites(BuildContext context) {
     return context.watch<FavoriteProvider>().favoriteIds.length;
@@ -98,17 +101,41 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _pickAvatar(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 85);
-      if (picked != null) {
-        setState(() => _avatarFile = File(picked.path));
-      }
-    } catch (e) {
+      final picked = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      final file = File(picked.path);
+
       if (mounted) {
-        await _showControlledSnackBar(
-          'Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.',
-          backgroundColor: Colors.redAccent,
-        );
+        setState(() => _avatarFile = file);
       }
+
+      await _showControlledSnackBar('Đang tải ảnh lên...', backgroundColor: AppColors.teal);
+
+      final imageUrl = await _storageService.uploadProfileImage(file);
+
+      await AuthService.updateUserProfile(
+        name: _user?.name ?? '',
+        location: _user?.location ?? '',
+        profileImageUrl: imageUrl,
+      );
+
+      await _loadUserProfile();
+
+      if (!mounted) return;
+
+      await _showControlledSnackBar('Cập nhật ảnh đại diện thành công');
+    } catch (e) {
+      if (!mounted) return;
+
+      await _showControlledSnackBar(
+        'Không thể cập nhật ảnh đại diện: $e',
+        backgroundColor: Colors.redAccent,
+      );
     }
   }
 
@@ -861,6 +888,7 @@ void _onLogout() {
                     await AuthService.updateUserProfile(
                       name: name,
                       location: location,
+                      profileImageUrl: _user?.profileImageUrl,
                     );
 
                     if (!mounted) return;
