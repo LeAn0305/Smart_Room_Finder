@@ -4,6 +4,7 @@ class UserModel {
   final String email;
   final String profileImageUrl;
   final String location;
+  final String phoneNumber;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -13,6 +14,7 @@ class UserModel {
     required this.email,
     this.profileImageUrl = '',
     this.location = 'TP. Hồ Chí Minh',
+    this.phoneNumber = '',
     this.createdAt,
     this.updatedAt,
   });
@@ -26,6 +28,7 @@ class UserModel {
       email: json['email'] ?? '',
       profileImageUrl: json['profileImageUrl'] ?? '',
       location: json['location'] ?? 'TP. Hồ Chí Minh',
+      phoneNumber: json['phoneNumber'] ?? '',
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
     );
@@ -38,6 +41,7 @@ class UserModel {
       'email': email,
       'profileImageUrl': profileImageUrl,
       'location': location,
+      'phoneNumber': phoneNumber,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -51,6 +55,7 @@ class UserModel {
       'email': email,
       'profileImageUrl': profileImageUrl,
       'location': location,
+      'phoneNumber': phoneNumber,
       'updatedAt': updatedAt?.toIso8601String() ??
           DateTime.now().toIso8601String(),
     };
@@ -63,6 +68,7 @@ class UserModel {
     String? email,
     String? profileImageUrl,
     String? location,
+    String? phoneNumber,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -72,6 +78,7 @@ class UserModel {
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       location: location ?? this.location,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -85,7 +92,7 @@ class UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, location: $location)';
+    return 'UserModel(id: $id, name: $name, email: $email, location: $location, phoneNumber: $phoneNumber)';
   }
 
   // ============ SAMPLE DATA (dùng để test UI) ============
@@ -97,6 +104,7 @@ class UserModel {
       email: 'vana@example.com',
       profileImageUrl: 'https://i.pravatar.cc/150?u=vana@example.com',
       location: 'TP. Hồ Chí Minh',
+      phoneNumber: '',
       createdAt: DateTime.now().subtract(const Duration(days: 30)),
     ),
     UserModel(
@@ -105,6 +113,7 @@ class UserModel {
       email: 'tranthib@example.com',
       profileImageUrl: 'https://i.pravatar.cc/150?u=tranthib@example.com',
       location: 'Hà Nội',
+      phoneNumber: '',
       createdAt: DateTime.now().subtract(const Duration(days: 20)),
     ),
   ];

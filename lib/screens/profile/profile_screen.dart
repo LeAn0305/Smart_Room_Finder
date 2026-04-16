@@ -20,6 +20,8 @@ import 'package:smart_room_finder/providers/room_provider.dart';
 
 import 'package:smart_room_finder/services/auth_service.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -85,6 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _animController.forward();
 
     _loadUserProfile();
+    _loadNotificationSetting();
   }
 
   @override
@@ -101,14 +104,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          ),
+        await _showControlledSnackBar(
+          'Không thể truy cập ảnh. Vui lòng kiểm tra quyền trong Cài đặt.',
+          backgroundColor: Colors.redAccent,
         );
       }
     }
@@ -165,20 +163,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  void _showComingSoon() {
+  Future<void> _showComingSoon() async {
     final lang = context.read<LanguageProvider>();
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(lang.tr('coming_soon'),
-            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-        backgroundColor: AppColors.teal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    await _showControlledSnackBar(lang.tr('coming_soon'));
   }
 
 void _onLogout() {
@@ -254,16 +242,9 @@ void _onLogout() {
               );
             } catch (e) {
               if (!mounted) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Đăng xuất thất bại: $e'),
+                await _showControlledSnackBar(
+                  'Đăng xuất thất bại: $e',
                   backgroundColor: Colors.redAccent,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
               );
             }
           },
@@ -392,11 +373,11 @@ void _onLogout() {
                         icon: Icons.notifications_outlined,
                         label: lang.tr('notifications'),
                         subtitle: lang.tr('notifications_subtitle'),
-                        onTap: () => setState(() => _notificationsEnabled = !_notificationsEnabled),
+                        onTap: () => _saveNotificationSetting(!_notificationsEnabled),
                         trailing: Switch(
                           value: _notificationsEnabled,
-                          onChanged: (val) => setState(() => _notificationsEnabled = val),
-                          activeThumbColor: AppColors.teal,
+                          onChanged: (val) => _saveNotificationSetting(val),
+                          activeColor: AppColors.teal,
                           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
@@ -418,9 +399,9 @@ void _onLogout() {
                     _buildMenuCard(children: [
                       _buildMenuItem(
                         icon: Icons.info_outline_rounded,
-                        label: 'Về ứng dụng',
-                        subtitle: 'Phiên bản 1.0.0',
-                        onTap: _showComingSoon,
+                        label: lang.tr('about_app'),
+                        subtitle: lang.tr('about_app_subtitle'),
+                        onTap: () => _showComingSoon(),
                       ),
                       _buildMenuItem(
                         icon: Icons.logout_rounded,
@@ -848,7 +829,7 @@ void _onLogout() {
             const SizedBox(height: 20),
             _buildEditField(controller: nameController, label: lang.tr('full_name'), icon: Icons.person_outline_rounded),
             const SizedBox(height: 14),
-            _buildEditField(controller: emailController, label: lang.tr('email'), icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+            _buildEditField(controller: emailController, label: lang.tr('email'), icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, readOnly: true,),
             const SizedBox(height: 14),
             _buildEditField(controller: locationController, label: lang.tr('address'), icon: Icons.location_on_outlined),
             const SizedBox(height: 24),
@@ -856,15 +837,65 @@ void _onLogout() {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () async {
+                  final name = nameController.text.trim();
+                  final location = locationController.text.trim();
+
+                  if (name.isEmpty) {
+                    await _showControlledSnackBar(
+                      'Vui lòng nhập họ và tên',
+                      backgroundColor: Colors.redAccent,
+                    );
+                    return;
+                  }
+
+                  if (location.isEmpty) {
+                    await _showControlledSnackBar(
+                      'Vui lòng nhập địa chỉ',
+                      backgroundColor: Colors.redAccent,
+                    );
+                    return;
+                  }
+
+                  try {
+                    await AuthService.updateUserProfile(
+                      name: name,
+                      location: location,
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.pop(context);
+
+                    await _loadUserProfile();
+
+                    if (!mounted) return;
+
+                    await _showControlledSnackBar('Cập nhật thông tin thành công');
+                  } catch (e) {
+                    if (!mounted) return;
+
+                    await _showControlledSnackBar(
+                      'Cập nhật thất bại: $e',
+                      backgroundColor: Colors.redAccent,
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.teal,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
-                child: Text(lang.tr('save_changes'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                child: Text(
+                  lang.tr('save_changes'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],
@@ -904,18 +935,11 @@ void _onLogout() {
                 ...LanguageProvider.languages.map((lang) {
                   final selected = provider.locale.languageCode == lang.$1;
                   return GestureDetector(
-                    onTap: () {
+                    onTap: () async{
                       provider.setLocale(lang.$1);
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${provider.tr('language_changed')} ${lang.$2}'),
-                          backgroundColor: AppColors.teal,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          duration: const Duration(seconds: 2),
-                        ),
+                      await _showControlledSnackBar(
+                        '${provider.tr('language_changed')} ${lang.$2}',
                       );
                     },
                     child: Container(
@@ -951,11 +975,12 @@ void _onLogout() {
     );
   }
 
-  Widget _buildEditField({
+    Widget _buildEditField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -969,9 +994,9 @@ void _onLogout() {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           decoration: InputDecoration(
-            prefixIcon:
-                Icon(icon, color: AppColors.teal, size: 20),
+            prefixIcon: Icon(icon, color: AppColors.teal, size: 20),
             filled: true,
             fillColor: AppColors.mintLight,
             contentPadding:
@@ -989,4 +1014,49 @@ void _onLogout() {
       ],
     );
   }
+
+  Future<void> _loadNotificationSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    });
+  }
+
+Future<void> _saveNotificationSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+
+    if (!mounted) return;
+
+    setState(() {
+      _notificationsEnabled = value;
+    });
+  }
+
+  Future<bool> _isNotificationEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notifications_enabled') ?? true;
+  }
+
+  Future<void> _showControlledSnackBar(
+    String message, {
+    Color backgroundColor = AppColors.teal,
+    }) async {
+        final enabled = await _isNotificationEnabled();
+        if (!enabled || !mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+        );
+      }
+
+
 }

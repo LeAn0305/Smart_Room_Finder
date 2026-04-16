@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/models/view_history_model.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
-//import 'package:smart_room_finder/widgets/room_card.dart';
+import 'package:smart_room_finder/services/view_history_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class ViewHistoryScreen extends StatefulWidget {
   const ViewHistoryScreen({super.key});
@@ -12,23 +14,86 @@ class ViewHistoryScreen extends StatefulWidget {
 }
 
 class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
-  // Dùng sample rooms làm lịch sử xem
-  final List<RoomModel> _history = RoomModel.sampleRooms.take(6).toList();
+  List<ViewHistoryModel> _history = [];
+  bool _isLoading = true;
 
-  void _removeItem(RoomModel room) {
-    setState(() => _history.remove(room));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Đã xóa khỏi lịch sử'),
-      backgroundColor: AppColors.teal,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      action: SnackBarAction(
-        label: 'Hoàn tác',
-        textColor: Colors.white,
-        onPressed: () => setState(() => _history.add(room)),
-      ),
-    ));
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final history = await ViewHistoryService.getUserHistory();
+
+      if (!mounted) return;
+
+      setState(() {
+        _history = history;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      await _showControlledSnackBar(
+        'Lỗi khi tải lịch sử xem: $e',
+        backgroundColor: Colors.redAccent,
+      );
+    }
+  }
+
+  Future<void> _removeItem(ViewHistoryModel room) async {
+    try {
+      await ViewHistoryService.deleteHistoryItem(room.id);
+
+      if (!mounted) return;
+
+      setState(() => _history.removeWhere((item) => item.id == room.id));
+
+      await _showControlledSnackBar('Đã xóa khỏi lịch sử');
+    } catch (e) {
+      if (!mounted) return;
+
+      await _showControlledSnackBar(
+        'Xóa thất bại: $e',
+        backgroundColor: Colors.redAccent,
+      );
+    }
+  }
+  
+  Future<void> _openRoomDetail(ViewHistoryModel historyItem) async {
+    try {
+      final room = await ViewHistoryService.getRoomById(historyItem.roomId);
+
+      if (!mounted) return;
+
+      if (room == null) {
+        await _showControlledSnackBar(
+        'Phòng này không còn tồn tại hoặc đã bị xóa',
+        backgroundColor: Colors.redAccent,
+      );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RoomDetailScreen(room: room),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      await _showControlledSnackBar(
+        'Không thể mở chi tiết phòng: $e',
+        backgroundColor: Colors.redAccent,
+      );
+    }
   }
 
   void _clearAll() {
@@ -36,17 +101,40 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Xóa lịch sử', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text(
+          'Xóa lịch sử',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: const Text('Bạn có muốn xóa toàn bộ lịch sử xem không?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy', style: TextStyle(color: AppColors.textSecondary))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              await ViewHistoryService.clearHistory();
+
+              if (!mounted) return;
+
               setState(() => _history.clear());
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: const Text('Xóa tất cả', style: TextStyle(fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Xóa tất cả',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -63,7 +151,11 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.mintLight, AppColors.mintSoft, AppColors.mintGreen],
+            colors: [
+              AppColors.mintLight,
+              AppColors.mintSoft,
+              AppColors.mintGreen,
+            ],
           ),
         ),
         child: SafeArea(
@@ -71,70 +163,133 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
             children: [
               _buildTopBar(),
               Expanded(
-                child: _history.isEmpty
-                    ? _buildEmpty()
-                    : ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _history.length,
-                        itemBuilder: (_, i) {
-                          final room = _history[i];
-                          return Dismissible(
-                            key: Key(room.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(16)),
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 26),
-                            ),
-                            onDismissed: (_) => _removeItem(room),
-                            child: GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RoomDetailScreen(room: room))),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.teal,
+                        ),
+                      )
+                    : _history.isEmpty
+                        ? _buildEmpty()
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _history.length,
+                            itemBuilder: (_, i) {
+                              final room = _history[i];
+                              return Dismissible(
+                                key: Key(room.id),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-                                      child: Image.asset(room.imageUrl, width: 100, height: 90, fit: BoxFit.cover,
-                                          errorBuilder: (_, _, _) => Container(width: 100, height: 90, color: AppColors.mintGreen,
-                                              child: const Icon(Icons.home_outlined, color: AppColors.teal, size: 32))),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(room.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                            const SizedBox(height: 4),
-                                            Text(room.location, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                            const SizedBox(height: 6),
-                                            Text('${room.price.toStringAsFixed(0)} đ/tháng',
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.teal)),
-                                          ],
+                                onDismissed: (_) => _removeItem(room),
+                                child: GestureDetector(
+                                  onTap: () => _openRoomDetail(room),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.85),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                    const Padding(
-                                      padding: EdgeInsets.only(right: 12),
-                                      child: Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                                    child: Row(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: const BorderRadius.horizontal(
+                                            left: Radius.circular(16),
+                                          ),
+                                          child: Image.asset(
+                                            room.imageUrl,
+                                            width: 100,
+                                            height: 90,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(
+                                              width: 100,
+                                              height: 90,
+                                              color: AppColors.mintGreen,
+                                              child: const Icon(
+                                                Icons.home_outlined,
+                                                color: AppColors.teal,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                              horizontal: 4,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  room.title,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.textPrimary,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  room.address,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: AppColors.textSecondary,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  '${room.price.toStringAsFixed(0)} đ/tháng',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.teal,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 12),
+                                          child: Icon(
+                                            Icons.chevron_right_rounded,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                              );
+                            },
+                          ),
               ),
             ],
           ),
@@ -153,19 +308,44 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.8),
+                color: Colors.white.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textPrimary),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(child: Text('Lịch sử xem', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary))),
+          const Expanded(
+            child: Text(
+              'Lịch sử xem',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
           if (_history.isNotEmpty)
             TextButton(
               onPressed: _clearAll,
-              child: const Text('Xóa tất cả', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 13)),
+              child: const Text(
+                'Xóa tất cả',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
             ),
         ],
       ),
@@ -179,15 +359,61 @@ class _ViewHistoryScreenState extends State<ViewHistoryScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: AppColors.teal.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: const Icon(Icons.history_rounded, size: 52, color: AppColors.teal),
+            decoration: BoxDecoration(
+              color: AppColors.teal.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.history_rounded,
+              size: 52,
+              color: AppColors.teal,
+            ),
           ),
           const SizedBox(height: 20),
-          const Text('Chưa có lịch sử xem', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          const Text(
+            'Chưa có lịch sử xem',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Các phòng bạn đã xem sẽ xuất hiện ở đây', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          const Text(
+            'Các phòng bạn đã xem sẽ xuất hiện ở đây',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
   }
+
+  Future<bool> _isNotificationEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notifications_enabled') ?? true;
+  }
+
+  Future<void> _showControlledSnackBar(
+    String message, {
+    Color backgroundColor = AppColors.teal,
+  }) async {
+      final enabled = await _isNotificationEnabled();
+      if (!enabled || !mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        ),
+      );
+    }
+
 }

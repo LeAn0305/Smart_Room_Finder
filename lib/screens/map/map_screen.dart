@@ -218,7 +218,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     double minDistance = double.infinity;
 
     final roomProvider = context.read<RoomProvider>();
-    List<RoomModel> availableRooms = _filteredRoomsFrom(roomProvider.activePublicRooms); // Chỉ tìm trong kết quả lọc hiện tại
+    List<RoomModel> availableRooms = _filteredRooms; // Chỉ tìm trong kết quả lọc hiện tại
 
     if (availableRooms.isEmpty) {
       availableRooms = roomProvider.activePublicRooms; // Dự phòng quét hết mọi nơi nếu lỡ lọc kỹ quá
@@ -260,7 +260,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  List<RoomModel> _filteredRoomsFrom(List<RoomModel> rooms) {
+  List<RoomModel> get _filteredRooms {
+    final rooms = context.watch<RoomProvider>().activePublicRooms;
     final typeMap = {
       'Chung cư': RoomType.apartment,
       'Phòng trọ': RoomType.studio,
@@ -269,14 +270,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     };
 
     List<RoomModel> result = _selectedFilter == 'Tất cả'
-        ? rooms
+        ? List<RoomModel>.from(rooms)
         : rooms.where((r) => r.type == typeMap[_selectedFilter]).toList();
 
     if (_searchQuery.isNotEmpty) {
-      result = result.where((r) {
-        return r.title.toLowerCase().contains(_searchQuery) ||
-            r.address.toLowerCase().contains(_searchQuery);
-      }).toList();
+      result = result.where((r) =>
+        r.title.toLowerCase().contains(_searchQuery) ||
+        r.address.toLowerCase().contains(_searchQuery) ||
+        r.location.toLowerCase().contains(_searchQuery)
+      ).toList();
     }
 
     if (_sortByDistance && _currentLocation != null) {
@@ -312,8 +314,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final roomProvider = context.watch<RoomProvider>();
-    final filteredRooms = _filteredRoomsFrom(roomProvider.activePublicRooms);
+    //final roomProvider = context.watch<RoomProvider>();
+    final filteredRooms = _filteredRooms;
 
     return Scaffold(
       body: Stack(

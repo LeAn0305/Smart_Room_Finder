@@ -7,7 +7,9 @@ class RoomProvider extends ChangeNotifier {
   final CollectionReference _roomsRef =
       FirebaseFirestore.instance.collection('rooms');
 
-  List<RoomModel> _rooms = List.from(RoomModel.sampleRooms);
+  // 🔥 Danh sách phòng đang dùng trong app
+  // Ban đầu vẫn để mock để app không bị trống nếu Firestore chưa load xong
+  List<RoomModel> _rooms = [];
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -62,8 +64,10 @@ class RoomProvider extends ChangeNotifier {
         _rooms = List.from(RoomModel.sampleRooms);
       }
     } catch (e) {
-      debugPrint('❌ Lỗi fetchRooms: $e');
-      _rooms = List.from(RoomModel.sampleRooms);
+      debugPrint('❌ Lỗi khi đọc rooms từ Firestore: $e');
+
+      // Nếu lỗi thì giữ mock data hiện tại, không làm app bị trắng dữ liệu
+      _rooms = [];
     } finally {
       _isLoading = false;
       notifyListeners();

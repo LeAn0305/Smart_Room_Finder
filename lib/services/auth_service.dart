@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:smart_room_finder/core/config/google_oauth_config.dart';
 import 'package:smart_room_finder/models/user_model.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -89,6 +90,51 @@ class AuthService {
   }
 
   // =========================
+  // PHONE LOGIN - SEND OTP
+  // =========================
+  static Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required Function(String verificationId, int? resendToken) codeSent,
+    required Function(FirebaseAuthException e) verificationFailed,
+    required Function(PhoneAuthCredential credential) verificationCompleted,
+    required Function(String verificationId) codeAutoRetrievalTimeout,
+  }) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: verificationCompleted,
+      verificationFailed: verificationFailed,
+      codeSent: (String verificationId, int? resendToken) {
+        codeSent(verificationId, resendToken);
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        codeAutoRetrievalTimeout(verificationId);
+      },
+    );
+  }
+
+  // =========================
+  // PHONE LOGIN - VERIFY OTP
+  // =========================
+  static Future<UserCredential> signInWithPhoneOtp({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+
+    final cred = await _auth.signInWithCredential(credential);
+
+    if (cred.user != null) {
+      await _syncUserToFirestore(cred.user!);
+    }
+
+    return cred;
+  }
+
+  // =========================
   // SYNC USER TO FIRESTORE
   // =========================
   static Future<void> _syncUserToFirestore(
@@ -102,8 +148,12 @@ class AuthService {
 
     if (!snapshot.exists) {
       await docRef.set({
-        'name': overrideName ?? user.displayName ?? 'Unknown User',
+        'name': overrideName ??
+            (user.displayName != null && user.displayName!.trim().isNotEmpty
+                ? user.displayName!.trim()
+                : 'Unknown User'),
         'email': user.email ?? '',
+        'phoneNumber': user.phoneNumber ?? '',
         'profileImageUrl': user.photoURL ?? '',
         'location': 'TP. Hồ Chí Minh',
         'createdAt': now,
@@ -118,11 +168,15 @@ class AuthService {
       'name': (overrideName != null && overrideName.trim().isNotEmpty)
           ? overrideName.trim()
           : ((user.displayName != null && user.displayName!.trim().isNotEmpty)
-              ? user.displayName!.trim()
-              : (oldData['name'] ?? 'Unknown User')),
+                ? user.displayName!.trim()
+                : (oldData['name'] ?? 'Unknown User')),
       'email': (user.email != null && user.email!.trim().isNotEmpty)
           ? user.email!.trim()
           : (oldData['email'] ?? ''),
+      'phoneNumber': (user.phoneNumber != null &&
+              user.phoneNumber!.trim().isNotEmpty)
+          ? user.phoneNumber!.trim()
+          : (oldData['phoneNumber'] ?? ''),
       'profileImageUrl':
           (user.photoURL != null && user.photoURL!.trim().isNotEmpty)
               ? user.photoURL!.trim()
@@ -203,5 +257,53 @@ class AuthService {
   static Future<void> sendPasswordReset(String email) async {
     await _auth.setLanguageCode('en');
     await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  // =========================
+  // CHECK IF USER SIGNED IN WITH EMAIL
+  // =========================
+  static bool isPasswordProvider() {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    return user.providerData.any((info) => info.providerId == 'password');
+  }
+
+  // =========================
+  // CHANGE PASSWORD
+  // =========================
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Không tìm thấy người dùng hiện tại',
+      );
+    }
+
+    if (user.email == null || user.email!.trim().isEmpty) {
+      throw FirebaseAuthException(
+        code: 'no-email',
+        message: 'Tài khoản hiện tại không có email',
+      );
+    }
+
+    final credential = EmailAuthProvider.credential(
+      email: user.email!.trim(),
+      password: currentPassword,
+    );
+
+    debugPrint('==> Reauthenticate bắt đầu');
+    await user.reauthenticateWithCredential(credential);
+
+    debugPrint('==> Reauthenticate xong, bắt đầu updatePassword');
+    await user.updatePassword(newPassword);
+
+    debugPrint('==> updatePassword xong, reload');
+    await user.reload();
   }
 }

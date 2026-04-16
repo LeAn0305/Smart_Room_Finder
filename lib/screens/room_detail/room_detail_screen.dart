@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
+import 'package:smart_room_finder/services/view_history_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final RoomModel room;
@@ -16,6 +17,20 @@ class RoomDetailScreen extends StatefulWidget {
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int _selectedImage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _saveViewHistory();
+  }
+
+  Future<void> _saveViewHistory() async {
+    try {
+      await ViewHistoryService.addToHistory(widget.room);
+    } catch (e) {
+      debugPrint('Lỗi khi lưu lịch sử xem: $e');
+    }
+  }
 
   List<String> get _images {
     final base = [widget.room.imageUrl];

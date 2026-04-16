@@ -3,7 +3,6 @@ import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
