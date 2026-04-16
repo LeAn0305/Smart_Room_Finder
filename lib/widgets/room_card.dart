@@ -258,18 +258,18 @@ class _RoomCardState extends State<RoomCard> {
                         ],
                       ),
                       // Diện tích + phòng ngủ nếu có
-                      if (widget.room.area != null || widget.room.bedrooms != null) ...[
+                      if (widget.room.area > 0 || widget.room.bedrooms > 0) ...[
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            if (widget.room.area != null) ...[
+                            if (widget.room.area > 0) ...[
                               const Icon(Icons.square_foot_rounded, color: AppColors.textSecondary, size: 13),
                               const SizedBox(width: 3),
-                              Text('${widget.room.area!.toInt()}m²',
+                              Text('${widget.room.area.toInt()}m²',
                                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                               const SizedBox(width: 12),
                             ],
-                            if (widget.room.bedrooms != null) ...[
+                            if (widget.room.bedrooms > 0) ...[
                               const Icon(Icons.bed_rounded, color: AppColors.textSecondary, size: 13),
                               const SizedBox(width: 3),
                               Text('${widget.room.bedrooms} PN',

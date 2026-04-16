@@ -50,11 +50,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _priceCtrl = TextEditingController(text: r != null ? r.price.toInt().toString() : '');
     _addressCtrl = TextEditingController(text: r?.address ?? '');
-    _areaCtrl = TextEditingController(text: r?.area?.toInt().toString() ?? '');
+    _areaCtrl = TextEditingController(text: r?.area.toInt().toString() ?? '');
     if (r != null) {
       _selectedType = r.type;
       _selectedDirection = r.direction;
-      _bedrooms = r.bedrooms ?? 1;
+      _bedrooms = r.bedrooms;
       _selectedAmenities.addAll(r.amenities);
       if (r.images.isNotEmpty) {
         _images = List.from(r.images);
@@ -144,7 +144,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         : currentUid,
     title: _titleCtrl.text.trim(),
     description: _descCtrl.text.trim(),
-    price: int.tryParse(_priceCtrl.text.trim()) ?? 0,
+    price: double.tryParse(_priceCtrl.text.trim()) ?? 0,
     address: _addressCtrl.text.trim(),
     imageUrl: finalImages.isNotEmpty
         ? finalImages.first
@@ -154,7 +154,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     type: _selectedType,
     location: 'TP. Ho Chi Minh',
     amenities: _selectedAmenities,
-    area: double.tryParse(_areaCtrl.text.trim()),
+    area: double.tryParse(_areaCtrl.text.trim()) ?? 0,
     bedrooms: _bedrooms,
     direction: _selectedDirection,
     isVerified: isEditing ? widget.editRoom!.isVerified : false,

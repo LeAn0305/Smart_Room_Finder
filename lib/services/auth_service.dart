@@ -140,6 +140,7 @@ class AuthService {
   static Future<void> _syncUserToFirestore(
     User user, {
     String? overrideName,
+    String? overrideRole,
   }) async {
     final docRef = _firestore.collection('users').doc(user.uid);
     final snapshot = await docRef.get();
@@ -156,6 +157,12 @@ class AuthService {
         'phoneNumber': user.phoneNumber ?? '',
         'profileImageUrl': user.photoURL ?? '',
         'location': 'TP. Hồ Chí Minh',
+
+        // 🔥 User mới chưa chọn vai trò
+        // Sau khi đăng nhập / đăng ký xong sẽ chuyển sang màn chọn vai trò
+        'role': null,
+        'hasSelectedRole': false,
+
         'createdAt': now,
         'updatedAt': now,
       });
@@ -182,6 +189,18 @@ class AuthService {
               ? user.photoURL!.trim()
               : (oldData['profileImageUrl'] ?? ''),
       'location': oldData['location'] ?? 'TP. Hồ Chí Minh',
+
+      // 🔥 Giữ role cũ nếu đã có trong Firestore
+      // Nếu có truyền overrideRole thì cập nhật theo overrideRole
+      // Nếu user cũ chưa có role thì giữ null để chuyển sang màn chọn vai trò
+      'role': (overrideRole != null && overrideRole.trim().isNotEmpty)
+          ? overrideRole.trim()
+          : oldData['role'],
+
+      // 🔥 Giữ trạng thái đã chọn vai trò nếu đã có
+      // Nếu user cũ chưa có field này thì mặc định là false
+      'hasSelectedRole': oldData['hasSelectedRole'] ?? false,
+
       'updatedAt': now,
     });
   }
