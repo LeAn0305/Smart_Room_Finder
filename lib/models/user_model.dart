@@ -5,8 +5,11 @@ class UserModel {
   final String profileImageUrl;
   final String location;
   final String phoneNumber;
+  final String? role;
+  final bool hasSelectedRole;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  
 
   UserModel({
     required this.id,
@@ -15,6 +18,8 @@ class UserModel {
     this.profileImageUrl = '',
     this.location = 'TP. Hồ Chí Minh',
     this.phoneNumber = '',
+    this.role,
+    this.hasSelectedRole = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -29,6 +34,8 @@ class UserModel {
       profileImageUrl: json['profileImageUrl'] ?? '',
       location: json['location'] ?? 'TP. Hồ Chí Minh',
       phoneNumber: json['phoneNumber'] ?? '',
+      role: json['role'],
+      hasSelectedRole: json['hasSelectedRole'] ?? false,
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
     );
@@ -44,6 +51,8 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'role': role,
+      'hasSelectedRole': hasSelectedRole,
     };
   }
 
@@ -58,6 +67,8 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'updatedAt': updatedAt?.toIso8601String() ??
           DateTime.now().toIso8601String(),
+      'role': role,
+      'hasSelectedRole': hasSelectedRole,
     };
   }
 
@@ -68,6 +79,8 @@ class UserModel {
     String? email,
     String? profileImageUrl,
     String? location,
+    String? role,
+    bool? hasSelectedRole,
     String? phoneNumber,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -81,6 +94,8 @@ class UserModel {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      role: role ?? this.role,
+      hasSelectedRole: hasSelectedRole ?? this.hasSelectedRole,
     );
   }
 
@@ -92,7 +107,7 @@ class UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, location: $location, phoneNumber: $phoneNumber)';
+    return 'UserModel(id: $id, name: $name, email: $email, role: $role, location: $location, phoneNumber: $phoneNumber)';
   }
 
   // ============ SAMPLE DATA (dùng để test UI) ============
@@ -105,6 +120,8 @@ class UserModel {
       profileImageUrl: 'https://i.pravatar.cc/150?u=vana@example.com',
       location: 'TP. Hồ Chí Minh',
       phoneNumber: '',
+      role: 'renter',
+      hasSelectedRole: true,
       createdAt: DateTime.now().subtract(const Duration(days: 30)),
     ),
     UserModel(
@@ -114,6 +131,8 @@ class UserModel {
       profileImageUrl: 'https://i.pravatar.cc/150?u=tranthib@example.com',
       location: 'Hà Nội',
       phoneNumber: '',
+      role: 'renter',
+      hasSelectedRole: true,
       createdAt: DateTime.now().subtract(const Duration(days: 20)),
     ),
   ];

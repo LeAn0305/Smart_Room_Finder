@@ -514,9 +514,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
 
   Widget _buildQuickStats(RoomModel room) {
     final stats = [
-      if (room.area != null)
-        (Icons.square_foot_rounded, '${room.area!.toInt()}m²', 'Diện tích'),
-      if (room.bedrooms != null)
+      if (room.area > 0)
+        (Icons.square_foot_rounded, '${room.area.toInt()}m²', 'Diện tích'),
+      if (room.bedrooms > 0)
         (Icons.bed_rounded, '${room.bedrooms} PN', 'Phòng ngủ'),
       if (room.direction != null)
         (Icons.explore_rounded, room.directionString, 'Hướng'),

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum RoomType {
   apartment,
   studio,
@@ -21,154 +23,188 @@ class RoomModel {
   final String ownerId;
   final String title;
   final String description;
-  final int price;
+  final double price;
   final String address;
-  final String imageUrl;
-  final List<String> images;
-  final double rating;
-  final RoomType type;
   final String location;
-  final List<String> amenities;
 
-  /// isFavorite chỉ nên dùng cho UI/local state
-  /// Không nên coi là dữ liệu gốc của document room trong Firestore
+  final bool isDraft;
   final bool isFavorite;
-
   final bool isVerified;
   final bool isActive;
+
+  // Ảnh cũ
+  final String imageUrl;
+  final List<String> images;
+
+  // Ảnh mới
+  final String mainImageUrl;
+  final List<String> subImageUrls;
+
+  final double rating;
+  final RoomType type;
+  final double area;
+  final int bedrooms;
+  final List<String> amenities;
   final int viewCount;
   final int contactCount;
-  final double? area;
-  final int? bedrooms;
+  final String postedBy;
   final RoomDirection? direction;
   final DateTime? postedAt;
   final DateTime? updatedAt;
   final DateTime? expiresAt;
-  final bool isDraft;
 
-  RoomModel({
+  const RoomModel({
     required this.id,
     required this.ownerId,
     required this.title,
-    required this.description,
+    this.description = '',
     required this.price,
-    required this.address,
-    required this.imageUrl,
-    this.images = const [],
-    this.rating = 0.0,
-    required this.type,
-    required this.location,
-    this.amenities = const [],
+    this.address = '',
+    this.location = '',
+    this.isDraft = false,
     this.isFavorite = false,
     this.isVerified = false,
     this.isActive = true,
+
+    // Ảnh cũ
+    this.imageUrl = '',
+    this.images = const [],
+
+    // Ảnh mới
+    this.mainImageUrl = '',
+    this.subImageUrls = const [],
+
+    this.rating = 0,
+    this.type = RoomType.studio,
+    this.area = 0,
+    this.bedrooms = 0,
+    this.amenities = const [],
     this.viewCount = 0,
     this.contactCount = 0,
-    this.area,
-    this.bedrooms,
+    this.postedBy = '',
     this.direction,
     this.postedAt,
     this.updatedAt,
     this.expiresAt,
-    this.isDraft = false,
   });
 
-  // ============ FIREBASE METHODS ============
+  factory RoomModel.fromMap(Map<String, dynamic> map, String docId) {
+    final resolvedMainImage =
+        (map['mainImageUrl'] ?? map['imageUrl'] ?? '').toString();
 
-  /// Dùng khi lấy dữ liệu từ Firestore
-  factory RoomModel.fromFirebase(Map<String, dynamic> json, String docId) {
+    final resolvedSubImages = List<String>.from(
+      map['subImageUrls'] ?? map['images'] ?? [],
+    );
+
     return RoomModel(
       id: docId,
-      ownerId: json['ownerId'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      price: _parseInt(json['price']),
-      address: json['address'] ?? '',
-      imageUrl: json['imageUrl'] ?? '',
-      images: List<String>.from(json['images'] ?? []),
-      rating: _parseDouble(json['rating']),
-      type: _parseRoomType(json['type'] ?? 'studio'),
-      location: json['location'] ?? '',
-      amenities: List<String>.from(json['amenities'] ?? []),
+      ownerId: (map['ownerId'] ?? '').toString(),
+      title: (map['title'] ?? '').toString(),
+      description: (map['description'] ?? '').toString(),
+      price: _toDouble(map['price']),
+      address: (map['address'] ?? '').toString(),
+      location: (map['location'] ?? '').toString(),
+      isDraft: map['isDraft'] ?? false,
+      isFavorite: map['isFavorite'] ?? false,
+      isVerified: map['isVerified'] ?? false,
+      isActive: map['isActive'] ?? true,
 
-      /// Không đọc isFavorite từ Firestore room làm dữ liệu gốc
-      /// Có thể set lại sau khi join với favorites của user hiện tại
-      isFavorite: json['isFavorite'] ?? false,
+      // field cũ
+      imageUrl: (map['imageUrl'] ?? map['mainImageUrl'] ?? '').toString(),
+      images: List<String>.from(map['images'] ?? map['subImageUrls'] ?? []),
 
-      isVerified: json['isVerified'] ?? false,
-      isActive: json['isActive'] ?? true,
-      viewCount: _parseInt(json['viewCount']),
-      contactCount: _parseInt(json['contactCount']),
-      area: json['area'] != null ? _parseDouble(json['area']) : null,
-      bedrooms: json['bedrooms'] != null ? _parseInt(json['bedrooms']) : null,
-      direction: json['direction'] != null
-          ? _parseRoomDirection(json['direction'])
-          : null,
-      postedAt: _parseDateTime(json['postedAt']),
-      updatedAt: _parseDateTime(json['updatedAt']),
-      expiresAt: _parseDateTime(json['expiresAt']),
-      isDraft: json['isDraft'] ?? false,
+      // field mới
+      mainImageUrl: resolvedMainImage,
+      subImageUrls: resolvedSubImages,
+
+      rating: _toDouble(map['rating']),
+      type: _parseRoomType(map['type']),
+      area: _toDouble(map['area']),
+      bedrooms: _toInt(map['bedrooms']),
+      amenities: List<String>.from(map['amenities'] ?? []),
+      viewCount: _toInt(map['viewCount']),
+      contactCount: _toInt(map['contactCount']),
+      postedBy: (map['postedBy'] ?? '').toString(),
+      direction: _parseDirectionNullable(map['direction']),
+      postedAt: _parseDateTime(map['postedAt']),
+      updatedAt: _parseDateTime(map['updatedAt']),
+      expiresAt: _parseDateTime(map['expiresAt']),
     );
   }
 
-  /// Dùng khi tạo room mới trên Firebase
-  Map<String, dynamic> toFirebase() {
+  factory RoomModel.fromFirebase(Map<String, dynamic> data, String docId) {
+    return RoomModel.fromMap(data, docId);
+  }
+
+  factory RoomModel.fromDocument(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return RoomModel.fromMap(data, doc.id);
+  }
+
+  Map<String, dynamic> toMap() {
     return {
       'ownerId': ownerId,
       'title': title,
       'description': description,
       'price': price,
       'address': address,
-      'imageUrl': imageUrl,
-      'images': images,
-      'rating': rating,
-      'type': _roomTypeToString(type),
       'location': location,
-      'amenities': amenities,
+      'isDraft': isDraft,
+      'isFavorite': isFavorite,
       'isVerified': isVerified,
       'isActive': isActive,
-      'viewCount': viewCount,
-      'contactCount': contactCount,
+
+      // giữ field cũ để code cũ không gãy
+      'imageUrl': mainImageUrl.isNotEmpty ? mainImageUrl : imageUrl,
+      'images': subImageUrls.isNotEmpty ? subImageUrls : images,
+
+      // field mới
+      'mainImageUrl': mainImageUrl.isNotEmpty ? mainImageUrl : imageUrl,
+      'subImageUrls': subImageUrls.isNotEmpty ? subImageUrls : images,
+
+      'rating': rating,
+      'type': type.name,
       'area': area,
       'bedrooms': bedrooms,
-      'direction': direction != null ? _directionToString(direction!) : null,
+      'amenities': amenities,
+      'viewCount': viewCount,
+      'contactCount': contactCount,
+      'postedBy': postedBy,
+      'direction': direction?.name,
       'postedAt': postedAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'expiresAt': expiresAt?.toIso8601String(),
-      'isDraft': isDraft,
     };
   }
 
-  /// Dùng khi update room
-  /// Tránh ghi đè postedAt nếu không muốn
-  Map<String, dynamic> toFirebaseForUpdate() {
-    return {
-      'ownerId': ownerId,
-      'title': title,
-      'description': description,
-      'price': price,
-      'address': address,
-      'imageUrl': imageUrl,
-      'images': images,
-      'rating': rating,
-      'type': _roomTypeToString(type),
-      'location': location,
-      'amenities': amenities,
-      'isVerified': isVerified,
-      'isActive': isActive,
-      'viewCount': viewCount,
-      'contactCount': contactCount,
-      'area': area,
-      'bedrooms': bedrooms,
-      'direction': direction != null ? _directionToString(direction!) : null,
-      'updatedAt': updatedAt?.toIso8601String() ??
-          DateTime.now().toIso8601String(),
-      'expiresAt': expiresAt?.toIso8601String(),
-      'isDraft': isDraft,
-    };
+  Map<String, dynamic> toFirebase() => toMap();
+
+  Map<String, dynamic> toFirebaseForUpdate() => toMap();
+
+  bool get isExpired {
+    if (expiresAt == null) return false;
+    return expiresAt!.isBefore(DateTime.now());
   }
 
-  // ============ GETTER METHODS ============
+  int get daysLeft {
+    if (expiresAt == null) return 0;
+    final now = DateTime.now();
+    final difference = expiresAt!.difference(now).inDays;
+    return difference < 0 ? 0 : difference;
+  }
+
+  String get typeString {
+    switch (type) {
+      case RoomType.apartment:
+        return 'apartment';
+      case RoomType.studio:
+        return 'studio';
+      case RoomType.house:
+        return 'house';
+      case RoomType.villa:
+        return 'villa';
+    }
+  }
 
   String get directionString {
     switch (direction) {
@@ -188,62 +224,40 @@ class RoomModel {
         return 'Đông Bắc';
       case RoomDirection.northWest:
         return 'Tây Bắc';
-      default:
+      case null:
         return '';
     }
   }
 
-  String get typeString {
-    switch (type) {
-      case RoomType.apartment:
-        return 'Chung cư';
-      case RoomType.studio:
-        return 'Phòng trọ';
-      case RoomType.house:
-        return 'Nhà nguyên căn';
-      case RoomType.villa:
-        return 'Biệt thự';
-    }
-  }
-
-  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
-
-  int get daysLeft {
-    if (expiresAt == null) return 0;
-    return expiresAt!.difference(DateTime.now()).inDays;
-  }
-
-  String get formattedPrice {
-    return '${(price / 1000000).toStringAsFixed(1)}M';
-  }
-
-  // ============ COPY WITH ============
 
   RoomModel copyWith({
     String? id,
     String? ownerId,
     String? title,
     String? description,
-    int? price,
+    double? price,
     String? address,
-    String? imageUrl,
-    List<String>? images,
-    double? rating,
-    RoomType? type,
     String? location,
-    List<String>? amenities,
+    bool? isDraft,
     bool? isFavorite,
     bool? isVerified,
     bool? isActive,
-    int? viewCount,
-    int? contactCount,
+    String? imageUrl,
+    List<String>? images,
+    String? mainImageUrl,
+    List<String>? subImageUrls,
+    double? rating,
+    RoomType? type,
     double? area,
     int? bedrooms,
+    List<String>? amenities,
+    int? viewCount,
+    int? contactCount,
+    String? postedBy,
     RoomDirection? direction,
     DateTime? postedAt,
     DateTime? updatedAt,
     DateTime? expiresAt,
-    bool? isDraft,
   }) {
     return RoomModel(
       id: id ?? this.id,
@@ -252,103 +266,73 @@ class RoomModel {
       description: description ?? this.description,
       price: price ?? this.price,
       address: address ?? this.address,
-      imageUrl: imageUrl ?? this.imageUrl,
-      images: images ?? this.images,
-      rating: rating ?? this.rating,
-      type: type ?? this.type,
       location: location ?? this.location,
-      amenities: amenities ?? this.amenities,
+      isDraft: isDraft ?? this.isDraft,
       isFavorite: isFavorite ?? this.isFavorite,
       isVerified: isVerified ?? this.isVerified,
       isActive: isActive ?? this.isActive,
-      viewCount: viewCount ?? this.viewCount,
-      contactCount: contactCount ?? this.contactCount,
+      imageUrl: imageUrl ?? this.imageUrl,
+      images: images ?? this.images,
+      mainImageUrl: mainImageUrl ?? this.mainImageUrl,
+      subImageUrls: subImageUrls ?? this.subImageUrls,
+      rating: rating ?? this.rating,
+      type: type ?? this.type,
       area: area ?? this.area,
       bedrooms: bedrooms ?? this.bedrooms,
+      amenities: amenities ?? this.amenities,
+      viewCount: viewCount ?? this.viewCount,
+      contactCount: contactCount ?? this.contactCount,
+      postedBy: postedBy ?? this.postedBy,
       direction: direction ?? this.direction,
       postedAt: postedAt ?? this.postedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       expiresAt: expiresAt ?? this.expiresAt,
-      isDraft: isDraft ?? this.isDraft,
     );
   }
 
-  // ============ HELPER METHODS ============
-
-  static RoomType _parseRoomType(String type) {
-    switch (type.toLowerCase()) {
-      case 'apartment':
-        return RoomType.apartment;
-      case 'studio':
-        return RoomType.studio;
-      case 'house':
-        return RoomType.house;
-      case 'villa':
-        return RoomType.villa;
-      default:
-        return RoomType.studio;
-    }
-  }
-
-  static String _roomTypeToString(RoomType type) {
-    return type.toString().split('.').last;
-  }
-
-  static RoomDirection _parseRoomDirection(String direction) {
-    switch (direction.toLowerCase()) {
-      case 'east':
-        return RoomDirection.east;
-      case 'west':
-        return RoomDirection.west;
-      case 'south':
-        return RoomDirection.south;
-      case 'north':
-        return RoomDirection.north;
-      case 'southeast':
-        return RoomDirection.southEast;
-      case 'southwest':
-        return RoomDirection.southWest;
-      case 'northeast':
-        return RoomDirection.northEast;
-      case 'northwest':
-        return RoomDirection.northWest;
-      default:
-        return RoomDirection.south;
-    }
-  }
-
-  static String _directionToString(RoomDirection direction) {
-    return direction.toString().split('.').last;
-  }
-
-  static int _parseInt(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value.toString()) ?? 0;
-  }
-
-  static double _parseDouble(dynamic value) {
-    if (value == null) return 0.0;
+  static double _toDouble(dynamic value) {
+    if (value is int) return value.toDouble();
     if (value is double) return value;
-    if (value is num) return value.toDouble();
-    return double.tryParse(value.toString()) ?? 0.0;
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
     if (value is DateTime) return value;
-    return DateTime.tryParse(value.toString());
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 
-  @override
-  String toString() {
-    return 'RoomModel(id: $id, ownerId: $ownerId, title: $title, price: $price, location: $location)';
+  static RoomType _parseRoomType(dynamic value) {
+    final raw = (value ?? '').toString();
+    return RoomType.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => RoomType.studio,
+    );
   }
 
-  // ============ SAMPLE DATA (dùng để test UI) ============
+  static RoomDirection? _parseDirectionNullable(dynamic value) {
+    if (value == null) return null;
+    final raw = value.toString();
+    try {
+      return RoomDirection.values.firstWhere((e) => e.name == raw);
+    } catch (_) {
+      return null;
+    }
+  }
 
-  static List<RoomModel> sampleRooms = [
+  static final List<RoomModel> sampleRooms = [
     RoomModel(
       id: '1',
       ownerId: 'user_1',
@@ -357,11 +341,13 @@ class RoomModel {
           'Phòng trọ sạch sẽ, thiết kế gác gỗ simili chắc chắn, không gian đơn giản phù hợp sinh viên và người lao động. Gần chợ Tân Mỹ.',
       price: 2500000,
       address: 'Đường Lê Văn Lương, Quận 7, TP. Hồ Chí Minh',
+      location: 'Quận 7',
       imageUrl: 'assets/images/phong_tro_gac_lung_go.png',
       images: ['assets/images/phong_tro_gac_lung_go.png'],
+      mainImageUrl: 'assets/images/phong_tro_gac_lung_go.png',
+      subImageUrls: ['assets/images/phong_tro_gac_lung_go.png'],
       rating: 4.2,
       type: RoomType.studio,
-      location: 'Quận 7',
       amenities: ['Gác gỗ', 'Kệ bếp', 'Wifi', 'WC riêng'],
       isFavorite: true,
       isVerified: true,
@@ -374,12 +360,14 @@ class RoomModel {
       description:
           'Dạng giường tầng đơn giản, có máy lạnh, mỗi người một tủ cá nhân. Khu vực yên tĩnh, an ninh tốt.',
       price: 1500000,
-      address: 'Đường Lý Thường Kiệt, Quận 10, TP. Hồ Chí MinhĐường Lý Thường Kiệt, Quận 10, TP. Hồ Chí Minh',
+      address: 'Đường Lý Thường Kiệt, Quận 10, TP. Hồ Chí Minh',
+      location: 'Quận 10',
       imageUrl: 'assets/images/ky_tuc_xa_sinh_vien.png',
       images: ['assets/images/ky_tuc_xa_sinh_vien.png'],
+      mainImageUrl: 'assets/images/ky_tuc_xa_sinh_vien.png',
+      subImageUrls: ['assets/images/ky_tuc_xa_sinh_vien.png'],
       rating: 4.4,
       type: RoomType.studio,
-      location: 'Quận 10',
       amenities: ['Giường tầng', 'Máy lạnh', 'Tủ cá nhân', 'Dọn phòng'],
       isVerified: true,
       viewCount: 85,
@@ -398,11 +386,13 @@ class RoomModel {
           'Căn hộ nhỏ gọn có khu vực bếp riêng, toilet sạch sẽ, gạch ốp tường láng đẹp. Thích hợp gia đình nhỏ.',
       price: 4500000,
       address: 'Đường Nơ Trang Long, Quận Bình Thạnh, TP. Hồ Chí Minh',
+      location: 'Bình Thạnh',
       imageUrl: 'assets/images/can_ho_mini_don_gian.png',
       images: ['assets/images/can_ho_mini_don_gian.png'],
+      mainImageUrl: 'assets/images/can_ho_mini_don_gian.png',
+      subImageUrls: ['assets/images/can_ho_mini_don_gian.png'],
       rating: 4.0,
       type: RoomType.apartment,
-      location: 'Bình Thạnh',
       amenities: ['Bếp riêng', 'Toilet riêng', 'Hầm xe', 'Bảo vệ'],
       isVerified: true,
       postedAt: DateTime.now().subtract(const Duration(days: 2)),

@@ -757,7 +757,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                       '${room.contactCount}',
                       Colors.green,
                     ),
-                    if (room.area != null) ...[
+                    if (room.area > 0) ...[
                       const SizedBox(width: 12),
                       _miniStat(
                         Icons.square_foot_rounded,
@@ -765,7 +765,7 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                         AppColors.teal,
                       ),
                     ],
-                    if (room.bedrooms != null) ...[
+                    if (room.bedrooms > 0) ...[
                       const SizedBox(width: 12),
                       _miniStat(
                         Icons.bed_rounded,

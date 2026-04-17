@@ -7,8 +7,6 @@ class RoomProvider extends ChangeNotifier {
   final CollectionReference _roomsRef =
       FirebaseFirestore.instance.collection('rooms');
 
-  // 🔥 Danh sách phòng đang dùng trong app
-  // Ban đầu vẫn để mock để app không bị trống nếu Firestore chưa load xong
   List<RoomModel> _rooms = [];
 
   bool _isLoading = false;
@@ -65,9 +63,7 @@ class RoomProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ Lỗi khi đọc rooms từ Firestore: $e');
-
-      // Nếu lỗi thì giữ mock data hiện tại, không làm app bị trắng dữ liệu
-      _rooms = [];
+      _rooms = List.from(RoomModel.sampleRooms);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -85,7 +81,6 @@ class RoomProvider extends ChangeNotifier {
       debugPrint('✅ Đăng phòng: ${docRef.id}');
     } catch (e) {
       debugPrint('❌ Lỗi addRoom: $e');
-
       _rooms.add(room);
       notifyListeners();
     }
@@ -113,16 +108,16 @@ class RoomProvider extends ChangeNotifier {
 
   Future<void> toggleActive(String roomId) async {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
-    if (idx != -1) {
-      final newActive = !_rooms[idx].isActive;
-      _rooms[idx] = _rooms[idx].copyWith(isActive: newActive);
-      notifyListeners();
+    if (idx == -1) return;
 
-      try {
-        await _roomsRef.doc(roomId).update({'isActive': newActive});
-      } catch (e) {
-        debugPrint('❌ Lỗi toggleActive: $e');
-      }
+    final newActive = !_rooms[idx].isActive;
+    _rooms[idx] = _rooms[idx].copyWith(isActive: newActive);
+    notifyListeners();
+
+    try {
+      await _roomsRef.doc(roomId).update({'isActive': newActive});
+    } catch (e) {
+      debugPrint('❌ Lỗi toggleActive: $e');
     }
   }
 
@@ -145,11 +140,13 @@ class RoomProvider extends ChangeNotifier {
       description: room.description,
       price: room.price,
       address: room.address,
+      location: room.location,
       imageUrl: room.imageUrl,
       images: room.images,
+      mainImageUrl: room.mainImageUrl,
+      subImageUrls: room.subImageUrls,
       rating: room.rating,
       type: room.type,
-      location: room.location,
       amenities: room.amenities,
       isVerified: false,
       isActive: false,
@@ -158,6 +155,12 @@ class RoomProvider extends ChangeNotifier {
       bedrooms: room.bedrooms,
       direction: room.direction,
       postedAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      expiresAt: room.expiresAt,
+      postedBy: room.postedBy,
+      viewCount: 0,
+      contactCount: 0,
+      isFavorite: false,
     );
 
     _rooms.add(newRoom);
@@ -166,27 +169,27 @@ class RoomProvider extends ChangeNotifier {
 
   void renewRoom(String roomId) {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
-    if (idx != -1) {
-      final r = _rooms[idx];
-      final base =
-          (r.expiresAt != null && r.expiresAt!.isAfter(DateTime.now()))
-              ? r.expiresAt!
-              : DateTime.now();
+    if (idx == -1) return;
 
-      _rooms[idx] = r.copyWith(
-        expiresAt: base.add(const Duration(days: 30)),
-      );
-      notifyListeners();
-    }
+    final r = _rooms[idx];
+    final base =
+        (r.expiresAt != null && r.expiresAt!.isAfter(DateTime.now()))
+            ? r.expiresAt!
+            : DateTime.now();
+
+    _rooms[idx] = r.copyWith(
+      expiresAt: base.add(const Duration(days: 30)),
+    );
+    notifyListeners();
   }
 
   void toggleFavorite(String roomId) {
     final idx = _rooms.indexWhere((r) => r.id == roomId);
-    if (idx != -1) {
-      _rooms[idx] = _rooms[idx].copyWith(
-        isFavorite: !_rooms[idx].isFavorite,
-      );
-      notifyListeners();
-    }
+    if (idx == -1) return;
+
+    _rooms[idx] = _rooms[idx].copyWith(
+      isFavorite: !_rooms[idx].isFavorite,
+    );
+    notifyListeners();
   }
 }
