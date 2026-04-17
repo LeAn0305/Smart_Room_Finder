@@ -63,6 +63,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '154072375713',
     projectId: 'smart-room-finder-app-firebase',
     storageBucket: 'smart-room-finder-app-firebase.firebasestorage.app',
+    androidClientId: '154072375713-snru8hj1ra0dbf5pefr2jcet0u63i2h4.apps.googleusercontent.com',
+    iosClientId: '154072375713-2kr93nqvgaupkojj7oetdu46jjqsf0tm.apps.googleusercontent.com',
     iosBundleId: 'com.example.smartRoomFinder',
   );
 
@@ -72,6 +74,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '154072375713',
     projectId: 'smart-room-finder-app-firebase',
     storageBucket: 'smart-room-finder-app-firebase.firebasestorage.app',
+    androidClientId: '154072375713-snru8hj1ra0dbf5pefr2jcet0u63i2h4.apps.googleusercontent.com',
+    iosClientId: '154072375713-2kr93nqvgaupkojj7oetdu46jjqsf0tm.apps.googleusercontent.com',
     iosBundleId: 'com.example.smartRoomFinder',
   );
 
@@ -83,4 +87,5 @@ class DefaultFirebaseOptions {
     authDomain: 'smart-room-finder-app-firebase.firebaseapp.com',
     storageBucket: 'smart-room-finder-app-firebase.firebasestorage.app',
   );
+
 }
