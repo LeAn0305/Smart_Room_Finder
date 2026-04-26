@@ -50,6 +50,26 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
       return;
     }
 
+    if (index == 2) {
+      openAdminUsers(context);
+      return;
+    }
+
+    if (index == 3) {
+      openAdminReports(context);
+      return;
+    }
+
+    if (index == 4) {
+      openAdminSupport(context);
+      return;
+    }
+
+    if (index == 5) {
+      openAdminSettings(context);
+      return;
+    }
+
     setState(() => _selectedMenuIndex = index);
   }
 

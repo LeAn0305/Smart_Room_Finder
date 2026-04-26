@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
@@ -18,11 +19,155 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedMenuIndex = 0;
   String _selectedPeriod = '7 ngày qua';
   String _selectedStatusFilter = 'Tất cả';
+  bool _isLoadingData = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardData();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // =========================
+  // FETCH FROM FIRESTORE
+  // =========================
+  Future<void> _fetchDashboardData() async {
+    try {
+      final fs  = FirebaseFirestore.instance;
+      final now = DateTime.now();
+      final results = await Future.wait([
+        fs.collection('rooms').get(),
+        fs.collection('users').get(),
+        fs.collection('reports').get(),
+        fs.collection('support_tickets').get(),
+      ]);
+
+      final rooms   = results[0].docs;
+      final users   = results[1].docs;
+      final reports = results[2].docs;
+      final support = results[3].docs;
+
+      DateTime? parseDate(dynamic raw) {
+        if (raw is Timestamp) return raw.toDate();
+        if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+        return null;
+      }
+
+      final pending  = rooms.where((d) => d.data()['isVerified'] != true && d.data()['isDraft'] != true).length;
+      final verified = rooms.where((d) => d.data()['isVerified'] == true).length;
+      final rejected = rooms.where((d) => d.data()['isDraft'] == true).length;
+
+      _adminStats = [
+        _AdminStat(title: 'Bài đăng chờ duyệt', value: '$pending',          changeText: '—', isPositive: false, icon: Icons.assignment_late_outlined, accent: const Color(0xFFF59E0B)),
+        _AdminStat(title: 'Người dùng',          value: '${users.length}',   changeText: '—', isPositive: true,  icon: Icons.groups_2_outlined,         accent: const Color(0xFF22B573)),
+        _AdminStat(title: 'Báo cáo mới',         value: '${reports.length}', changeText: '—', isPositive: false, icon: Icons.flag_outlined,             accent: AppColors.blue),
+        _AdminStat(title: 'Yêu cầu hỗ trợ',     value: '${support.length}', changeText: '—', isPositive: true,  icon: Icons.headset_mic_outlined,      accent: const Color(0xFF8B5CF6)),
+      ];
+
+      _weeklyChartData = List.generate(7, (i) {
+        final day   = now.subtract(Duration(days: 6 - i));
+        final count = rooms.where((d) {
+          final date = parseDate(d.data()['postedAt']);
+          return date != null && date.year == day.year && date.month == day.month && date.day == day.day;
+        }).length;
+        return _ChartPoint(label: '${day.day}/${day.month}', value: count.toDouble());
+      });
+
+      final pending2 = math.max(0, rooms.length - verified - rejected);
+      _listingStatuses = [
+        _ListingStatus(label: 'Đã xác minh',  count: verified, color: const Color(0xFF57C98D)),
+        _ListingStatus(label: 'Chờ xác minh', count: pending2, color: const Color(0xFFFFB84D)),
+        _ListingStatus(label: 'Bị từ chối',   count: rejected, color: const Color(0xFFFF6B6B)),
+      ];
+
+      final total    = rooms.length;
+      final vRate    = total == 0 ? '0%' : '${(verified / total * 100).toStringAsFixed(1)}%';
+      final todayCnt = rooms.where((d) {
+        final date = parseDate(d.data()['postedAt']);
+        return date != null && date.year == now.year && date.month == now.month && date.day == now.day;
+      }).length;
+      final newUsers = users.where((d) {
+        final date = parseDate(d.data()['createdAt']);
+        return date != null && now.difference(date).inDays <= 7;
+      }).length;
+
+      _quickInsights = [
+        _QuickInsight(title: 'Tỷ lệ xác minh',       value: vRate,        changeText: 'Trên $total phòng',   icon: Icons.verified_rounded,         accent: const Color(0xFF22B573), isPositive: true),
+        _QuickInsight(title: 'Đăng mới hôm nay',      value: '$todayCnt', changeText: 'Trong ngày hôm nay',  icon: Icons.note_add_rounded,         accent: AppColors.blue,          isPositive: true),
+        _QuickInsight(title: 'Người dùng mới (tuần)', value: '$newUsers', changeText: '7 ngày gần nhất',     icon: Icons.person_add_alt_1_rounded, accent: const Color(0xFF8B5CF6), isPositive: true),
+        _QuickInsight(title: 'Tổng số phòng',         value: '$total',    changeText: 'Toàn hệ thống',       icon: Icons.home_work_outlined,       accent: const Color(0xFFF59E0B), isPositive: true),
+      ];
+
+      final sorted = [...rooms]..sort((a, b) {
+        final da = parseDate(a.data()['postedAt']);
+        final db = parseDate(b.data()['postedAt']);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return db.compareTo(da);
+      });
+
+      _recentActivities = sorted.take(5).map((doc) {
+        final d  = doc.data();
+        final id = doc.id;
+        final String status;
+        if (d['isVerified'] == true)   { status = 'Đã xác minh'; }
+        else if (d['isDraft'] == true) { status = 'Bị từ chối'; }
+        else                           { status = 'Chờ duyệt'; }
+        final date    = parseDate(d['postedAt']);
+        final dateStr = date == null ? '—'
+            : '${date.day}/${date.month}/${date.year}\n${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        return _RecentActivity(
+          roomCode:   'SRF-${id.substring(0, math.min(6, id.length)).toUpperCase()}',
+          roomName:   (d['title']    ?? 'Chưa đặt tên').toString(),
+          ownerName:  (d['postedBy'] ?? 'Ẩn danh').toString(),
+          ownerEmail: '',
+          status:     status,
+          postedAt:   dateStr,
+          imageAsset: (d['mainImageUrl'] ?? d['imageUrl'] ?? '').toString(),
+        );
+      }).toList();
+
+      _alerts = [
+        for (final doc in reports.take(3))
+          _AlertItem(
+            title:    'Báo cáo nội dung',
+            subtitle: (doc.data()['reason'] ?? doc.data()['message'] ?? 'Nội dung vi phạm').toString(),
+            timeAgo:  _timeAgo(doc.data()['createdAt']),
+            icon:     Icons.report_gmailerrorred_rounded,
+            accent:   const Color(0xFFFF6B6B),
+          ),
+        for (final doc in support.take(2))
+          _AlertItem(
+            title:    'Yêu cầu hỗ trợ mới',
+            subtitle: (doc.data()['message'] ?? doc.data()['subject'] ?? 'Cần phản hồi').toString(),
+            timeAgo:  _timeAgo(doc.data()['createdAt']),
+            icon:     Icons.info_outline_rounded,
+            accent:   AppColors.blue,
+          ),
+      ];
+
+      if (mounted) setState(() => _isLoadingData = false);
+    } catch (e) {
+      debugPrint('❌ Dashboard fetch error: $e');
+      if (mounted) setState(() => _isLoadingData = false);
+    }
+  }
+
+  static String _timeAgo(dynamic raw) {
+    DateTime? date;
+    if (raw is Timestamp) date = raw.toDate();
+    else if (raw is String && raw.isNotEmpty) date = DateTime.tryParse(raw);
+    if (date == null) return '—';
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    if (diff.inHours < 24)   return '${diff.inHours} giờ trước';
+    return '${diff.inDays} ngày trước';
   }
 
   // =========================
@@ -41,6 +186,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (index == 1) {
       openPostApproval(context);
+      return;
+    }
+
+    if (index == 2) {
+      openAdminUsers(context);
+      return;
+    }
+
+    if (index == 3) {
+      openAdminReports(context);
+      return;
+    }
+
+    if (index == 4) {
+      openAdminSupport(context);
+      return;
+    }
+
+    if (index == 5) {
+      openAdminSettings(context);
       return;
     }
 
@@ -891,9 +1056,9 @@ class _WeeklyActivityCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Text(
-                'Tổng: 4,325',
-                style: TextStyle(
+              Text(
+                'Tổng: ${_weeklyChartData.fold(0.0, (s, p) => s + p.value).toInt()} bài đăng',
+                style: const TextStyle(
                   color: AppColors.blueDark,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -2103,204 +2268,26 @@ class _DonutChartPainter extends CustomPainter {
 }
 
 // =========================
-// MOCK DATA - SIDEBAR
+// MOCK DATA - SIDEBAR (UI tĩnh, giữ nguyên)
 // =========================
 const List<_AdminMenuItem> _adminMenus = [
-  _AdminMenuItem(label: 'Tổng quan', icon: Icons.dashboard_outlined),
+  _AdminMenuItem(label: 'Tổng quan',      icon: Icons.dashboard_outlined),
   _AdminMenuItem(label: 'Duyệt bài đăng', icon: Icons.fact_check_outlined),
-  _AdminMenuItem(label: 'Người dùng', icon: Icons.group_outlined),
-  _AdminMenuItem(label: 'Báo cáo', icon: Icons.bar_chart_rounded),
-  _AdminMenuItem(label: 'Hỗ trợ', icon: Icons.support_agent_outlined),
-  _AdminMenuItem(label: 'Cài đặt', icon: Icons.settings_outlined),
+  _AdminMenuItem(label: 'Người dùng',     icon: Icons.group_outlined),
+  _AdminMenuItem(label: 'Báo cáo',        icon: Icons.bar_chart_rounded),
+  _AdminMenuItem(label: 'Hỗ trợ',         icon: Icons.support_agent_outlined),
+  _AdminMenuItem(label: 'Cài đặt',        icon: Icons.settings_outlined),
 ];
 
 // =========================
-// MOCK DATA - STATS
+// FIRESTORE DATA — được gán bởi _fetchDashboardData()
 // =========================
-const List<_AdminStat> _adminStats = [
-  _AdminStat(
-    title: 'Bài đăng chờ duyệt',
-    value: '128',
-    changeText: '+12.5%',
-    isPositive: false,
-    icon: Icons.assignment_late_outlined,
-    accent: Color(0xFFF59E0B),
-  ),
-  _AdminStat(
-    title: 'Người dùng',
-    value: '5,426',
-    changeText: '+8.3%',
-    isPositive: true,
-    icon: Icons.groups_2_outlined,
-    accent: Color(0xFF22B573),
-  ),
-  _AdminStat(
-    title: 'Báo cáo mới',
-    value: '23',
-    changeText: '+27.8%',
-    isPositive: false,
-    icon: Icons.flag_outlined,
-    accent: AppColors.blue,
-  ),
-  _AdminStat(
-    title: 'Yêu cầu hỗ trợ',
-    value: '15',
-    changeText: '+6.7%',
-    isPositive: true,
-    icon: Icons.headset_mic_outlined,
-    accent: Color(0xFF8B5CF6),
-  ),
-];
-
-// =========================
-// MOCK DATA - LINE CHART
-// =========================
-const List<_ChartPoint> _weeklyChartData = [
-  _ChartPoint(label: '13/05', value: 300),
-  _ChartPoint(label: '14/05', value: 460),
-  _ChartPoint(label: '15/05', value: 810),
-  _ChartPoint(label: '16/05', value: 450),
-  _ChartPoint(label: '17/05', value: 360),
-  _ChartPoint(label: '18/05', value: 820),
-  _ChartPoint(label: '19/05', value: 610),
-];
-
-// =========================
-// MOCK DATA - LISTING STATUS
-// =========================
-const List<_ListingStatus> _listingStatuses = [
-  _ListingStatus(
-    label: 'Đã xác minh',
-    count: 1563,
-    color: Color(0xFF57C98D),
-  ),
-  _ListingStatus(
-    label: 'Chờ xác minh',
-    count: 628,
-    color: Color(0xFFFFB84D),
-  ),
-  _ListingStatus(
-    label: 'Bị từ chối',
-    count: 267,
-    color: Color(0xFFFF6B6B),
-  ),
-];
-
-// =========================
-// MOCK DATA - QUICK INSIGHTS
-// =========================
-const List<_QuickInsight> _quickInsights = [
-  _QuickInsight(
-    title: 'Tỷ lệ xác minh',
-    value: '63.6%',
-    changeText: '+5.4% so với tuần trước',
-    icon: Icons.verified_rounded,
-    accent: Color(0xFF22B573),
-    isPositive: true,
-  ),
-  _QuickInsight(
-    title: 'Đăng mới hôm nay',
-    value: '86',
-    changeText: '+15.2% so với hôm qua',
-    icon: Icons.note_add_rounded,
-    accent: AppColors.blue,
-    isPositive: true,
-  ),
-  _QuickInsight(
-    title: 'Người dùng mới',
-    value: '312',
-    changeText: '+9.7% so với tuần trước',
-    icon: Icons.person_add_alt_1_rounded,
-    accent: Color(0xFF8B5CF6),
-    isPositive: true,
-  ),
-  _QuickInsight(
-    title: 'Lượt xem hôm nay',
-    value: '2,451',
-    changeText: '+11.3% so với hôm qua',
-    icon: Icons.visibility_rounded,
-    accent: Color(0xFFF59E0B),
-    isPositive: true,
-  ),
-];
-
-// =========================
-// MOCK DATA - RECENT ACTIVITY
-// =========================
-const List<_RecentActivity> _recentActivities = [
-  _RecentActivity(
-    roomCode: 'SRF-10293',
-    roomName: 'Phòng trọ quận 10, TP.HCM',
-    ownerName: 'Nguyễn Văn Bình',
-    ownerEmail: 'binh.nv@gmail.com',
-    status: 'Chờ duyệt',
-    postedAt: '19/05/2025\n09:15',
-    imageAsset: 'assets/images/room_apartment_horizon.png',
-  ),
-  _RecentActivity(
-    roomCode: 'SRF-10292',
-    roomName: 'Phòng trọ gần Đại Bách Khoa',
-    ownerName: 'Trần Thị Mai',
-    ownerEmail: 'mai.tt@gmail.com',
-    status: 'Đã xác minh',
-    postedAt: '19/05/2025\n08:45',
-    imageAsset: 'assets/images/room_student_room.png',
-  ),
-  _RecentActivity(
-    roomCode: 'SRF-10291',
-    roomName: 'Phòng full nội thất, Quận 7',
-    ownerName: 'Lê Minh Tuấn',
-    ownerEmail: 'tuanlm@gmail.com',
-    status: 'Chờ xác minh',
-    postedAt: '19/05/2025\n08:30',
-    imageAsset: 'assets/images/room_muji_studio.png',
-  ),
-  _RecentActivity(
-    roomCode: 'SRF-10290',
-    roomName: 'Phòng trọ giá rẻ Gò Vấp',
-    ownerName: 'Phạm Văn Hùng',
-    ownerEmail: 'hungpv@gmail.com',
-    status: 'Bị từ chối',
-    postedAt: '19/05/2025\n07:50',
-    imageAsset: 'assets/images/room_apartment_mini.png',
-  ),
-  _RecentActivity(
-    roomCode: 'SRF-10289',
-    roomName: 'Phòng mới xây, Tân Bình',
-    ownerName: 'Đỗ Thu Hằng',
-    ownerEmail: 'hangdt@gmail.com',
-    status: 'Đã xác minh',
-    postedAt: '19/05/2025\n07:20',
-    imageAsset: 'assets/images/room_apartment_2br.png',
-  ),
-];
-
-// =========================
-// MOCK DATA - ALERTS
-// =========================
-const List<_AlertItem> _alerts = [
-  _AlertItem(
-    title: 'Báo cáo nội dung',
-    subtitle: 'Bài đăng có nội dung vi phạm #RC-2025-0519',
-    timeAgo: '10 phút trước',
-    icon: Icons.report_gmailerrorred_rounded,
-    accent: Color(0xFFFF6B6B),
-  ),
-  _AlertItem(
-    title: 'Bài đăng bị từ chối',
-    subtitle: 'Mã phòng SRF-10293 vừa bị từ chối xác minh',
-    timeAgo: '35 phút trước',
-    icon: Icons.warning_amber_rounded,
-    accent: Color(0xFFF59E0B),
-  ),
-  _AlertItem(
-    title: 'Yêu cầu hỗ trợ mới',
-    subtitle: 'Từ người dùng Nguyễn Văn A cần phản hồi',
-    timeAgo: '1 giờ trước',
-    icon: Icons.info_outline_rounded,
-    accent: AppColors.blue,
-  ),
-];
+var _adminStats       = <_AdminStat>[];
+var _weeklyChartData  = <_ChartPoint>[];
+var _listingStatuses  = <_ListingStatus>[];
+var _quickInsights    = <_QuickInsight>[];
+var _recentActivities = <_RecentActivity>[];
+var _alerts           = <_AlertItem>[];
 
 // =========================
 // PRIVATE HELPERS

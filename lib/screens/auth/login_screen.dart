@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
-import 'package:smart_room_finder/screens/dashboard_admin/dashboard_admin.dart';
+import 'package:smart_room_finder/screens/admin/admin_dashboard_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
 
