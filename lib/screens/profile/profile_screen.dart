@@ -596,6 +596,8 @@ void _onLogout() {
             letterSpacing: -0.3,
           ),
         ),
+        const SizedBox(height: 6),
+        _buildRoleTag(_user?.role),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -640,6 +642,65 @@ void _onLogout() {
     ],
   );
 }
+
+  // ==================================
+  // ROLE TAG / CHIP
+  // ==================================
+  Widget _buildRoleTag(UserRole? role) {
+    if (role == null) return const SizedBox.shrink();
+
+    final IconData icon;
+    final String   label;
+    final Color    bgColor;
+    final Color    fgColor;
+    final Color    borderColor;
+
+    switch (role) {
+      case UserRole.admin:
+        icon        = Icons.verified_user_rounded;
+        label       = 'Admin';
+        bgColor     = const Color(0xFFFFEBEB);
+        fgColor     = const Color(0xFFD32F2F);
+        borderColor = const Color(0xFFFFCDD2);
+      case UserRole.landlord:
+        icon        = Icons.home_rounded;
+        label       = 'Chủ trọ';
+        bgColor     = AppColors.teal.withValues(alpha: 0.08);
+        fgColor     = AppColors.tealDark;
+        borderColor = AppColors.teal.withValues(alpha: 0.25);
+      case UserRole.renter:
+        icon        = Icons.search_rounded;
+        label       = 'Người thuê';
+        bgColor     = AppColors.teal.withValues(alpha: 0.08);
+        fgColor     = AppColors.teal;
+        borderColor = AppColors.teal.withValues(alpha: 0.25);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fgColor),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: fgColor,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildStatsRow({
   required int totalRooms,

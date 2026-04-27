@@ -21,6 +21,11 @@ class AuthService {
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // =========================
+  // ROLE HELPERS
+  // =========================
+  static String? _roleToValue(UserRole? role) => role?.value;
+
+  // =========================
   // EMAIL LOGIN
   // =========================
   static Future<UserCredential> signInWithEmail(
@@ -37,6 +42,65 @@ class AuthService {
     }
 
     return cred;
+  }
+
+  // =========================
+  // ADMIN LOGIN
+  // =========================
+  static Future<UserModel> signInAdminWithEmail({
+    required String email,
+    required String password,
+    required String secretCode,
+  }) async {
+    final cred = await signInWithEmail(email, password);
+    final user = cred.user;
+
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Không tìm thấy tài khoản admin hiện tại',
+      );
+    }
+
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final data = doc.data();
+
+    if (!doc.exists || data == null) {
+      await signOut();
+      throw FirebaseAuthException(
+        code: 'user-data-not-found',
+        message: 'Không tìm thấy dữ liệu người dùng trong Firestore',
+      );
+    }
+
+    final userModel = UserModel.fromFirebase(data, doc.id);
+    final storedSecret = (data['adminSecretCode'] ?? '').toString().trim();
+
+    if (!userModel.isAdmin) {
+      await signOut();
+      throw FirebaseAuthException(
+        code: 'not-admin',
+        message: 'Tài khoản này không có quyền quản trị',
+      );
+    }
+
+    if (storedSecret.isEmpty) {
+      await signOut();
+      throw FirebaseAuthException(
+        code: 'admin-secret-not-set',
+        message: 'Tài khoản admin chưa được cấu hình mã bí mật',
+      );
+    }
+
+    if (storedSecret != secretCode.trim()) {
+      await signOut();
+      throw FirebaseAuthException(
+        code: 'invalid-admin-secret',
+        message: 'Mã bí mật admin không chính xác',
+      );
+    }
+
+    return userModel;
   }
 
   // =========================
@@ -140,12 +204,13 @@ class AuthService {
   static Future<void> _syncUserToFirestore(
     User user, {
     String? overrideName,
-    String? overrideRole,
+    UserRole? overrideRole,
   }) async {
     final docRef = _firestore.collection('users').doc(user.uid);
     final snapshot = await docRef.get();
 
     final now = DateTime.now().toIso8601String();
+    final resolvedRole = _roleToValue(overrideRole);
 
     if (!snapshot.exists) {
       await docRef.set({
@@ -160,8 +225,8 @@ class AuthService {
 
         // 🔥 User mới chưa chọn vai trò
         // Sau khi đăng nhập / đăng ký xong sẽ chuyển sang màn chọn vai trò
-        'role': null,
-        'hasSelectedRole': false,
+        'role': resolvedRole,
+        'hasSelectedRole': resolvedRole != null,
 
         'createdAt': now,
         'updatedAt': now,
@@ -193,17 +258,46 @@ class AuthService {
       // 🔥 Giữ role cũ nếu đã có trong Firestore
       // Nếu có truyền overrideRole thì cập nhật theo overrideRole
       // Nếu user cũ chưa có role thì giữ null để chuyển sang màn chọn vai trò
-      'role': (overrideRole != null && overrideRole.trim().isNotEmpty)
-          ? overrideRole.trim()
-          : oldData['role'],
+      'role': resolvedRole ?? oldData['role'],
 
       // 🔥 Giữ trạng thái đã chọn vai trò nếu đã có
       // Nếu user cũ chưa có field này thì mặc định là false
-      'hasSelectedRole': oldData['hasSelectedRole'] ?? false,
+      'hasSelectedRole': resolvedRole != null ? true : (oldData['hasSelectedRole'] ?? (oldData['role'] != null)),
+
 
       'updatedAt': now,
     });
   }
+
+  // =========================
+  // USER ROLE
+  // =========================
+  static Future<void> updateUserRole(UserRole role) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Không tìm thấy người dùng hiện tại',
+      );
+    }
+
+    await _firestore.collection('users').doc(user.uid).set({
+      'role': _roleToValue(role),
+      'hasSelectedRole': true,
+      'updatedAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
+
+  }
+
+  static Future<UserRole?> getCurrentUserRole() async {
+    final userData = await getCurrentUserData();
+    return userData?.role;
+  }
+
+  static Future<bool> isCurrentUserAdmin() async {
+    return (await getCurrentUserRole()) == UserRole.admin;
+  }
+
 
   // =========================
   // GET CURRENT USER DATA

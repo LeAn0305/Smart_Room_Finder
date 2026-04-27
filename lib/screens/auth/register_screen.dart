@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
+import 'package:smart_room_finder/screens/chose_role/chose_role_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -101,7 +101,7 @@ Future<void> _onRegister() async {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      MaterialPageRoute(builder: (_) => const ChoseRoleScreen()),
       (_) => false,
     );
   } on FirebaseAuthException catch (e) {

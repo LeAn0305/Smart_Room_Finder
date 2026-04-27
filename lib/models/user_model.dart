@@ -1,3 +1,25 @@
+enum UserRole {
+  renter,
+  landlord,
+  admin,
+}
+
+extension UserRoleX on UserRole {
+  String get value => name;
+
+  static UserRole? fromValue(dynamic raw) {
+    if (raw == null) return null;
+
+    final value = raw.toString().trim().toLowerCase();
+
+    try {
+      return UserRole.values.firstWhere((role) => role.name == value);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 class UserModel {
   final String id;
   final String name;
@@ -5,18 +27,17 @@ class UserModel {
   final String profileImageUrl;
   final String location;
   final String phoneNumber;
-  final String? role;
+  final UserRole? role;
   final bool hasSelectedRole;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  
 
-  UserModel({
+  const UserModel({
     required this.id,
     required this.name,
     required this.email,
     this.profileImageUrl = '',
-    this.location = 'TP. Hồ Chí Minh',
+    this.location = 'TP. Ho Chi Minh',
     this.phoneNumber = '',
     this.role,
     this.hasSelectedRole = false,
@@ -24,24 +45,23 @@ class UserModel {
     this.updatedAt,
   });
 
-  /// 🔥 Chuyển từ Firebase JSON sang UserModel
-  /// Dùng khi lấy dữ liệu từ Firestore
   factory UserModel.fromFirebase(Map<String, dynamic> json, String docId) {
+    final parsedRole = UserRoleX.fromValue(json['role']);
+
     return UserModel(
       id: docId,
       name: json['name'] ?? 'Unknown User',
       email: json['email'] ?? '',
       profileImageUrl: json['profileImageUrl'] ?? '',
-      location: json['location'] ?? 'TP. Hồ Chí Minh',
+      location: json['location'] ?? 'TP. Ho Chi Minh',
       phoneNumber: json['phoneNumber'] ?? '',
-      role: json['role'],
-      hasSelectedRole: json['hasSelectedRole'] ?? false,
+      role: parsedRole,
+      hasSelectedRole: json['hasSelectedRole'] ?? (parsedRole != null),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
     );
   }
 
-  /// 🔥 Dùng khi tạo user mới trên Firebase
   Map<String, dynamic> toFirebase() {
     return {
       'name': name,
@@ -51,13 +71,11 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
-      'role': role,
+      'role': role?.value,
       'hasSelectedRole': hasSelectedRole,
     };
   }
 
-  /// 🔥 Dùng khi cập nhật user
-  /// Không ghi đè createdAt
   Map<String, dynamic> toFirebaseForUpdate() {
     return {
       'name': name,
@@ -67,19 +85,19 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'updatedAt': updatedAt?.toIso8601String() ??
           DateTime.now().toIso8601String(),
-      'role': role,
+      'role': role?.value,
       'hasSelectedRole': hasSelectedRole,
     };
   }
 
-  /// 📝 Copy with
   UserModel copyWith({
     String? id,
     String? name,
     String? email,
     String? profileImageUrl,
     String? location,
-    String? role,
+    UserRole? role,
+    bool clearRole = false,
     bool? hasSelectedRole,
     String? phoneNumber,
     DateTime? createdAt,
@@ -94,10 +112,14 @@ class UserModel {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      role: role ?? this.role,
+      role: clearRole ? null : (role ?? this.role),
       hasSelectedRole: hasSelectedRole ?? this.hasSelectedRole,
     );
   }
+
+  bool get isAdmin => role == UserRole.admin;
+  bool get isLandlord => role == UserRole.landlord;
+  bool get isRenter => role == UserRole.renter;
 
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
@@ -107,31 +129,27 @@ class UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, role: $role, location: $location, phoneNumber: $phoneNumber)';
+    return 'UserModel(id: $id, name: $name, email: $email, role: ${role?.value}, location: $location, phoneNumber: $phoneNumber)';
   }
 
-  // ============ SAMPLE DATA (dùng để test UI) ============
-
-  static List<UserModel> sampleUsers = [
+  static final List<UserModel> sampleUsers = [
     UserModel(
       id: 'user_1',
-      name: 'Nguyễn Văn A',
+      name: 'Nguyen Van A',
       email: 'vana@example.com',
       profileImageUrl: 'https://i.pravatar.cc/150?u=vana@example.com',
-      location: 'TP. Hồ Chí Minh',
-      phoneNumber: '',
-      role: 'renter',
+      location: 'TP. Ho Chi Minh',
+      role: UserRole.renter,
       hasSelectedRole: true,
       createdAt: DateTime.now().subtract(const Duration(days: 30)),
     ),
     UserModel(
       id: 'user_2',
-      name: 'Trần Thị B',
+      name: 'Tran Thi B',
       email: 'tranthib@example.com',
       profileImageUrl: 'https://i.pravatar.cc/150?u=tranthib@example.com',
-      location: 'Hà Nội',
-      phoneNumber: '',
-      role: 'renter',
+      location: 'Ha Noi',
+      role: UserRole.renter,
       hasSelectedRole: true,
       createdAt: DateTime.now().subtract(const Duration(days: 20)),
     ),
