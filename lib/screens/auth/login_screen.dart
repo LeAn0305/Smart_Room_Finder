@@ -9,7 +9,9 @@ import 'package:smart_room_finder/screens/auth/forgot_password_screen.dart';
 import 'package:smart_room_finder/screens/auth/register_screen.dart';
 import 'package:smart_room_finder/screens/admin/admin_dashboard_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/screens/onboarding/preference_screen.dart';
+
+import 'package:smart_room_finder/screens/chose_role/chose_role_screen.dart';
+import 'package:smart_room_finder/screens/main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -391,12 +393,40 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _goToHome() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-      (route) => false,
-    );
+  // =========================
+  // ROUTING SAU ĐĂNG NHẬP
+  // Kiểm tra hasSelectedRole:
+  //   - false → ChoseRoleScreen (lần đầu)
+  //   - true  → MainNavigationScreen (đã chọn role rồi)
+  // =========================
+  Future<void> _goToHome() async {
+    try {
+      final userData = await AuthService.getCurrentUserData();
+      if (!mounted) return;
+
+      if (userData != null && userData.hasSelectedRole) {
+        // Người dùng đã chọn role từ lần trước → vào thẳng Home
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      } else {
+        // Lần đầu → màn chọn vai trò
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const ChoseRoleScreen()),
+          (route) => false,
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const ChoseRoleScreen()),
+        (route) => false,
+      );
+    }
   }
 
   void _goToAdminDashboard() {
@@ -525,7 +555,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService.signInWithEmail(email, password);
       debugPrint('UID hiện tại: ${AuthService.currentUser?.uid}');
       if (!mounted) return;
-      _goToHome();
+      await _goToHome();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -578,7 +608,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
-      _goToHome();
+      await _goToHome();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -614,11 +644,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-        (route) => false,
-      );
+      await _goToHome();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
