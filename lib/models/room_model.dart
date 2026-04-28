@@ -41,6 +41,9 @@ class RoomModel {
   final List<String> subImageUrls;
 
   final double rating;
+  final int totalReviews;
+  final double latitude;
+  final double longitude;
   final RoomType type;
   final double area;
   final int bedrooms;
@@ -75,6 +78,9 @@ class RoomModel {
     this.subImageUrls = const [],
 
     this.rating = 0,
+    this.totalReviews = 0,
+    this.latitude = 0.0,
+    this.longitude = 0.0,
     this.type = RoomType.studio,
     this.area = 0,
     this.bedrooms = 0,
@@ -118,6 +124,9 @@ class RoomModel {
       subImageUrls: resolvedSubImages,
 
       rating: _toDouble(map['rating']),
+      totalReviews: _toInt(map['totalReviews']),
+      latitude: _toDouble(map['latitude']),
+      longitude: _toDouble(map['longitude']),
       type: _parseRoomType(map['type']),
       area: _toDouble(map['area']),
       bedrooms: _toInt(map['bedrooms']),
@@ -163,6 +172,9 @@ class RoomModel {
       'subImageUrls': subImageUrls.isNotEmpty ? subImageUrls : images,
 
       'rating': rating,
+      'totalReviews': totalReviews,
+      'latitude': latitude,
+      'longitude': longitude,
       'type': type.name,
       'area': area,
       'bedrooms': bedrooms,
@@ -247,6 +259,9 @@ class RoomModel {
     String? mainImageUrl,
     List<String>? subImageUrls,
     double? rating,
+    int? totalReviews,
+    double? latitude,
+    double? longitude,
     RoomType? type,
     double? area,
     int? bedrooms,
@@ -276,6 +291,9 @@ class RoomModel {
       mainImageUrl: mainImageUrl ?? this.mainImageUrl,
       subImageUrls: subImageUrls ?? this.subImageUrls,
       rating: rating ?? this.rating,
+      totalReviews: totalReviews ?? this.totalReviews,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       type: type ?? this.type,
       area: area ?? this.area,
       bedrooms: bedrooms ?? this.bedrooms,
@@ -347,6 +365,9 @@ class RoomModel {
       mainImageUrl: 'assets/images/phong_tro_gac_lung_go.png',
       subImageUrls: ['assets/images/phong_tro_gac_lung_go.png'],
       rating: 4.2,
+      totalReviews: 124,
+      latitude: 10.732,
+      longitude: 106.700,
       type: RoomType.studio,
       amenities: ['Gác gỗ', 'Kệ bếp', 'Wifi', 'WC riêng'],
       isFavorite: true,
@@ -367,6 +388,9 @@ class RoomModel {
       mainImageUrl: 'assets/images/ky_tuc_xa_sinh_vien.png',
       subImageUrls: ['assets/images/ky_tuc_xa_sinh_vien.png'],
       rating: 4.4,
+      totalReviews: 85,
+      latitude: 10.776,
+      longitude: 106.660,
       type: RoomType.studio,
       amenities: ['Giường tầng', 'Máy lạnh', 'Tủ cá nhân', 'Dọn phòng'],
       isVerified: true,
@@ -392,6 +416,9 @@ class RoomModel {
       mainImageUrl: 'assets/images/can_ho_mini_don_gian.png',
       subImageUrls: ['assets/images/can_ho_mini_don_gian.png'],
       rating: 4.0,
+      totalReviews: 42,
+      latitude: 10.810,
+      longitude: 106.690,
       type: RoomType.apartment,
       amenities: ['Bếp riêng', 'Toilet riêng', 'Hầm xe', 'Bảo vệ'],
       isVerified: true,

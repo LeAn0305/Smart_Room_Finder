@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
+import 'package:smart_room_finder/screens/map/route_map_screen.dart';
+import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
+import 'package:smart_room_finder/screens/room_detail/widgets/review_section.dart';
 import 'package:smart_room_finder/services/view_history_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
@@ -109,7 +112,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '(124)',
+                                    '(${room.totalReviews})',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppColors.textSecondary.withValues(alpha: 
@@ -143,13 +146,43 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                               ),
                               const SizedBox(width: 6),
                               Expanded(
-                                child: Text(
-                                  room.address,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      room.address,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => RouteMapScreen(room: room),
+                                          ),
+                                        );
+                                      },
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.directions_rounded, size: 16, color: AppColors.teal),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Chỉ đường',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.teal,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -241,6 +274,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                 )
                                 .toList(),
                           ),
+                          const SizedBox(height: 20),
+                          const Divider(color: AppColors.mintSoft),
+                          const SizedBox(height: 20),
+                          ReviewSection(
+                            room: room,
+                            onReviewAdded: () {
+                              setState(() {}); // refresh to get new averageRating and totalReviews if possible, but actually we should refresh the room data from firestore. For now setState will update child.
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -262,6 +304,17 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   ),
                   Row(
                     children: [
+                      _circleBtn(Icons.flag_rounded, () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (context) => ReportBottomSheet(room: room),
+                        );
+                      }),
+                      const SizedBox(width: 10),
                       _circleBtn(Icons.share_rounded, () {}),
                       const SizedBox(width: 10),
                       _circleBtn(
