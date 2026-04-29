@@ -41,13 +41,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
 
   List<String> get _images {
     final base = [_room.imageUrl];
-    final extras = [
-      'assets/images/room_studio_luxury.png',
-      'assets/images/room_apartment_mini.png',
-      'assets/images/room_muji_studio.png',
-      'assets/images/room_apartment_horizon.png',
-    ].where((e) => e != _room.imageUrl).take(3).toList();
-
+    final extras = _room.images.where((e) => e != _room.imageUrl).toList();
     return [...base, ...extras];
   }
 

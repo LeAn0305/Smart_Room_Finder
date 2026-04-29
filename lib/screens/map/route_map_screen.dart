@@ -225,7 +225,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$_distance • $_duration',
+                              '$_distance • ước tính $_duration',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],

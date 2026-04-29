@@ -16,7 +16,7 @@ class ImageService {
       File file = File(filePath);
       final userId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
       // Tạo tên ngẫu nhiên kết hợp timestamp
-      String fileName = 'room_images/$userId/${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+      String fileName = 'room_images/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
       Reference ref = _storage.ref().child(fileName);
       
       UploadTask uploadTask = ref.putFile(file);
