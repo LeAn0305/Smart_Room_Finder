@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
 
 class PostApprovalScreen extends StatefulWidget {
@@ -21,14 +23,442 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   String _selectedArea = 'Tất cả khu vực';
   String _selectedDateRange = '13/05/2025 - 19/05/2025';
   String _selectedSort = 'Mới nhất';
-  String _selectedListingId = _moderationListings.first.id;
+  String _selectedListingId = '';
   int _selectedPreviewIndex = 0;
+
+  // ---- Firebase state ----
+  List<_ModerationListing> _listings = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPendingRooms();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     _tableSearchController.dispose();
     super.dispose();
+  }
+
+  // =========================
+  // FIREBASE: FETCH PENDING
+  // =========================
+  Future<void> _fetchPendingRooms() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final db = FirebaseFirestore.instance;
+
+      // Query đơn giản: chỉ lọc isVerified=false.
+      // Không dùng orderBy hay nhiều where để tránh cần Composite Index.
+      // Các điều kiện khác (isDraft, isActive, approvalStatus) được lọc client-side
+      // để tương thích với phòng cũ chưa có đủ field.
+      final snap = await db
+          .collection('rooms')
+          .where('isVerified', isEqualTo: false)
+          .get();
+
+      final rooms = snap.docs
+          .map((d) => RoomModel.fromMap(d.data(), d.id))
+          // Lọc client-side: bỏ phòng đang ở nháp hoặc đã bị từ chối
+          .where((r) =>
+              r.isDraft == false &&
+              r.isActive != false && // null cũng coi là active (backward compat)
+              r.approvalStatus != RoomStatus.rejected)
+          .toList()
+        // Sắp xếp client-side: mới nhất lên đầu
+        ..sort((a, b) {
+          final at = a.postedAt;
+          final bt = b.postedAt;
+          if (at == null && bt == null) return 0;
+          if (at == null) return 1;
+          if (bt == null) return -1;
+          return bt.compareTo(at);
+        });
+
+      // Fetch thông tin chủ trọ song song
+      final ownerIds = rooms.map((r) => r.ownerId).toSet().toList();
+      final ownerDocs = await Future.wait(
+        ownerIds.map((uid) => db.collection('users').doc(uid).get()),
+      );
+      final ownerMap = <String, Map<String, dynamic>>{};
+      for (final doc in ownerDocs) {
+        if (doc.exists) ownerMap[doc.id] = doc.data()!;
+      }
+
+      final listings = rooms.map((room) {
+        final owner = ownerMap[room.ownerId] ?? {};
+        return _ModerationListing.fromRoom(room, owner);
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _listings = listings;
+        _selectedListingId = listings.isNotEmpty ? listings.first.id : '';
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Không thể tải dữ liệu: $e';
+      });
+    }
+  }
+
+  // =========================
+  // FIREBASE: APPROVE
+  // =========================
+  Future<void> _approveRoom(String roomId) async {
+    final db = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+    final historyEntry = RoomReviewHistory(
+      id: db.collection('_').doc().id,
+      time: now.toDate(),
+      title: 'Bài đăng đã được xác minh',
+      subtitle: 'Admin đã kiểm tra và xác nhận thông tin bài đăng hợp lệ.',
+      actorName: 'Admin',
+    );
+    await db.collection('rooms').doc(roomId).update({
+      'isVerified': true,
+      'isActive': true,
+      'approvalStatus': RoomStatus.verified.name,
+      'updatedAt': now,
+      'reviewHistory': FieldValue.arrayUnion([historyEntry.toMap()]),
+    });
+    _removeListingFromState(roomId);
+  }
+
+  // =========================
+  // DIALOG: Yêu cầu bổ sung
+  // =========================
+  Future<void> _showNeedsInfoDialog(String roomId, String ownerId) async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: AppColors.blue, size: 22),
+            SizedBox(width: 10),
+            Text(
+              'Yêu cầu bổ sung thông tin',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vui lòng nhập lý do yêu cầu bổ sung. Chủ trọ sẽ nhận được thông báo này.',
+              style: TextStyle(
+                  color: Color(0xFF7A8898), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              maxLength: 300,
+              decoration: InputDecoration(
+                hintText:
+                    'Ví dụ: Cần bổ sung ảnh mặt tiền, giấy chứng minh sở hữu...',
+                hintStyle: const TextStyle(
+                    color: Color(0xFFAFBCC9), fontSize: 12.5),
+                filled: true,
+                fillColor: const Color(0xFFF7FAFE),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide:
+                      const BorderSide(color: AppColors.blue, width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF8A97A8))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text('Gửi yêu cầu',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final reason = reasonCtrl.text.trim().isEmpty
+          ? 'Admin yêu cầu bổ sung thêm thông tin hoặc giấy tờ.'
+          : reasonCtrl.text.trim();
+      await _requestMoreInfo(roomId: roomId, ownerId: ownerId, reason: reason);
+    }
+    reasonCtrl.dispose();
+  }
+
+  // =========================
+  // DIALOG: Từ chối
+  // =========================
+  Future<void> _showRejectDialog(String roomId, String ownerId) async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 22),
+            SizedBox(width: 10),
+            Text(
+              'Từ chối bài đăng',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Hành động này sẽ ẩn bài đăng và hủy tất cả đơn yêu cầu liên quan. '
+              'Chủ trọ sẽ nhận được thông báo từ chối.',
+              style: TextStyle(
+                  color: Color(0xFF7A8898), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              maxLength: 300,
+              decoration: InputDecoration(
+                hintText:
+                    'Ví dụ: Thông tin a và giấy tờ không khớp, nội dung vi phạm...',
+                hintStyle: const TextStyle(
+                    color: Color(0xFFAFBCC9), fontSize: 12.5),
+                filled: true,
+                fillColor: const Color(0xFFF7FAFE),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                      color: Color(0xFFEF4444), width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF8A97A8))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text('Xác nhận từ chối',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final reason = reasonCtrl.text.trim().isEmpty
+          ? 'Bài đăng không đáp ứng tiêu chuẩn kiểm duyệt.'
+          : reasonCtrl.text.trim();
+      await _rejectRoom(roomId: roomId, ownerId: ownerId, reason: reason);
+    }
+    reasonCtrl.dispose();
+  }
+
+  // =========================
+  // FIREBASE: REQUEST MORE INFO
+  // =========================
+  Future<void> _requestMoreInfo({
+    required String roomId,
+    required String ownerId,
+    required String reason,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+    final historyEntry = RoomReviewHistory(
+      id: db.collection('_').doc().id,
+      time: now.toDate(),
+      title: 'Yêu cầu bổ sung thông tin',
+      subtitle: reason,
+      actorName: 'Admin',
+    );
+    await db.collection('rooms').doc(roomId).update({
+      'approvalStatus': RoomStatus.needsInfo.name,
+      'moderationNote': reason, // Lưu lý do để chủ trọ có thể đọc
+      'updatedAt': now,
+      'reviewHistory': FieldValue.arrayUnion([historyEntry.toMap()]),
+    });
+    // Hook thông báo — bạn làm Push Notification sẽ đọc từ đây
+    await _sendOwnerNotification(
+      db: db,
+      ownerId: ownerId,
+      roomId: roomId,
+      type: 'needs_info',
+      title: 'Bài đăng cần bổ sung thông tin',
+      body: reason,
+    );
+    _removeListingFromState(roomId);
+  }
+
+  // =========================
+  // FIREBASE: REJECT
+  // =========================
+  Future<void> _rejectRoom({
+    required String roomId,
+    required String ownerId,
+    required String reason,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final now = Timestamp.now();
+    final batch = db.batch();
+
+    // 1. Cập nhật trạng thái phòng → ẩn hoàn toàn
+    final historyEntry = RoomReviewHistory(
+      id: db.collection('_').doc().id,
+      time: now.toDate(),
+      title: 'Bài đăng bị từ chối',
+      subtitle: reason,
+      actorName: 'Admin',
+    );
+    batch.update(db.collection('rooms').doc(roomId), {
+      'isDraft': true,
+      'isActive': false,
+      'approvalStatus': RoomStatus.rejected.name,
+      'moderationNote': reason, // Lưu lý do để chủ trọ có thể đọc
+      'updatedAt': now,
+      'reviewHistory': FieldValue.arrayUnion([historyEntry.toMap()]),
+    });
+
+    // 2. Hủy tất cả applications liên quan
+    final appSnap = await db
+        .collection('applications')
+        .where('roomId', isEqualTo: roomId)
+        .get();
+    for (final doc in appSnap.docs) {
+      batch.update(doc.reference, {
+        'status': 'cancelled',
+        'updatedAt': now.toDate().toIso8601String(),
+      });
+    }
+
+    // 3. Xóa favorites liên quan
+    final favSnap = await db
+        .collection('favorites')
+        .where('roomId', isEqualTo: roomId)
+        .get();
+    for (final doc in favSnap.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
+
+    // Hook thông báo — bạn làm Push Notification sẽ đọc từ đây
+    await _sendOwnerNotification(
+      db: db,
+      ownerId: ownerId,
+      roomId: roomId,
+      type: 'rejected',
+      title: 'Bài đăng của bạn đã bị từ chối',
+      body: reason,
+    );
+    _removeListingFromState(roomId);
+  }
+
+  // =============================================================
+  // NOTIFICATION HOOK
+  // Viết vào collection 'notifications' trên Firestore.
+  // Bạn phụ trách Push Notification chỉ cần đọc từ collection này
+  // và gửi FCM đến token của [ownerId] là xong.
+  // Schema document notifications/:
+  //   id         : String  — doc ID tự động
+  //   receiverId : String  — uid của chủ trọ nhận thông báo
+  //   roomId     : String  — ID phòng liên quan
+  //   type       : String  — 'needs_info' | 'rejected' | 'verified'
+  //   title      : String  — Tiêu đề thông báo
+  //   body       : String  — Nội dung / lý do chi tiết
+  //   isRead     : bool    — false khi mới tạo
+  //   createdAt  : Timestamp
+  // =============================================================
+  Future<void> _sendOwnerNotification({
+    required FirebaseFirestore db,
+    required String ownerId,
+    required String roomId,
+    required String type,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      await db.collection('notifications').add({
+        'receiverId': ownerId,
+        'roomId': roomId,
+        'type': type,
+        'title': title,
+        'body': body,
+        'isRead': false,
+        'createdAt': Timestamp.now(),
+      });
+    } catch (e) {
+      // Không để lỗi notification ảnh hưởng luồng chính
+      debugPrint('[Admin] Lỗi gửi notification: $e');
+    }
+  }
+
+  /// Xóa listing khỏi danh sách sau khi admin thao tác xong.
+  void _removeListingFromState(String roomId) {
+    if (!mounted) return;
+    setState(() {
+      _listings.removeWhere((l) => l.id == roomId);
+      // Chọn item tiếp theo nếu item bị xóa đang được chọn
+      if (_selectedListingId == roomId) {
+        _selectedListingId =
+            _listings.isNotEmpty ? _listings.first.id : '';
+        _selectedPreviewIndex = 0;
+      }
+    });
   }
 
   // =========================
@@ -73,10 +503,11 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
     setState(() => _selectedMenuIndex = index);
   }
 
-  _ModerationListing get _selectedListing {
-    return _moderationListings.firstWhere(
+  _ModerationListing? get _selectedListing {
+    if (_listings.isEmpty || _selectedListingId.isEmpty) return null;
+    return _listings.firstWhere(
       (item) => item.id == _selectedListingId,
-      orElse: () => _moderationListings.first,
+      orElse: () => _listings.first,
     );
   }
 
@@ -291,107 +722,142 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   // BUILD MAIN SECTION
   // =========================
   Widget _buildMainSection(double width) {
-    final selectedListing = _selectedListing;
-
-    if (_isMobile(width)) {
-      return Column(
-        children: [
-          _ModerationListCard(
-            isCompact: true,
-            selectedSort: _selectedSort,
-            selectedListingId: _selectedListingId,
-            listings: _moderationListings,
-            onSortChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedSort = value);
-            },
-            onSelectListing: (listing) {
-              setState(() {
-                _selectedListingId = listing.id;
-                _selectedPreviewIndex = 0;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          _ListingDetailPanel(
-            listing: selectedListing,
-            isCompact: true,
-            selectedPreviewIndex: _selectedPreviewIndex,
-            onPreviewChanged: (index) {
-              setState(() => _selectedPreviewIndex = index);
-            },
-          ),
-        ],
+    // Loading state
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 80),
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
-    if (_isTablet(width)) {
-      return Column(
-        children: [
-          _ModerationListCard(
-            isCompact: false,
-            selectedSort: _selectedSort,
-            selectedListingId: _selectedListingId,
-            listings: _moderationListings,
-            onSortChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedSort = value);
-            },
-            onSelectListing: (listing) {
-              setState(() {
-                _selectedListingId = listing.id;
-                _selectedPreviewIndex = 0;
-              });
-            },
+    // Error state
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 60),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded,
+                  size: 48, color: Color(0xFFB0BEC5)),
+              const SizedBox(height: 16),
+              Text(_errorMessage!,
+                  style: const TextStyle(
+                      color: Color(0xFF7A8798), fontSize: 13)),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _fetchPendingRooms,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Thử lại'),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          _ListingDetailPanel(
+        ),
+      );
+    }
+
+    final selectedListing = _selectedListing;
+
+    // Shared builder for list card
+    Widget listCard({required bool compact}) => _ModerationListCard(
+          isCompact: compact,
+          selectedSort: _selectedSort,
+          selectedListingId: _selectedListingId,
+          listings: _listings,
+          onSortChanged: (value) {
+            if (value == null) return;
+            setState(() => _selectedSort = value);
+          },
+          onSelectListing: (listing) {
+            setState(() {
+              _selectedListingId = listing.id;
+              _selectedPreviewIndex = 0;
+            });
+          },
+        );
+
+    // Shared builder for detail panel
+    Widget detailPanel({required bool compact}) => selectedListing == null
+        ? _buildEmptyDetail()
+        : _ListingDetailPanel(
             listing: selectedListing,
-            isCompact: false,
+            isCompact: compact,
             selectedPreviewIndex: _selectedPreviewIndex,
             onPreviewChanged: (index) {
               setState(() => _selectedPreviewIndex = index);
             },
-          ),
-        ],
-      );
+            onApprove: () => _approveRoom(selectedListing.id),
+            onNeedsInfo: () => _showNeedsInfoDialog(
+              selectedListing.id,
+              selectedListing.ownerId,
+            ),
+            onReject: () => _showRejectDialog(
+              selectedListing.id,
+              selectedListing.ownerId,
+            ),
+          );
+
+    if (_isMobile(width)) {
+      return Column(children: [
+        listCard(compact: true),
+        const SizedBox(height: 16),
+        detailPanel(compact: true),
+      ]);
+    }
+
+    if (_isTablet(width)) {
+      return Column(children: [
+        listCard(compact: false),
+        const SizedBox(height: 16),
+        detailPanel(compact: false),
+      ]);
     }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 7,
-          child: _ModerationListCard(
-            isCompact: false,
-            selectedSort: _selectedSort,
-            selectedListingId: _selectedListingId,
-            listings: _moderationListings,
-            onSortChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedSort = value);
-            },
-            onSelectListing: (listing) {
-              setState(() {
-                _selectedListingId = listing.id;
-                _selectedPreviewIndex = 0;
-              });
-            },
-          ),
-        ),
+        Expanded(flex: 7, child: listCard(compact: false)),
         const SizedBox(width: 16),
-        Expanded(
-          flex: 5,
-          child: _ListingDetailPanel(
-            listing: selectedListing,
-            isCompact: false,
-            selectedPreviewIndex: _selectedPreviewIndex,
-            onPreviewChanged: (index) {
-              setState(() => _selectedPreviewIndex = index);
-            },
-          ),
-        ),
+        Expanded(flex: 5, child: detailPanel(compact: false)),
       ],
+    );
+  }
+
+  Widget _buildEmptyDetail() {
+    return _AdminSurfaceCard(
+      padding: const EdgeInsets.all(40),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F5FF),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.fact_check_outlined,
+                  size: 48, color: AppColors.blue),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Không có bài đăng chờ duyệt',
+              style: TextStyle(
+                color: Color(0xFF1E2B3A),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tất cả bài đăng đã được xử lý.',
+              style: TextStyle(color: Color(0xFF8A97A8), fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1341,8 +1807,8 @@ class _ModerationDesktopRow extends StatelessWidget {
               flex: 4,
               child: Row(
                 children: [
-                  _MockRoomImage(
-                    label: listing.galleryLabels.first,
+                  _RoomPhotoWidget(
+                    imageUrl: listing.mainImageUrl,
                     width: 64,
                     height: 50,
                   ),
@@ -1484,8 +1950,8 @@ class _ModerationMobileTile extends StatelessWidget {
               children: [
                 _SelectionCheckbox(isSelected: isSelected),
                 const SizedBox(width: 10),
-                _MockRoomImage(
-                  label: listing.galleryLabels.first,
+                _RoomPhotoWidget(
+                  imageUrl: listing.mainImageUrl,
                   width: 72,
                   height: 58,
                 ),
@@ -1568,18 +2034,24 @@ class _ListingDetailPanel extends StatelessWidget {
     required this.isCompact,
     required this.selectedPreviewIndex,
     required this.onPreviewChanged,
+    required this.onApprove,
+    required this.onNeedsInfo,
+    required this.onReject,
   });
 
   final _ModerationListing listing;
   final bool isCompact;
   final int selectedPreviewIndex;
   final ValueChanged<int> onPreviewChanged;
+  final VoidCallback onApprove;
+  final VoidCallback onNeedsInfo;
+  final VoidCallback onReject;
 
   @override
   Widget build(BuildContext context) {
-    final safePreviewIndex = selectedPreviewIndex
-        .clamp(0, listing.galleryLabels.length - 1)
-        .toInt();
+    final allImages = listing.allImageUrls;
+    final safePreviewIndex =
+        allImages.isEmpty ? 0 : selectedPreviewIndex.clamp(0, allImages.length - 1).toInt();
 
     return _AdminSurfaceCard(
       padding: const EdgeInsets.all(18),
@@ -1627,47 +2099,48 @@ class _ListingDetailPanel extends StatelessWidget {
           if (isCompact)
             Column(
               children: [
-                _MockRoomImage(
-                  label: listing.galleryLabels[safePreviewIndex],
+                _RoomPhotoWidget(
+                  imageUrl: allImages.isNotEmpty ? allImages[safePreviewIndex] : '',
                   width: double.infinity,
                   height: 220,
                   borderRadius: 20,
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  height: 76,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: listing.galleryLabels.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final isSelected = index == safePreviewIndex;
-                      return InkWell(
-                        onTap: () => onPreviewChanged(index),
-                        borderRadius: BorderRadius.circular(16),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          width: 90,
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.blueDark
-                                  : const Color(0xFFE2EAF3),
+                if (allImages.length > 1)
+                  SizedBox(
+                    height: 76,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: allImages.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final isSel = index == safePreviewIndex;
+                        return InkWell(
+                          onTap: () => onPreviewChanged(index),
+                          borderRadius: BorderRadius.circular(16),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 90,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSel
+                                    ? AppColors.blueDark
+                                    : const Color(0xFFE2EAF3),
+                              ),
+                            ),
+                            child: _RoomPhotoWidget(
+                              imageUrl: allImages[index],
+                              width: 84,
+                              height: 68,
+                              borderRadius: 12,
                             ),
                           ),
-                          child: _MockRoomImage(
-                            label: listing.galleryLabels[index],
-                            width: 84,
-                            height: 68,
-                            borderRadius: 12,
-                          ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
               ],
             )
           else
@@ -1676,71 +2149,73 @@ class _ListingDetailPanel extends StatelessWidget {
               children: [
                 Expanded(
                   flex: 3,
-                  child: _MockRoomImage(
-                    label: listing.galleryLabels[safePreviewIndex],
+                  child: _RoomPhotoWidget(
+                    imageUrl: allImages.isNotEmpty ? allImages[safePreviewIndex] : '',
                     width: double.infinity,
                     height: 220,
                     borderRadius: 20,
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 110,
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < listing.galleryLabels.length; i++) ...[
-                        InkWell(
-                          onTap: () => onPreviewChanged(i),
-                          borderRadius: BorderRadius.circular(16),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            width: 110,
-                            height: 64,
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: i == safePreviewIndex
-                                    ? AppColors.blueDark
-                                    : const Color(0xFFE2EAF3),
-                              ),
-                            ),
-                            child: Stack(
-                              children: [
-                                _MockRoomImage(
-                                  label: listing.galleryLabels[i],
-                                  width: 104,
-                                  height: 58,
-                                  borderRadius: 12,
+                if (allImages.length > 1) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 110,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < allImages.length && i < 4; i++) ...[
+                          InkWell(
+                            onTap: () => onPreviewChanged(i),
+                            borderRadius: BorderRadius.circular(16),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              width: 110,
+                              height: 64,
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: i == safePreviewIndex
+                                      ? AppColors.blueDark
+                                      : const Color(0xFFE2EAF3),
                                 ),
-                                if (i == listing.galleryLabels.length - 1)
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.38),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: const Text(
-                                        '+ 6 ảnh',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
+                              ),
+                              child: Stack(
+                                children: [
+                                  _RoomPhotoWidget(
+                                    imageUrl: allImages[i],
+                                    width: 104,
+                                    height: 58,
+                                    borderRadius: 12,
+                                  ),
+                                  if (i == 3 && allImages.length > 4)
+                                    Positioned.fill(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.38),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          '+${allImages.length - 4} ảnh',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        if (i != listing.galleryLabels.length - 1)
-                          const SizedBox(height: 8),
+                          if (i != 3 && i != allImages.length - 1)
+                            const SizedBox(height: 8),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           const SizedBox(height: 16),
@@ -1999,7 +2474,7 @@ class _ListingDetailPanel extends StatelessWidget {
                   icon: Icons.check_circle_outline_rounded,
                   backgroundColor: const Color(0xFF22B573),
                   foregroundColor: Colors.white,
-                  onTap: () {},
+                  onTap: onApprove,
                 ),
                 const SizedBox(height: 10),
                 _ModerationActionButton(
@@ -2007,7 +2482,7 @@ class _ListingDetailPanel extends StatelessWidget {
                   icon: Icons.edit_note_rounded,
                   backgroundColor: AppColors.blue,
                   foregroundColor: Colors.white,
-                  onTap: () {},
+                  onTap: onNeedsInfo,
                 ),
                 const SizedBox(height: 10),
                 _ModerationActionButton(
@@ -2015,7 +2490,7 @@ class _ListingDetailPanel extends StatelessWidget {
                   icon: Icons.close_rounded,
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
-                  onTap: () {},
+                  onTap: onReject,
                 ),
               ],
             )
@@ -2028,7 +2503,7 @@ class _ListingDetailPanel extends StatelessWidget {
                     icon: Icons.check_circle_outline_rounded,
                     backgroundColor: const Color(0xFF22B573),
                     foregroundColor: Colors.white,
-                    onTap: () {},
+                    onTap: onApprove,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2038,7 +2513,7 @@ class _ListingDetailPanel extends StatelessWidget {
                     icon: Icons.edit_note_rounded,
                     backgroundColor: AppColors.blue,
                     foregroundColor: Colors.white,
-                    onTap: () {},
+                    onTap: onNeedsInfo,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2048,7 +2523,7 @@ class _ListingDetailPanel extends StatelessWidget {
                     icon: Icons.close_rounded,
                     backgroundColor: const Color(0xFFEF4444),
                     foregroundColor: Colors.white,
-                    onTap: () {},
+                    onTap: onReject,
                   ),
                 ),
               ],
@@ -2176,7 +2651,24 @@ class _AmenityChip extends StatelessWidget {
 class _DocumentCard extends StatelessWidget {
   const _DocumentCard({required this.document});
 
-  final _ModerationDocument document;
+  final RoomDocument document;
+
+  // Icon và màu sắc dựa theo loại file
+  IconData get _icon {
+    return switch (document.fileType.toUpperCase()) {
+      'PDF' => Icons.picture_as_pdf_rounded,
+      'JPG' || 'PNG' || 'JPEG' => Icons.image_outlined,
+      _ => Icons.description_outlined,
+    };
+  }
+
+  Color get _accent {
+    return switch (document.fileType.toUpperCase()) {
+      'PDF' => const Color(0xFFEF6A5B),
+      'JPG' || 'PNG' || 'JPEG' => const Color(0xFF22B573),
+      _ => const Color(0xFFF59E0B),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2195,10 +2687,10 @@ class _DocumentCard extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: document.accent.withValues(alpha: 0.12),
+              color: _accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(document.icon, color: document.accent, size: 20),
+            child: Icon(_icon, color: _accent, size: 20),
           ),
           const SizedBox(height: 10),
           Text(
@@ -2230,10 +2722,16 @@ class _DocumentCard extends StatelessWidget {
 class _ReviewHistoryTile extends StatelessWidget {
   const _ReviewHistoryTile({required this.entry});
 
-  final _ReviewHistoryEntry entry;
+  final RoomReviewHistory entry;
+
+  IconData get _icon => Icons.history_rounded;
+  Color get _accent => const Color(0xFF3B82F6);
 
   @override
   Widget build(BuildContext context) {
+    final timeStr =
+        '${entry.time.day.toString().padLeft(2, '0')}/${entry.time.month.toString().padLeft(2, '0')}/${entry.time.year} '
+        '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}';
     return Padding(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -2243,10 +2741,10 @@ class _ReviewHistoryTile extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: entry.accent.withValues(alpha: 0.12),
+              color: _accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(entry.icon, color: entry.accent, size: 18),
+            child: Icon(_icon, color: _accent, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2254,7 +2752,7 @@ class _ReviewHistoryTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  entry.time,
+                  timeStr,
                   style: const TextStyle(
                     color: Color(0xFF8D99A9),
                     fontSize: 10.5,
@@ -2277,6 +2775,15 @@ class _ReviewHistoryTile extends StatelessWidget {
                     color: Color(0xFF7D8DA0),
                     fontSize: 11.5,
                     height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  entry.actorName,
+                  style: const TextStyle(
+                    color: Color(0xFF96A5B5),
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2634,108 +3141,68 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _MockRoomImage extends StatelessWidget {
-  const _MockRoomImage({
-    required this.label,
+/// Widget hiển thị ảnh phòng thật từ Firebase Storage.
+/// Tự động fallback về placeholder nếu URL rỗng hoặc lỗi tải ảnh.
+class _RoomPhotoWidget extends StatelessWidget {
+  const _RoomPhotoWidget({
+    required this.imageUrl,
     required this.width,
     required this.height,
     this.borderRadius = 16,
   });
 
-  final String label;
+  final String imageUrl;
   final double width;
   final double height;
   final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
+    final hasUrl = imageUrl.isNotEmpty;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: hasUrl
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                loadingBuilder: (_, child, progress) {
+                  if (progress == null) return child;
+                  return _buildPlaceholder();
+                },
+              )
+            : _buildPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
         gradient: const LinearGradient(
           colors: [Color(0xFFEFE5DD), Color(0xFFD6E1EA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: height * 0.24,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F7F8).withValues(alpha: 0.86),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(borderRadius),
-                  bottomRight: Radius.circular(borderRadius),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: width * 0.1,
-            top: height * 0.18,
-            child: Container(
-              width: width * 0.18,
-              height: height * 0.48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8A6B54).withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          Positioned(
-            right: width * 0.08,
-            top: height * 0.18,
-            child: Container(
-              width: width * 0.18,
-              height: height * 0.22,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          Positioned(
-            right: width * 0.12,
-            bottom: height * 0.28,
-            child: Container(
-              width: width * 0.48,
-              height: height * 0.18,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F5F1).withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 8,
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: const Color(0xFF6C7A8C).withValues(alpha: 0.9),
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
+      child: const Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: Color(0xFFABB8C4),
+          size: 24,
+        ),
       ),
     );
   }
 }
 
 // =========================
-// MOCK DATA
+// STATIC OPTIONS (non-mock)
 // =========================
 const List<_AdminMenuItem> _adminMenus = [
   _AdminMenuItem(label: 'Tổng quan', icon: Icons.dashboard_outlined),
@@ -2775,220 +3242,8 @@ const List<String> _sortOptions = [
   'Ưu tiên cần xử lý',
 ];
 
-final List<_ModerationListing> _moderationListings = [
-  _ModerationListing(
-    id: 'room_1',
-    roomCode: 'SRF-10293',
-    title: 'Phòng trọ quận 10, TP.HCM',
-    subtitle: 'Có cửa sổ, giờ giấc tự do',
-    shortAddress: 'Phòng trọ quận 10, TP.HCM',
-    area: 'Q.10, TP.HCM',
-    address: 'Đường 3/2, Phường 12, Quận 10, TP.HCM',
-    status: 'Chờ xác minh',
-    postedAtShort: '19/05/2025\n09:15',
-    postedAtFull: '19/05/2025 09:15',
-    updatedAtFull: '19/05/2025 09:20',
-    ownerName: 'Nguyễn Văn Bình',
-    ownerPhone: '0901 234 567',
-    ownerEmail: 'binh.nv@gmail.com',
-    price: '3.200.000 đ/tháng',
-    galleryLabels: ['Phòng ngủ', 'Cửa sổ', 'Khu bếp', 'Lối vào'],
-    amenities: const [
-      'Wi-Fi',
-      'Điều hòa',
-      'Tủ lạnh',
-      'Máy giặt',
-      'Nhà vệ sinh riêng',
-      'Giờ giấc tự do',
-    ],
-    description:
-        'Phòng rộng 20m², có cửa sổ thoáng mát, ánh sáng tự nhiên. Khu vực an ninh, yên tĩnh, gần chợ, siêu thị và các tiện ích. Giờ giấc tự do, không chung chủ.',
-    documents: [
-      _ModerationDocument(
-        title: 'Sổ đỏ / Hợp đồng nhà',
-        fileType: 'PDF',
-        fileSize: '1.2 MB',
-        icon: Icons.picture_as_pdf_rounded,
-        accent: const Color(0xFFEF6A5B),
-      ),
-      _ModerationDocument(
-        title: 'CMND / CCCD chủ trọ',
-        fileType: 'JPG',
-        fileSize: '824 KB',
-        icon: Icons.badge_outlined,
-        accent: const Color(0xFF22B573),
-      ),
-      _ModerationDocument(
-        title: 'Giấy phép kinh doanh',
-        fileType: 'PDF',
-        fileSize: '1.1 MB',
-        icon: Icons.description_outlined,
-        accent: const Color(0xFFF59E0B),
-      ),
-    ],
-    reviewHistory: [
-      _ReviewHistoryEntry(
-        time: '19/05/2025 09:15',
-        title: 'Hệ thống tạo bài đăng mới',
-        subtitle: 'Bài đăng được gửi lên để chờ kiểm duyệt.',
-        icon: Icons.add_circle_outline_rounded,
-        accent: AppColors.blue,
-      ),
-      _ReviewHistoryEntry(
-        time: '19/05/2025 09:20',
-        title: 'Đồng bộ ảnh và giấy tờ',
-        subtitle: 'Ảnh minh họa và tài liệu pháp lý đã được đính kèm đầy đủ.',
-        icon: Icons.sync_rounded,
-        accent: AppColors.tealDark,
-      ),
-    ],
-  ),
-  _ModerationListing(
-    id: 'room_2',
-    roomCode: 'SRF-10292',
-    title: 'Phòng trọ gần Đại Bách Khoa',
-    subtitle: 'Nội thất đủ, vào ở ngay',
-    shortAddress: 'Phòng trọ gần Đại Bách Khoa',
-    area: 'Q. Hai Bà Trưng, Hà Nội',
-    address: 'Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội',
-    status: 'Đã xác minh',
-    postedAtShort: '19/05/2025\n08:45',
-    postedAtFull: '19/05/2025 08:45',
-    updatedAtFull: '19/05/2025 09:00',
-    ownerName: 'Trần Thị Mai',
-    ownerPhone: '0912 345 678',
-    ownerEmail: 'mai.tt@gmail.com',
-    price: '3.800.000 đ/tháng',
-    galleryLabels: ['Nội thất', 'Bàn học', 'Cửa sổ', 'Kệ bếp'],
-    amenities: const [
-      'Wi-Fi',
-      'Nóng lạnh',
-      'Bãi xe',
-      'Máy giặt',
-    ],
-    description:
-        'Phòng sạch sẽ, nội thất cơ bản, phù hợp sinh viên và người đi làm. Khu dân cư yên tĩnh, gần trường và bến xe buýt.',
-    documents: [
-      _ModerationDocument(
-        title: 'Hợp đồng thuê',
-        fileType: 'PDF',
-        fileSize: '950 KB',
-        icon: Icons.picture_as_pdf_rounded,
-        accent: const Color(0xFFEF6A5B),
-      ),
-    ],
-    reviewHistory: [
-      _ReviewHistoryEntry(
-        time: '19/05/2025 08:45',
-        title: 'Bài đăng đã xác minh',
-        subtitle: 'Admin Lan đã xác minh và cho phép hiển thị công khai.',
-        icon: Icons.verified_rounded,
-        accent: const Color(0xFF22B573),
-      ),
-    ],
-  ),
-  _ModerationListing(
-    id: 'room_3',
-    roomCode: 'SRF-10291',
-    title: 'Phòng full nội thất, Quận 7',
-    subtitle: 'Gần Lotte Mart',
-    shortAddress: 'Phòng full nội thất, Quận 7',
-    area: 'Q.7, TP.HCM',
-    address: 'Nguyễn Thị Thập, Quận 7, TP.HCM',
-    status: 'Chờ xác minh',
-    postedAtShort: '19/05/2025\n08:30',
-    postedAtFull: '19/05/2025 08:30',
-    updatedAtFull: '19/05/2025 08:35',
-    ownerName: 'Lê Minh Tuấn',
-    ownerPhone: '0938 234 888',
-    ownerEmail: 'tuanlm@gmail.com',
-    price: '4.200.000 đ/tháng',
-    galleryLabels: ['Giường ngủ', 'Ban công', 'Tủ đồ', 'WC riêng'],
-    amenities: const ['Ban công', 'Máy lạnh', 'Máy nước nóng'],
-    description:
-        'Phòng mới sơn sửa, nội thất hoàn chỉnh, phù hợp ở lâu dài. Gần trung tâm thương mại và khu ăn uống.',
-    documents: [],
-    reviewHistory: [],
-  ),
-  _ModerationListing(
-    id: 'room_4',
-    roomCode: 'SRF-10290',
-    title: 'Phòng trọ giá rẻ Gò Vấp',
-    subtitle: 'Giờ giấc tự do',
-    shortAddress: 'Phòng trọ giá rẻ Gò Vấp',
-    area: 'Gò Vấp, TP.HCM',
-    address: 'Phan Huy Ích, Gò Vấp, TP.HCM',
-    status: 'Cần bổ sung',
-    postedAtShort: '19/05/2025\n07:50',
-    postedAtFull: '19/05/2025 07:50',
-    updatedAtFull: '19/05/2025 08:10',
-    ownerName: 'Phạm Văn Hùng',
-    ownerPhone: '0898 200 123',
-    ownerEmail: 'hungpv@gmail.com',
-    price: '2.500.000 đ/tháng',
-    galleryLabels: ['Mặt tiền', 'Phòng chính', 'Kệ bếp', 'Sân trước'],
-    amenities: const ['Giờ giấc tự do', 'Bãi xe'],
-    description:
-        'Phòng phù hợp người đi làm, giá tốt, gần chợ và tuyến xe buýt. Hiện cần cập nhật thêm giấy tờ xác minh chủ sở hữu.',
-    documents: [],
-    reviewHistory: [
-      _ReviewHistoryEntry(
-        time: '19/05/2025 08:10',
-        title: 'Yêu cầu bổ sung giấy tờ',
-        subtitle: 'Admin yêu cầu cập nhật ảnh mặt tiền và giấy tờ pháp lý.',
-        icon: Icons.edit_note_rounded,
-        accent: const Color(0xFF3B82F6),
-      ),
-    ],
-  ),
-  _ModerationListing(
-    id: 'room_5',
-    roomCode: 'SRF-10289',
-    title: 'Phòng mới xây, Tân Bình',
-    subtitle: 'Có thang máy, hầm xe',
-    shortAddress: 'Phòng mới xây, Tân Bình',
-    area: 'Tân Bình, TP.HCM',
-    address: 'Cộng Hòa, Tân Bình, TP.HCM',
-    status: 'Đã xác minh',
-    postedAtShort: '19/05/2025\n07:20',
-    postedAtFull: '19/05/2025 07:20',
-    updatedAtFull: '19/05/2025 07:45',
-    ownerName: 'Đỗ Thu Hằng',
-    ownerPhone: '0988 320 456',
-    ownerEmail: 'hangdt@gmail.com',
-    price: '5.100.000 đ/tháng',
-    galleryLabels: ['Phòng mới', 'Sảnh', 'Thang máy', 'Ban công'],
-    amenities: const ['Thang máy', 'Hầm xe', 'Khóa vân tay'],
-    description: 'Tòa nhà mới xây, nội thất cơ bản và hệ thống an ninh tốt.',
-    documents: [],
-    reviewHistory: [],
-  ),
-  _ModerationListing(
-    id: 'room_6',
-    roomCode: 'SRF-10288',
-    title: 'Phòng trọ Cầu Giấy',
-    subtitle: 'Gần công viên Cầu Giấy',
-    shortAddress: 'Phòng trọ Cầu Giấy',
-    area: 'Cầu Giấy, Hà Nội',
-    address: 'Dịch Vọng, Cầu Giấy, Hà Nội',
-    status: 'Từ chối',
-    postedAtShort: '18/05/2025\n21:10',
-    postedAtFull: '18/05/2025 21:10',
-    updatedAtFull: '18/05/2025 21:45',
-    ownerName: 'Hoàng Anh Dũng',
-    ownerPhone: '0905 444 999',
-    ownerEmail: 'dungha@gmail.com',
-    price: '3.000.000 đ/tháng',
-    galleryLabels: ['Phòng chính', 'Nhà vệ sinh', 'Lối đi', 'Tầng trệt'],
-    amenities: const ['Gần công viên', 'An ninh'],
-    description: 'Thông tin địa chỉ và giấy tờ chưa khớp với nội dung bài đăng.',
-    documents: [],
-    reviewHistory: [],
-  ),
-];
-
 // =========================
-// MODELS
+// MODELS (internal UI)
 // =========================
 class _AdminMenuItem {
   const _AdminMenuItem({
@@ -3000,9 +3255,12 @@ class _AdminMenuItem {
   final IconData icon;
 }
 
+/// Internal UI model được build từ [RoomModel] + dữ liệu chủ trọ.
+/// Tách biệt UI data khỏi domain model để dễ render.
 class _ModerationListing {
   const _ModerationListing({
     required this.id,
+    required this.ownerId,
     required this.roomCode,
     required this.title,
     required this.subtitle,
@@ -3017,7 +3275,8 @@ class _ModerationListing {
     required this.ownerPhone,
     required this.ownerEmail,
     required this.price,
-    required this.galleryLabels,
+    required this.mainImageUrl,
+    required this.allImageUrls,
     required this.amenities,
     required this.description,
     required this.documents,
@@ -3025,6 +3284,8 @@ class _ModerationListing {
   });
 
   final String id;
+  /// UID của chủ trọ trên Firebase Auth — dùng để gửi thông báo.
+  final String ownerId;
   final String roomCode;
   final String title;
   final String subtitle;
@@ -3039,41 +3300,101 @@ class _ModerationListing {
   final String ownerPhone;
   final String ownerEmail;
   final String price;
-  final List<String> galleryLabels;
+
+  /// URL ảnh đại diện hiển thị trong list row.
+  final String mainImageUrl;
+
+  /// Danh sách tất cả URL ảnh dùng trong gallery chi tiết.
+  final List<String> allImageUrls;
+
   final List<String> amenities;
   final String description;
-  final List<_ModerationDocument> documents;
-  final List<_ReviewHistoryEntry> reviewHistory;
-}
 
-class _ModerationDocument {
-  const _ModerationDocument({
-    required this.title,
-    required this.fileType,
-    required this.fileSize,
-    required this.icon,
-    required this.accent,
-  });
+  /// Giấy tờ pháp lý (map từ RoomDocument).
+  final List<RoomDocument> documents;
 
-  final String title;
-  final String fileType;
-  final String fileSize;
-  final IconData icon;
-  final Color accent;
-}
+  /// Lịch sử kiểm duyệt (map từ RoomReviewHistory).
+  final List<RoomReviewHistory> reviewHistory;
 
-class _ReviewHistoryEntry {
-  const _ReviewHistoryEntry({
-    required this.time,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accent,
-  });
+  /// Tạo _ModerationListing từ [RoomModel] và dữ liệu chủ trọ.
+  factory _ModerationListing.fromRoom(
+    RoomModel room,
+    Map<String, dynamic> ownerData,
+  ) {
+    final posted = room.postedAt;
+    final updated = room.updatedAt;
 
-  final String time;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accent;
+    String fmt(DateTime? dt) {
+      if (dt == null) return '--';
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    String fmtShort(DateTime? dt) {
+      if (dt == null) return '--';
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}\n'
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    final statusLabel = switch (room.approvalStatus) {
+      RoomStatus.verified => 'Đã xác minh',
+      RoomStatus.rejected => 'Từ chối',
+      RoomStatus.needsInfo => 'Cần bổ sung',
+      RoomStatus.pending => 'Chờ xác minh',
+    };
+
+    final priceFormatted =
+        '${_formatPrice(room.price)} đ/tháng';
+
+    // Tập hợp tất cả URL ảnh: ảnh chính + ảnh phụ
+    final allUrls = [
+      if (room.mainImageUrl.isNotEmpty) room.mainImageUrl,
+      ...room.subImageUrls.where((u) => u != room.mainImageUrl),
+    ];
+
+    return _ModerationListing(
+      id: room.id,
+      ownerId: room.ownerId,
+      roomCode: 'SRF-${room.id.substring(0, math.min(5, room.id.length)).toUpperCase()}',
+      title: room.title,
+      subtitle: room.description.isNotEmpty
+          ? room.description
+          : room.amenities.take(2).join(', '),
+      shortAddress: room.address,
+      area: room.location,
+      address: room.address,
+      status: statusLabel,
+      postedAtShort: fmtShort(posted),
+      postedAtFull: fmt(posted),
+      updatedAtFull: fmt(updated),
+      ownerName: (ownerData['displayName'] ??
+              ownerData['name'] ??
+              ownerData['fullName'] ??
+              'Chủ trọ')
+          .toString(),
+      ownerPhone:
+          (ownerData['phone'] ?? ownerData['phoneNumber'] ?? '--').toString(),
+      ownerEmail: (ownerData['email'] ?? '--').toString(),
+      price: priceFormatted,
+      mainImageUrl: room.mainImageUrl.isNotEmpty
+          ? room.mainImageUrl
+          : (room.imageUrl.isNotEmpty ? room.imageUrl : ''),
+      allImageUrls: allUrls,
+      amenities: room.amenities,
+      description: room.description,
+      documents: room.documents,
+      reviewHistory: room.reviewHistory,
+    );
+  }
+
+  static String _formatPrice(double price) {
+    if (price >= 1000000) {
+      final millions = price / 1000000;
+      return '${millions % 1 == 0 ? millions.toInt() : millions.toStringAsFixed(1)} triệu';
+    }
+    if (price >= 1000) {
+      return '${(price / 1000).toInt()}.${((price % 1000) / 100).toInt()}00K';
+    }
+    return price.toInt().toString();
+  }
 }

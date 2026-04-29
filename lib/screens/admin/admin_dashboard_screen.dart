@@ -112,6 +112,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return db.compareTo(da);
       });
 
+      // Tạo map uid → user data để cross-reference nhanh
+      final userMap = <String, Map<String, dynamic>>{
+        for (final u in users) u.id: u.data(),
+      };
+
       _recentActivities = sorted.take(5).map((doc) {
         final d  = doc.data();
         final id = doc.id;
@@ -122,11 +127,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final date    = parseDate(d['postedAt']);
         final dateStr = date == null ? '—'
             : '${date.day}/${date.month}/${date.year}\n${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+        // Lấy tên chủ trọ từ users collection qua ownerId
+        final ownerId  = (d['ownerId'] ?? d['postedBy'] ?? '').toString();
+        final ownerDoc = userMap[ownerId] ?? {};
+        final ownerName = (ownerDoc['displayName'] ??
+                ownerDoc['name'] ??
+                ownerDoc['fullName'] ??
+                (ownerId.isNotEmpty ? 'Chủ trọ' : 'Ẩn danh'))
+            .toString();
+        final ownerEmail = (ownerDoc['email'] ?? '').toString();
+
         return _RecentActivity(
           roomCode:   'SRF-${id.substring(0, math.min(6, id.length)).toUpperCase()}',
           roomName:   (d['title']    ?? 'Chưa đặt tên').toString(),
-          ownerName:  (d['postedBy'] ?? 'Ẩn danh').toString(),
-          ownerEmail: '',
+          ownerName:  ownerName,
+          ownerEmail: ownerEmail,
           status:     status,
           postedAt:   dateStr,
           imageAsset: (d['mainImageUrl'] ?? d['imageUrl'] ?? '').toString(),
@@ -1815,12 +1831,7 @@ class _RecentActivityMobileCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  data.imageAsset,
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                ),
+                child: _buildRoomThumb(data.imageAsset, 56, 56),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2009,12 +2020,7 @@ class _RoomInfoCell extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            data.imageAsset,
-            width: 52,
-            height: 52,
-            fit: BoxFit.cover,
-          ),
+          child: _buildRoomThumb(data.imageAsset, 52, 52),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -2403,4 +2409,43 @@ class _AlertItem {
   final String timeAgo;
   final IconData icon;
   final Color accent;
+}
+
+/// Tự động chọn Image.network hoặc Image.asset dựa trên [url].
+/// Nếu [url] là Firebase Storage URL (http/https) → dùng Image.network.
+/// Nếu là đường dẫn asset local (assets/...) → dùng Image.asset.
+/// Nếu rỗng hoặc lỗi → hiển thị placeholder teal.
+Widget _buildRoomThumb(String url, double width, double height) {
+  Widget placeholder() => Container(
+        width: width,
+        height: height,
+        color: const Color(0xFFE0F5F5),
+        child: const Center(
+          child: Icon(Icons.apartment_rounded,
+              color: Color(0xFF4DD4C0), size: 22),
+        ),
+      );
+
+  if (url.isEmpty) return placeholder();
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return Image.network(
+      url,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => placeholder(),
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : placeholder(),
+    );
+  }
+
+  // Local asset path
+  return Image.asset(
+    url,
+    width: width,
+    height: height,
+    fit: BoxFit.cover,
+    errorBuilder: (_, __, ___) => placeholder(),
+  );
 }

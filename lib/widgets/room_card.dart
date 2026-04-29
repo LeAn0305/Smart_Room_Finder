@@ -124,31 +124,78 @@ class _RoomCardState extends State<RoomCard> {
                           ),
                         ),
                       ),
-                      // Badge xác thực
-                      if (widget.room.isVerified)
-                        Positioned(
-                          top: 10,
-                          left: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: AppColors.teal.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.verified_rounded, color: Colors.white, size: 12),
-                                SizedBox(width: 4),
-                                Text('Xác thực',
-                                    style: TextStyle(
+                      // Badge xác minh — chỉ hiện 1 trong 2 trạng thái
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: widget.room.isVerified
+                            // ── Đã xác minh ──
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.teal.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.teal.withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.verified_rounded,
+                                        color: Colors.white, size: 12),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Đã xác minh',
+                                      style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 10)),
-                              ],
-                            ),
-                          ),
-                        ),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            // ── Chưa xác minh ──
+                            : Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B)
+                                      .withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFF59E0B)
+                                          .withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.schedule_rounded,
+                                        color: Colors.white, size: 12),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Chưa xác minh',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
                       // Giá
                       Positioned(
                         bottom: 12,
@@ -320,17 +367,28 @@ class _RoomCardState extends State<RoomCard> {
   }
 
   Widget _buildImage(double height) {
-    final url = widget.room.imageUrl;
+    // Ưu tiên dùng mainImageUrl (mới), fallback về imageUrl (cũ)
+    final url = widget.room.mainImageUrl.isNotEmpty
+        ? widget.room.mainImageUrl
+        : widget.room.imageUrl;
+
+    if (url.isEmpty) return _placeholder(height);
     if (url.startsWith('assets/')) {
       return Image.asset(url,
-          height: height, width: double.infinity, fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _placeholder(height));
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _placeholder(height));
     }
-    return Image.network(url,
-        height: height, width: double.infinity, fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) =>
-            progress == null ? child : _placeholder(height),
-        errorBuilder: (_, _, _) => _placeholder(height));
+    return Image.network(
+      url,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : _placeholder(height),
+      errorBuilder: (_, __, ___) => _placeholder(height),
+    );
   }
 
   Widget _placeholder(double height) {

@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// =============================================================================
+// ENUMS
+// =============================================================================
+
 enum RoomType {
   apartment,
   studio,
@@ -18,6 +22,155 @@ enum RoomDirection {
   northWest,
 }
 
+/// Trạng thái kiểm duyệt bài đăng phòng từ phía Admin.
+/// Lưu trong Firestore với field name là 'approvalStatus'.
+///
+/// Backward-compatible: nếu field 'approvalStatus' chưa có trong Firestore
+/// (phòng cũ), tự động suy ra từ [isVerified] và [isDraft].
+enum RoomStatus {
+  /// Phòng vừa được chủ trọ đăng lên, đang chờ Admin xem xét và xác minh.
+  /// Phòng vẫn hiển thị công khai trên Home Screen với nhãn "Chưa xác minh".
+  /// Điều kiện tương đương: isVerified=false, isDraft=false
+  pending,
+
+  /// Admin đã kiểm tra thông tin, xác minh hợp lệ và cho phép hiển thị đầy đủ.
+  /// Phòng hiển thị trên Home Screen với nhãn "Đã xác minh".
+  /// Điều kiện tương đương: isVerified=true
+  verified,
+
+  /// Admin từ chối bài đăng do vi phạm nội dung, thông tin sai lệch hoặc
+  /// không đủ tiêu chuẩn đăng tải.
+  /// Phòng bị ẩn hoàn toàn khỏi Home Screen (isActive=false, isDraft=true).
+  /// Mọi đơn yêu cầu (applications) liên quan đều bị hủy.
+  rejected,
+
+  /// Admin yêu cầu chủ trọ bổ sung thêm giấy tờ, ảnh hoặc thông tin còn thiếu.
+  /// Phòng vẫn hiển thị công khai với nhãn "Chưa xác minh" trong khi chờ bổ sung.
+  /// Chủ trọ nhận thông báo và cần cập nhật trước khi Admin xét duyệt lại.
+  needsInfo,
+}
+
+// =============================================================================
+// SUPPORTING MODELS
+// =============================================================================
+
+/// Giấy tờ pháp lý do chủ trọ đính kèm vào bài đăng phòng.
+/// Admin sẽ xem xét các giấy tờ này trước khi xác minh bài đăng.
+/// Lưu trong Firestore dưới dạng array of map trong field 'documents' của room.
+class RoomDocument {
+  /// ID duy nhất của giấy tờ (tạo tự động khi upload).
+  final String id;
+
+  /// Tên mô tả giấy tờ. Ví dụ: "Sổ đỏ / Hợp đồng nhà", "CMND/CCCD chủ trọ".
+  final String title;
+
+  /// Loại định dạng file. Ví dụ: "PDF", "JPG", "PNG".
+  final String fileType;
+
+  /// Kích thước file hiển thị cho người dùng. Ví dụ: "1.2 MB", "824 KB".
+  final String fileSize;
+
+  /// URL download/preview của file trên Firebase Storage.
+  final String url;
+
+  const RoomDocument({
+    required this.id,
+    required this.title,
+    required this.fileType,
+    required this.fileSize,
+    required this.url,
+  });
+
+  factory RoomDocument.fromMap(Map<String, dynamic> map) {
+    return RoomDocument(
+      id: (map['id'] ?? '').toString(),
+      title: (map['title'] ?? '').toString(),
+      fileType: (map['fileType'] ?? '').toString(),
+      fileSize: (map['fileSize'] ?? '').toString(),
+      url: (map['url'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'fileType': fileType,
+      'fileSize': fileSize,
+      'url': url,
+    };
+  }
+}
+
+/// Một mục trong lịch sử kiểm duyệt bài đăng phòng.
+/// Mỗi lần Admin thực hiện hành động (xác minh/từ chối/yêu cầu bổ sung)
+/// hoặc hệ thống tạo sự kiện tự động đều được ghi lại tại đây.
+/// Lưu trong Firestore dưới dạng array of map trong field 'reviewHistory' của room.
+class RoomReviewHistory {
+  /// ID duy nhất của mục lịch sử.
+  final String id;
+
+  /// Thời điểm xảy ra sự kiện.
+  final DateTime time;
+
+  /// Tiêu đề ngắn mô tả hành động. Ví dụ: "Bài đăng đã xác minh".
+  final String title;
+
+  /// Mô tả chi tiết hơn về sự kiện đó.
+  final String subtitle;
+
+  /// UID của Admin thực hiện hành động.
+  /// Null nếu đây là hành động tự động của hệ thống (ví dụ: tạo bài đăng).
+  final String? actorId;
+
+  /// Tên hiển thị của người thực hiện.
+  /// Ví dụ: "Admin Lan", hoặc "Hệ thống" nếu actorId == null.
+  final String actorName;
+
+  const RoomReviewHistory({
+    required this.id,
+    required this.time,
+    required this.title,
+    required this.subtitle,
+    this.actorId,
+    required this.actorName,
+  });
+
+  factory RoomReviewHistory.fromMap(Map<String, dynamic> map) {
+    return RoomReviewHistory(
+      id: (map['id'] ?? '').toString(),
+      time: _parseDateTime(map['time']) ?? DateTime.now(),
+      title: (map['title'] ?? '').toString(),
+      subtitle: (map['subtitle'] ?? '').toString(),
+      actorId: map['actorId']?.toString(),
+      actorName: (map['actorName'] ?? 'Hệ thống').toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'time': Timestamp.fromDate(time),
+      'title': title,
+      'subtitle': subtitle,
+      'actorId': actorId,
+      'actorName': actorName,
+    };
+  }
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
+    return null;
+  }
+}
+
+// =============================================================================
+// ROOM MODEL
+// =============================================================================
+
 class RoomModel {
   final String id;
   final String ownerId;
@@ -27,19 +180,44 @@ class RoomModel {
   final String address;
   final String location;
 
+  /// Phòng đang ở chế độ nháp (chủ trọ chưa đăng hoặc bị từ chối).
+  /// true  → phòng bị ẩn khỏi Home Screen, không ai xem được ngoài chủ trọ.
+  /// false → phòng hiển thị công khai (dù chưa được Admin xác minh).
   final bool isDraft;
+
+  /// Người dùng đã thêm phòng này vào danh sách yêu thích chưa.
+  /// Field này được quản lý riêng theo từng user, không phải trạng thái phòng.
   final bool isFavorite;
+
+  /// Admin đã xác minh thông tin phòng hay chưa.
+  /// true  → hiển thị badge "Đã xác minh" trên Home Screen.
+  /// false → hiển thị badge "Chưa xác minh" (nếu isDraft=false và isActive=true).
   final bool isVerified;
+
+  /// Phòng đang hoạt động (được phép hiển thị) hay không.
+  /// true  → bình thường, hiển thị theo isDraft/isVerified.
+  /// false → bị tắt hoàn toàn (ví dụ: Admin từ chối → isActive=false).
   final bool isActive;
 
-  // Ảnh cũ
+  // ---------------------------------------------------------------------------
+  // Ảnh (giữ cả field cũ và mới để backward compatible)
+  // ---------------------------------------------------------------------------
+
+  /// [Cũ] URL ảnh đại diện. Dùng mainImageUrl thay thế trong code mới.
   final String imageUrl;
+
+  /// [Cũ] Danh sách ảnh phụ. Dùng subImageUrls thay thế trong code mới.
   final List<String> images;
 
-  // Ảnh mới
+  /// [Mới] URL ảnh đại diện chính của phòng (hiển thị trên card ở Home Screen).
   final String mainImageUrl;
+
+  /// [Mới] Danh sách URL ảnh phụ trong gallery của bài đăng.
   final List<String> subImageUrls;
 
+  // ---------------------------------------------------------------------------
+  // Thông tin chi tiết phòng
+  // ---------------------------------------------------------------------------
   final double rating;
   final RoomType type;
   final double area;
@@ -52,6 +230,28 @@ class RoomModel {
   final DateTime? postedAt;
   final DateTime? updatedAt;
   final DateTime? expiresAt;
+
+  // ---------------------------------------------------------------------------
+  // Trạng thái kiểm duyệt (mới)
+  // ---------------------------------------------------------------------------
+
+  /// Trạng thái kiểm duyệt của bài đăng, lưu bằng field 'approvalStatus' trong Firestore.
+  ///
+  /// Backward-compatible: phòng cũ chưa có field này sẽ tự động được suy ra:
+  ///   - isVerified=true               → [RoomStatus.verified]
+  ///   - isDraft=true                  → [RoomStatus.rejected]
+  ///   - isVerified=false, isDraft=false → [RoomStatus.pending]
+  final RoomStatus approvalStatus;
+
+  /// Danh sách giấy tờ pháp lý mà chủ trọ đính kèm vào bài đăng.
+  /// Admin xem xét các giấy tờ này trong quá trình kiểm duyệt.
+  /// Lưu trong Firestore dưới dạng array of map, field 'documents'.
+  final List<RoomDocument> documents;
+
+  /// Lịch sử các lần Admin thao tác với bài đăng này.
+  /// Mỗi hành động (xác minh/từ chối/yêu cầu bổ sung) đều được ghi lại.
+  /// Lưu trong Firestore dưới dạng array of map, field 'reviewHistory'.
+  final List<RoomReviewHistory> reviewHistory;
 
   const RoomModel({
     required this.id,
@@ -86,6 +286,11 @@ class RoomModel {
     this.postedAt,
     this.updatedAt,
     this.expiresAt,
+
+    // Kiểm duyệt (mới)
+    this.approvalStatus = RoomStatus.pending,
+    this.documents = const [],
+    this.reviewHistory = const [],
   });
 
   factory RoomModel.fromMap(Map<String, dynamic> map, String docId) {
@@ -95,6 +300,31 @@ class RoomModel {
     final resolvedSubImages = List<String>.from(
       map['subImageUrls'] ?? map['images'] ?? [],
     );
+
+    // Parse approvalStatus — backward compatible với phòng cũ
+    final approvalStatus = _parseApprovalStatus(
+      raw: map['approvalStatus'],
+      isVerified: map['isVerified'] ?? false,
+      isDraft: map['isDraft'] ?? false,
+    );
+
+    // Parse documents array
+    final rawDocuments = map['documents'];
+    final documents = rawDocuments is List
+        ? rawDocuments
+            .whereType<Map<String, dynamic>>()
+            .map(RoomDocument.fromMap)
+            .toList()
+        : <RoomDocument>[];
+
+    // Parse reviewHistory array
+    final rawHistory = map['reviewHistory'];
+    final reviewHistory = rawHistory is List
+        ? rawHistory
+            .whereType<Map<String, dynamic>>()
+            .map(RoomReviewHistory.fromMap)
+            .toList()
+        : <RoomReviewHistory>[];
 
     return RoomModel(
       id: docId,
@@ -129,6 +359,11 @@ class RoomModel {
       postedAt: _parseDateTime(map['postedAt']),
       updatedAt: _parseDateTime(map['updatedAt']),
       expiresAt: _parseDateTime(map['expiresAt']),
+
+      // kiểm duyệt
+      approvalStatus: approvalStatus,
+      documents: documents,
+      reviewHistory: reviewHistory,
     );
   }
 
@@ -174,12 +409,21 @@ class RoomModel {
       'postedAt': postedAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
       'expiresAt': expiresAt?.toIso8601String(),
+
+      // kiểm duyệt (mới)
+      'approvalStatus': approvalStatus.name,
+      'documents': documents.map((d) => d.toMap()).toList(),
+      'reviewHistory': reviewHistory.map((h) => h.toMap()).toList(),
     };
   }
 
   Map<String, dynamic> toFirebase() => toMap();
 
   Map<String, dynamic> toFirebaseForUpdate() => toMap();
+
+  // ---------------------------------------------------------------------------
+  // Getters
+  // ---------------------------------------------------------------------------
 
   bool get isExpired {
     if (expiresAt == null) return false;
@@ -229,6 +473,9 @@ class RoomModel {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // copyWith
+  // ---------------------------------------------------------------------------
 
   RoomModel copyWith({
     String? id,
@@ -258,6 +505,9 @@ class RoomModel {
     DateTime? postedAt,
     DateTime? updatedAt,
     DateTime? expiresAt,
+    RoomStatus? approvalStatus,
+    List<RoomDocument>? documents,
+    List<RoomReviewHistory>? reviewHistory,
   }) {
     return RoomModel(
       id: id ?? this.id,
@@ -287,8 +537,15 @@ class RoomModel {
       postedAt: postedAt ?? this.postedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       expiresAt: expiresAt ?? this.expiresAt,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      documents: documents ?? this.documents,
+      reviewHistory: reviewHistory ?? this.reviewHistory,
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Static helpers
+  // ---------------------------------------------------------------------------
 
   static double _toDouble(dynamic value) {
     if (value is int) return value.toDouble();
@@ -332,6 +589,30 @@ class RoomModel {
     }
   }
 
+  /// Suy ra [RoomStatus] từ field 'approvalStatus' hoặc từ các boolean cũ.
+  /// Đảm bảo backward compatible với phòng cũ trong Firestore chưa có field này.
+  static RoomStatus _parseApprovalStatus({
+    required dynamic raw,
+    required bool isVerified,
+    required bool isDraft,
+  }) {
+    if (raw != null) {
+      try {
+        return RoomStatus.values.firstWhere((e) => e.name == raw.toString());
+      } catch (_) {
+        // fall through to legacy logic
+      }
+    }
+    // Fallback cho phòng cũ không có approvalStatus
+    if (isVerified) return RoomStatus.verified;
+    if (isDraft) return RoomStatus.rejected;
+    return RoomStatus.pending;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sample data (chỉ dùng cho testing/UI development)
+  // ---------------------------------------------------------------------------
+
   static final List<RoomModel> sampleRooms = [
     RoomModel(
       id: '1',
@@ -351,6 +632,7 @@ class RoomModel {
       amenities: ['Gác gỗ', 'Kệ bếp', 'Wifi', 'WC riêng'],
       isFavorite: true,
       isVerified: true,
+      approvalStatus: RoomStatus.verified,
       postedAt: DateTime.now().subtract(const Duration(days: 5)),
     ),
     RoomModel(
@@ -370,6 +652,7 @@ class RoomModel {
       type: RoomType.studio,
       amenities: ['Giường tầng', 'Máy lạnh', 'Tủ cá nhân', 'Dọn phòng'],
       isVerified: true,
+      approvalStatus: RoomStatus.verified,
       viewCount: 85,
       contactCount: 7,
       area: 65,
@@ -395,6 +678,7 @@ class RoomModel {
       type: RoomType.apartment,
       amenities: ['Bếp riêng', 'Toilet riêng', 'Hầm xe', 'Bảo vệ'],
       isVerified: true,
+      approvalStatus: RoomStatus.verified,
       postedAt: DateTime.now().subtract(const Duration(days: 2)),
     ),
   ];
