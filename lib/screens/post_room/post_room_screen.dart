@@ -133,7 +133,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   RoomModel _buildRoom({required bool isDraft, List<String>? uploadedUrls}) {
   final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  final finalImages = (uploadedUrls != null && uploadedUrls.isNotEmpty) ? uploadedUrls : _images;
+  final finalImages = uploadedUrls ?? [];
 
   return RoomModel(
     id: isEditing

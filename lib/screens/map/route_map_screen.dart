@@ -31,34 +31,33 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   Future<void> _loadRoute() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showError('Vui lòng bật dịch vụ vị trí');
+      if (widget.room.latitude == 0.0 || widget.room.longitude == 0.0) {
+        _showErrorDialog('Phòng này chưa có tọa độ để chỉ đường');
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
+      final destination = LatLng(widget.room.latitude, widget.room.longitude);
 
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+
+      if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         if (permission == LocationPermission.denied) {
-          _showError('Quyền truy cập vị trí bị từ chối');
-          return;
+           permission = await Geolocator.requestPermission();
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        _showError('Quyền truy cập vị trí bị từ chối vĩnh viễn');
+      if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        _showErrorDialog('Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.');
+        if (mounted) setState(() => _isLoading = false);
+        // Move camera to destination
+        _mapController.move(destination, 13);
         return;
       }
 
       final pos = await Geolocator.getCurrentPosition();
       final origin = LatLng(pos.latitude, pos.longitude);
       
-      // Fallback destination if room has no coordinates
-      final destination = widget.room.latitude != 0.0 && widget.room.longitude != 0.0
-          ? LatLng(widget.room.latitude, widget.room.longitude)
-          : const LatLng(10.7769, 106.7009); // Default center
-
       if (mounted) {
         setState(() => _currentLocation = origin);
       }
@@ -83,16 +82,35 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         );
       } else {
         _showError('Không thể lấy đường đi');
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
       _showError('Có lỗi xảy ra: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showError(String message) {
     if (mounted) {
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -134,12 +152,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 ),
               MarkerLayer(
                 markers: [
-                  Marker(
-                    point: destination,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                  ),
+                  if (widget.room.latitude != 0.0 && widget.room.longitude != 0.0)
+                    Marker(
+                      point: destination,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                    ),
                   if (_currentLocation != null)
                     Marker(
                       point: _currentLocation!,
@@ -188,7 +207,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.mintSoft,
                           shape: BoxShape.circle,
                         ),

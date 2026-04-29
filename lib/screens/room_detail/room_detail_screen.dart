@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 import 'package:smart_room_finder/screens/map/route_map_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
@@ -20,10 +22,12 @@ class RoomDetailScreen extends StatefulWidget {
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int _selectedImage = 0;
+  late RoomModel _room;
 
   @override
   void initState() {
     super.initState();
+    _room = widget.room;
     _saveViewHistory();
   }
 
@@ -36,20 +40,20 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   List<String> get _images {
-    final base = [widget.room.imageUrl];
+    final base = [_room.imageUrl];
     final extras = [
       'assets/images/room_studio_luxury.png',
       'assets/images/room_apartment_mini.png',
       'assets/images/room_muji_studio.png',
       'assets/images/room_apartment_horizon.png',
-    ].where((e) => e != widget.room.imageUrl).take(3).toList();
+    ].where((e) => e != _room.imageUrl).take(3).toList();
 
     return [...base, ...extras];
   }
 
   @override
   Widget build(BuildContext context) {
-    final room = widget.room;
+    final room = _room;
     final isWideScreen = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(
@@ -279,8 +283,22 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           const SizedBox(height: 20),
                           ReviewSection(
                             room: room,
-                            onReviewAdded: () {
-                              setState(() {}); // refresh to get new averageRating and totalReviews if possible, but actually we should refresh the room data from firestore. For now setState will update child.
+                            onReviewAdded: () async {
+                              // Fetch updated rooms
+                              final provider = Provider.of<RoomProvider>(context, listen: false);
+                              await provider.fetchRooms();
+                              
+                              final updatedRooms = provider.allRooms;
+                              final updatedRoom = updatedRooms.firstWhere(
+                                (r) => r.id == _room.id,
+                                orElse: () => _room,
+                              );
+                              
+                              if (mounted) {
+                                setState(() {
+                                  _room = updatedRoom;
+                                });
+                              }
                             },
                           ),
                         ],

@@ -9,6 +9,7 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'dart:async';
+import 'package:smart_room_finder/screens/map/route_map_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -740,6 +741,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ],
                 ],
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RouteMapScreen(room: room),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.mintSoft,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.directions_rounded, size: 14, color: AppColors.teal),
+                      SizedBox(width: 4),
+                      Text('Chỉ đường', style: TextStyle(color: AppColors.teal, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
