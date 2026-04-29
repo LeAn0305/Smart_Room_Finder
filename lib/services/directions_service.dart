@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 class DirectionsService {
-  static const String _baseUrl = 'http://router.project-osrm.org/route/v1';
+  static const String _baseUrl = 'https://router.project-osrm.org/route/v1';
 
   static Future<Map<String, dynamic>?> getDirections({
     required LatLng origin,
@@ -13,7 +13,9 @@ class DirectionsService {
     try {
       final url = '$_baseUrl/$mode/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?geometries=geojson&overview=full';
 
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 10),
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

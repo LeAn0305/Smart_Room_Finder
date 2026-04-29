@@ -71,6 +71,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   LatLng _getRoomLocation(RoomModel room) {
+    if (room.latitude != 0.0 && room.longitude != 0.0) {
+      return LatLng(room.latitude, room.longitude);
+    }
     return _roomLocations[room.id] ?? _fallbackRoomLocation(room);
   }
 
@@ -128,7 +131,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           setState(() => _loadingLocation = false);
           return;
         }
-        final pos = await Geolocator.getCurrentPosition();
+        final pos = await Geolocator.getCurrentPosition().timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            throw Exception('Lỗi lấy vị trí: Hết thời gian chờ');
+          },
+        );
         _updateLocation(pos, animateSelected: true);
         return;
       }
@@ -174,6 +182,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 10),
         ),
+      ).timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {
+          throw Exception('Lỗi lấy vị trí: Hết thời gian chờ');
+        },
       );
       _updateLocation(pos, animateSelected: true);
 
@@ -219,7 +232,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     double minDistance = double.infinity;
 
     final roomProvider = context.read<RoomProvider>();
-    List<RoomModel> availableRooms = _filteredRooms; // Chỉ tìm trong kết quả lọc hiện tại
+    List<RoomModel> availableRooms = _getFilteredRooms(roomProvider.activePublicRooms); // Chỉ tìm trong kết quả lọc hiện tại
 
     if (availableRooms.isEmpty) {
       availableRooms = roomProvider.activePublicRooms; // Dự phòng quét hết mọi nơi nếu lỡ lọc kỹ quá
@@ -261,8 +274,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  List<RoomModel> get _filteredRooms {
-    final rooms = context.watch<RoomProvider>().activePublicRooms;
+  List<RoomModel> _getFilteredRooms(List<RoomModel> rooms) {
     final typeMap = {
       'Chung cư': RoomType.apartment,
       'Phòng trọ': RoomType.studio,
@@ -315,8 +327,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    //final roomProvider = context.watch<RoomProvider>();
-    final filteredRooms = _filteredRooms;
+    final roomProvider = context.watch<RoomProvider>();
+    final filteredRooms = _getFilteredRooms(roomProvider.activePublicRooms);
 
     return Scaffold(
       body: Stack(
@@ -745,12 +757,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => RouteMapScreen(room: room),
-                    ),
-                  );
+                  try {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RouteMapScreen(
+                          room: room,
+                          userLocation: _currentLocation,
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    _showLocationError('Không thể mở màn hình chỉ đường');
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

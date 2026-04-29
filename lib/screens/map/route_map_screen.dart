@@ -8,8 +8,9 @@ import 'package:smart_room_finder/services/directions_service.dart';
 
 class RouteMapScreen extends StatefulWidget {
   final RoomModel room;
+  final LatLng? userLocation;
 
-  const RouteMapScreen({super.key, required this.room});
+  const RouteMapScreen({super.key, required this.room, this.userLocation});
 
   @override
   State<RouteMapScreen> createState() => _RouteMapScreenState();
@@ -38,28 +39,63 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       }
       final destination = LatLng(widget.room.latitude, widget.room.longitude);
 
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      LocationPermission permission = await Geolocator.checkPermission();
+      LatLng? origin;
 
-      if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (permission == LocationPermission.denied) {
-           permission = await Geolocator.requestPermission();
+      if (widget.userLocation != null) {
+        origin = widget.userLocation;
+      } else {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        LocationPermission permission = await Geolocator.checkPermission();
+
+        if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          if (permission == LocationPermission.denied) {
+             permission = await Geolocator.requestPermission();
+          }
         }
-      }
 
-      if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        _showErrorDialog('Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.');
-        if (mounted) setState(() => _isLoading = false);
-        // Move camera to destination
-        _mapController.move(destination, 13);
-        return;
-      }
+        if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          _showErrorDialog('Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.');
+          if (mounted) setState(() => _isLoading = false);
+          // Move camera to destination
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              try { _mapController.move(destination, 13); } catch (_) {}
+            }
+          });
+          return;
+        }
 
-      final pos = await Geolocator.getCurrentPosition();
-      final origin = LatLng(pos.latitude, pos.longitude);
+        Position? pos;
+        try {
+          pos = await Geolocator.getCurrentPosition().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              throw Exception('Lỗi lấy vị trí: Hết thời gian chờ');
+            },
+          );
+        } catch (e) {
+          _showErrorDialog('Không thể lấy vị trí hiện tại của bạn. Vui lòng kiểm tra lại GPS hoặc quyền truy cập vị trí.');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                try { _mapController.move(destination, 13); } catch (_) {}
+              }
+            });
+          }
+          return;
+        }
+        origin = LatLng(pos.latitude, pos.longitude);
+      }
       
-      if (mounted) {
+      if (mounted && origin != null) {
         setState(() => _currentLocation = origin);
+      }
+
+      if (origin == null) {
+        _showError('Không thể xác định vị trí khởi đầu. Vui lòng thử lại.');
+        if (mounted) setState(() => _isLoading = false);
+        return;
       }
 
       final result = await DirectionsService.getDirections(
@@ -77,9 +113,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
         // Fit bounds
         final bounds = LatLngBounds.fromPoints([origin, destination, ..._routePoints]);
-        _mapController.fitCamera(
-          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
-        );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            try {
+              _mapController.fitCamera(
+                CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+              );
+            } catch (_) {}
+          }
+        });
       } else {
         _showError('Không thể lấy đường đi');
         if (mounted) setState(() => _isLoading = false);
