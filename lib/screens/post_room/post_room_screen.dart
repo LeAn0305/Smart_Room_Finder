@@ -416,7 +416,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   Widget _buildMapPlaceholder() {
     return GestureDetector(
       onTap: () async {
-        final LatLng? result = await Navigator.push(
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => MapPickerScreen(
@@ -426,7 +426,19 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
             ),
           ),
         );
-        if (result != null) {
+        if (result != null && result is Map<String, dynamic>) {
+          setState(() {
+            final LatLng loc = result['location'];
+            _latitude = loc.latitude;
+            _longitude = loc.longitude;
+            
+            // Auto-fill address if empty
+            if (_addressCtrl.text.isEmpty || _addressCtrl.text == 'TP. Ho Chi Minh') {
+              _addressCtrl.text = result['address'] ?? '';
+            }
+          });
+        } else if (result != null && result is LatLng) {
+          // Backward compatibility if picker still returns just LatLng
           setState(() {
             _latitude = result.latitude;
             _longitude = result.longitude;

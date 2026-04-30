@@ -47,19 +47,27 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         LocationPermission permission = await Geolocator.checkPermission();
 
-        if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (!serviceEnabled ||
+            permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
           if (permission == LocationPermission.denied) {
-             permission = await Geolocator.requestPermission();
+            permission = await Geolocator.requestPermission();
           }
         }
 
-        if (!serviceEnabled || permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-          _showErrorDialog('Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.');
+        if (!serviceEnabled ||
+            permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          _showErrorDialog(
+            'Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.',
+          );
           if (mounted) setState(() => _isLoading = false);
           // Move camera to destination
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
-              try { _mapController.move(destination, 13); } catch (_) {}
+              try {
+                _mapController.move(destination, 13);
+              } catch (_) {}
             }
           });
           return;
@@ -74,12 +82,16 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
             },
           );
         } catch (e) {
-          _showErrorDialog('Không thể lấy vị trí hiện tại của bạn. Vui lòng kiểm tra lại GPS hoặc quyền truy cập vị trí.');
+          _showErrorDialog(
+            'Không thể lấy vị trí hiện tại của bạn. Vui lòng kiểm tra lại GPS hoặc quyền truy cập vị trí.',
+          );
           if (mounted) {
             setState(() => _isLoading = false);
             Future.delayed(const Duration(milliseconds: 300), () {
               if (mounted) {
-                try { _mapController.move(destination, 13); } catch (_) {}
+                try {
+                  _mapController.move(destination, 13);
+                } catch (_) {}
               }
             });
           }
@@ -87,7 +99,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         }
         origin = LatLng(pos.latitude, pos.longitude);
       }
-      
+
       if (mounted && origin != null) {
         setState(() => _currentLocation = origin);
       }
@@ -112,12 +124,19 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         });
 
         // Fit bounds
-        final bounds = LatLngBounds.fromPoints([origin, destination, ..._routePoints]);
+        final bounds = LatLngBounds.fromPoints([
+          origin,
+          destination,
+          ..._routePoints,
+        ]);
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted) {
             try {
               _mapController.fitCamera(
-                CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
+                CameraFit.bounds(
+                  bounds: bounds,
+                  padding: const EdgeInsets.all(50.0),
+                ),
               );
             } catch (_) {}
           }
@@ -134,7 +153,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -158,13 +179,20 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final destination = widget.room.latitude != 0.0 && widget.room.longitude != 0.0
+    final destination =
+        widget.room.latitude != 0.0 && widget.room.longitude != 0.0
         ? LatLng(widget.room.latitude, widget.room.longitude)
         : const LatLng(10.7769, 106.7009);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chỉ đường đến phòng', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Chỉ đường đến phòng',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
@@ -173,10 +201,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         children: [
           FlutterMap(
             mapController: _mapController,
-            options: MapOptions(
-              initialCenter: destination,
-              initialZoom: 13,
-            ),
+            options: MapOptions(initialCenter: destination, initialZoom: 13),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -194,12 +219,17 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 ),
               MarkerLayer(
                 markers: [
-                  if (widget.room.latitude != 0.0 && widget.room.longitude != 0.0)
+                  if (widget.room.latitude != 0.0 &&
+                      widget.room.longitude != 0.0)
                     Marker(
                       point: destination,
                       width: 40,
                       height: 40,
-                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.red,
+                        size: 40,
+                      ),
                     ),
                   if (_currentLocation != null)
                     Marker(
@@ -212,7 +242,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                         ),
-                        child: const Icon(Icons.person, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                 ],
@@ -242,7 +276,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               right: 20,
               child: Card(
                 elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -253,7 +289,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           color: AppColors.mintSoft,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.directions_bike_rounded, color: AppColors.teal),
+                        child: const Icon(
+                          Icons.directions_bike_rounded,
+                          color: AppColors.teal,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -263,12 +302,18 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                           children: [
                             const Text(
                               'Khoảng cách và Thời gian',
-                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '$_distance • ước tính $_duration',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
