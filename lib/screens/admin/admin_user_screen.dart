@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/screens/admin/models/admin_user_model.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
 
 class AdminUserScreen extends StatefulWidget {
@@ -20,15 +22,249 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
   String _selectedRole = 'Tất cả';
   String _selectedStatus = 'Tất cả';
   String _selectedVerification = 'Tất cả';
-  String _selectedUserId = _adminUsers.first.id;
+  String _selectedUserId = '';
   int _currentPage = 1;
   int _pageSize = 10;
+  List<AdminUserModel> _users = [];
+  bool _isLoadingUsers = true;
+  String? _userError;
+
+  @override
+  void initState() {
+    super.initState();
+    _tableSearchController.addListener(_handleUserSearchChanged);
+    _fetchUsers();
+  }
 
   @override
   void dispose() {
+    _tableSearchController.removeListener(_handleUserSearchChanged);
     _searchController.dispose();
     _tableSearchController.dispose();
     super.dispose();
+  }
+
+  void _handleUserSearchChanged() {
+    if (!mounted) return;
+    setState(() {
+      _currentPage = 1;
+    });
+  }
+
+  Future<void> _fetchUsers() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingUsers = true;
+      _userError = null;
+    });
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+
+      final users = snapshot.docs.map(AdminUserModel.fromFirestore).toList()
+        ..sort((a, b) {
+          final left = a.createdAt;
+          final right = b.createdAt;
+          if (left == null && right == null) return 0;
+          if (left == null) return 1;
+          if (right == null) return -1;
+          return right.compareTo(left);
+        });
+
+      if (!mounted) return;
+      setState(() {
+        _users = users;
+        _selectedUserId = users.isNotEmpty ? users.first.id : '';
+        _isLoadingUsers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _userError = 'Không thể tải danh sách người dùng: $e';
+        _isLoadingUsers = false;
+      });
+    }
+  }
+
+  void _showAdminSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : AppColors.teal,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _showLockUserDialog(AdminUserModel user) async {
+    if (user.isAdmin) {
+      _showAdminSnackBar('Không thể khóa tài khoản Admin.', isError: true);
+      return;
+    }
+
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Khóa tài khoản',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bạn có chắc muốn khóa tài khoản ${user.displayName}?',
+              style: const TextStyle(
+                color: Color(0xFF5C6D82),
+                fontSize: 13,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Nhập lý do khóa tài khoản',
+                filled: true,
+                fillColor: const Color(0xFFF7FAFE),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide:
+                      const BorderSide(color: Color(0xFFFF5B6E), width: 1.4),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF5B6E),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Xác nhận khóa',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final reason = reasonController.text.trim().isEmpty
+        ? 'Vi phạm quy định sử dụng'
+        : reasonController.text.trim();
+    reasonController.dispose();
+
+    if (confirmed != true) return;
+    await _lockUser(user, reason);
+  }
+
+  Future<void> _showUnlockUserDialog(AdminUserModel user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Mở khóa tài khoản',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'Bạn có chắc muốn mở khóa tài khoản ${user.displayName}?',
+          style: const TextStyle(
+            color: Color(0xFF5C6D82),
+            fontSize: 13,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Xác nhận mở khóa',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    await _unlockUser(user);
+  }
+
+  Future<void> _lockUser(AdminUserModel user, String reason) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+        'status': 'locked',
+        'lockedReason': reason,
+        'lockedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _fetchUsers();
+      _showAdminSnackBar('Đã khóa tài khoản ${user.displayName}.');
+    } catch (e) {
+      _showAdminSnackBar(
+        'Khóa tài khoản thất bại: $e',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _unlockUser(AdminUserModel user) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+        'status': 'active',
+        'lockedReason': '',
+        'lockedAt': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _fetchUsers();
+      _showAdminSnackBar('Đã mở khóa tài khoản ${user.displayName}.');
+    } catch (e) {
+      _showAdminSnackBar(
+        'Mở khóa tài khoản thất bại: $e',
+        isError: true,
+      );
+    }
   }
 
   bool _isMobile(double width) => width < 700;
@@ -68,11 +304,79 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
     setState(() => _selectedMenuIndex = index);
   }
 
-  _AdminUser get _selectedUser {
-    return _adminUsers.firstWhere(
+  List<AdminUserModel> get _filteredUsers {
+    final query = _tableSearchController.text.trim().toLowerCase();
+
+    return _users.where((user) {
+      final matchesRole =
+          _selectedRole == 'Tất cả' || user.roleLabel == _selectedRole;
+      final matchesStatus =
+          _selectedStatus == 'Tất cả' || user.statusLabel == _selectedStatus;
+      final matchesVerification = _selectedVerification == 'Tất cả' ||
+          user.accountSetupLabel == _selectedVerification;
+      final matchesSearch = query.isEmpty ||
+          user.displayName.toLowerCase().contains(query) ||
+          user.email.toLowerCase().contains(query) ||
+          user.phoneNumber.toLowerCase().contains(query);
+
+      return matchesRole &&
+          matchesStatus &&
+          matchesVerification &&
+          matchesSearch;
+    }).toList();
+  }
+
+  AdminUserModel? get _selectedUser {
+    final users = _filteredUsers;
+    if (users.isEmpty) return null;
+
+    return users.firstWhere(
       (user) => user.id == _selectedUserId,
-      orElse: () => _adminUsers.first,
+      orElse: () => users.first,
     );
+  }
+
+  List<_AdminUserStat> get _adminUserStats {
+    final renters =
+        _users.where((u) => u.role.trim().toLowerCase() == 'renter').length;
+    final landlords =
+        _users.where((u) => u.role.trim().toLowerCase() == 'landlord').length;
+    final locked = _users.where((u) => u.isLocked).length;
+
+    return [
+      _AdminUserStat(
+        title: 'Tổng người dùng',
+        value: '${_users.length}',
+        changeText: 'Dữ liệu từ Firestore',
+        isPositive: true,
+        icon: Icons.groups_2_outlined,
+        accent: AppColors.blue,
+      ),
+      _AdminUserStat(
+        title: 'Người thuê',
+        value: '$renters',
+        changeText: 'Vai trò người thuê',
+        isPositive: true,
+        icon: Icons.person_pin_circle_outlined,
+        accent: const Color(0xFF22B573),
+      ),
+      _AdminUserStat(
+        title: 'Chủ trọ',
+        value: '$landlords',
+        changeText: 'Vai trò chủ trọ',
+        isPositive: true,
+        icon: Icons.home_work_outlined,
+        accent: const Color(0xFF9B5CFF),
+      ),
+      _AdminUserStat(
+        title: 'Tài khoản bị khóa',
+        value: '$locked',
+        changeText: 'Trạng thái tạm khóa',
+        isPositive: locked == 0,
+        icon: Icons.lock_outline_rounded,
+        accent: const Color(0xFFF59E0B),
+      ),
+    ];
   }
 
   @override
@@ -221,7 +525,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
     );
 
     final verificationBox = _FilterDropdown(
-      label: 'Trạng thái xác minh',
+      label: 'Thiết lập tài khoản',
       value: _selectedVerification,
       items: _verificationOptions,
       onChanged: (value) {
@@ -320,6 +624,35 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
   Widget _buildMainSection(double width) {
     final isMobile = _isMobile(width);
     final isDesktop = _isDesktop(width);
+    final users = _filteredUsers;
+    final selectedUser = _selectedUser;
+
+    if (_isLoadingUsers) {
+      return const _AdminStateCard(
+        icon: Icons.hourglass_empty_rounded,
+        title: 'Đang tải danh sách người dùng',
+        message: 'Đang lấy dữ liệu người dùng từ Firestore.',
+        showLoading: true,
+      );
+    }
+
+    if (_userError != null) {
+      return _AdminStateCard(
+        icon: Icons.error_outline_rounded,
+        title: 'Không thể tải dữ liệu',
+        message: _userError!,
+        actionLabel: 'Thử lại',
+        onAction: _fetchUsers,
+      );
+    }
+
+    if (users.isEmpty) {
+      return const _AdminStateCard(
+        icon: Icons.people_outline_rounded,
+        title: 'Chưa có người dùng phù hợp',
+        message: 'Thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem dữ liệu khác.',
+      );
+    }
 
     if (isDesktop) {
       return Row(
@@ -328,7 +661,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
           Expanded(
             flex: 7,
             child: _UserTableCard(
-              users: _adminUsers,
+              users: users,
               selectedUserId: _selectedUserId,
               isCompact: false,
               currentPage: _currentPage,
@@ -348,7 +681,11 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
           const SizedBox(width: 16),
           SizedBox(
             width: 280,
-            child: _UserDetailPanel(user: _selectedUser),
+            child: _UserDetailPanel(
+              user: selectedUser!,
+              onLockUser: _showLockUserDialog,
+              onUnlockUser: _showUnlockUserDialog,
+            ),
           ),
         ],
       );
@@ -357,7 +694,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
     return Column(
       children: [
         _UserTableCard(
-          users: _adminUsers,
+          users: users,
           selectedUserId: _selectedUserId,
           isCompact: isMobile,
           currentPage: _currentPage,
@@ -374,7 +711,11 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
           },
         ),
         const SizedBox(height: 16),
-        _UserDetailPanel(user: _selectedUser),
+        _UserDetailPanel(
+          user: selectedUser!,
+          onLockUser: _showLockUserDialog,
+          onUnlockUser: _showUnlockUserDialog,
+        ),
       ],
     );
   }
@@ -847,12 +1188,12 @@ class _UserTableCard extends StatelessWidget {
     required this.onPageSizeChanged,
   });
 
-  final List<_AdminUser> users;
+  final List<AdminUserModel> users;
   final String selectedUserId;
   final bool isCompact;
   final int currentPage;
   final int pageSize;
-  final ValueChanged<_AdminUser> onSelectUser;
+  final ValueChanged<AdminUserModel> onSelectUser;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int?> onPageSizeChanged;
 
@@ -884,9 +1225,77 @@ class _UserTableCard extends StatelessWidget {
           _PaginationBar(
             currentPage: currentPage,
             pageSize: pageSize,
+            totalCount: users.length,
             onPageChanged: onPageChanged,
             onPageSizeChanged: onPageSizeChanged,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminStateCard extends StatelessWidget {
+  const _AdminStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.showLoading = false,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool showLoading;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return _AdminSurfaceCard(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showLoading)
+            const SizedBox(
+              width: 34,
+              height: 34,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            )
+          else
+            Icon(icon, size: 38, color: AppColors.blue),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF1E2B3A),
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF7D8EA3),
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 18),
+            _FilterActionButton(
+              label: actionLabel!,
+              icon: Icons.refresh_rounded,
+              onTap: onAction!,
+            ),
+          ],
         ],
       ),
     );
@@ -936,7 +1345,7 @@ class _UserTableRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final _AdminUser user;
+  final AdminUserModel user;
   final bool isSelected;
   final bool isCompact;
   final VoidCallback onTap;
@@ -964,7 +1373,7 @@ class _UserTableRow extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user.name,
+                          user.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -995,8 +1404,8 @@ class _UserTableRow extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _RoleChip(label: user.role),
-                  _StatusChip(label: user.status),
+                  _RoleChip(label: user.roleLabel),
+                  _StatusChip(label: user.statusLabel),
                   _MetaPill(icon: Icons.phone_outlined, text: user.phone),
                   _MetaPill(icon: Icons.calendar_today_rounded, text: user.joinedAt),
                 ],
@@ -1025,7 +1434,7 @@ class _UserTableRow extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      user.name,
+                      user.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1039,9 +1448,9 @@ class _UserTableRow extends StatelessWidget {
               ),
             ),
             Expanded(flex: 3, child: _TableText(user.email)),
-            Expanded(flex: 2, child: _RoleChip(label: user.role)),
+            Expanded(flex: 2, child: _RoleChip(label: user.roleLabel)),
             Expanded(flex: 2, child: _TableText(user.phone)),
-            Expanded(flex: 2, child: _StatusChip(label: user.status)),
+            Expanded(flex: 2, child: _StatusChip(label: user.statusLabel)),
             Expanded(flex: 2, child: _TableText(user.joinedAt)),
             const SizedBox(
               width: 32,
@@ -1055,9 +1464,15 @@ class _UserTableRow extends StatelessWidget {
 }
 
 class _UserDetailPanel extends StatelessWidget {
-  const _UserDetailPanel({required this.user});
+  const _UserDetailPanel({
+    required this.user,
+    required this.onLockUser,
+    required this.onUnlockUser,
+  });
 
-  final _AdminUser user;
+  final AdminUserModel user;
+  final ValueChanged<AdminUserModel> onLockUser;
+  final ValueChanged<AdminUserModel> onUnlockUser;
 
   @override
   Widget build(BuildContext context) {
@@ -1077,7 +1492,7 @@ class _UserDetailPanel extends StatelessWidget {
           _ProfileAvatar(user: user, size: 76),
           const SizedBox(height: 14),
           Text(
-            user.name,
+            user.displayName,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Color(0xFF1E2B3A),
@@ -1086,33 +1501,33 @@ class _UserDetailPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _RoleChip(label: user.role),
+          _RoleChip(label: user.roleLabel),
           const SizedBox(height: 20),
           _ContactLine(icon: Icons.email_outlined, text: user.email),
           const SizedBox(height: 10),
           _ContactLine(icon: Icons.phone_outlined, text: user.phone),
           const SizedBox(height: 10),
-          _ContactLine(icon: Icons.location_on_outlined, text: user.location),
+          _ContactLine(icon: Icons.location_on_outlined, text: user.displayLocation),
           const SizedBox(height: 20),
           const Divider(height: 1, color: Color(0xFFE5EDF6)),
           const SizedBox(height: 18),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Trạng thái xác minh',
+              'Trạng thái thiết lập tài khoản',
               style: _detailLabelStyle,
             ),
           ),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: _StatusChip(label: 'Đã xác minh'),
+            child: _StatusChip(label: user.accountSetupLabel),
           ),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Xác minh ngày ${user.verifiedAt}',
+              user.accountSetupDescription,
               style: const TextStyle(
                 color: Color(0xFF8EA0B4),
                 fontSize: 11,
@@ -1132,7 +1547,7 @@ class _UserDetailPanel extends StatelessWidget {
                   child: _DetailMetric(
                     title: 'Bài đăng',
                     value: '${user.postCount}',
-                    subtitle: '10 bài đang hiển thị',
+                    subtitle: 'Chưa thống kê',
                   ),
                 ),
                 Container(width: 1, height: 72, color: const Color(0xFFE5EDF6)),
@@ -1140,24 +1555,25 @@ class _UserDetailPanel extends StatelessWidget {
                   child: _DetailMetric(
                     title: 'Báo cáo nhận',
                     value: '${user.reportCount}',
-                    subtitle: 'Trong 30 ngày qua',
+                    subtitle: 'Chưa thống kê',
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 18),
-          _DangerButton(
-            label: 'Khóa tài khoản',
-            icon: Icons.lock_outline_rounded,
-            onTap: () {},
-          ),
-          const SizedBox(height: 10),
-          _SuccessButton(
-            label: 'Mở khóa',
-            icon: Icons.lock_open_outlined,
-            onTap: () {},
-          ),
+          if (user.isLocked)
+            _SuccessButton(
+              label: 'Mở khóa',
+              icon: Icons.lock_open_outlined,
+              onTap: () => onUnlockUser(user),
+            )
+          else
+            _DangerButton(
+              label: 'Khóa tài khoản',
+              icon: Icons.lock_outline_rounded,
+              onTap: () => onLockUser(user),
+            ),
           const SizedBox(height: 10),
           _GhostButton(
             label: 'Xem chi tiết',
@@ -1174,12 +1590,14 @@ class _PaginationBar extends StatelessWidget {
   const _PaginationBar({
     required this.currentPage,
     required this.pageSize,
+    required this.totalCount,
     required this.onPageChanged,
     required this.onPageSizeChanged,
   });
 
   final int currentPage;
   final int pageSize;
+  final int totalCount;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int?> onPageSizeChanged;
 
@@ -1193,97 +1611,21 @@ class _PaginationBar extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         alignment: WrapAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Hiển thị',
-                style: TextStyle(
-                  color: Color(0xFF7D8EA3),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2EAF3)),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: pageSize,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: Color(0xFF8EA0B4),
-                      size: 18,
-                    ),
-                    style: const TextStyle(
-                      color: Color(0xFF4C5F75),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    onChanged: onPageSizeChanged,
-                    items: const [10, 20, 50]
-                        .map(
-                          (value) => DropdownMenuItem<int>(
-                            value: value,
-                            child: Text('$value'),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'trong tổng số 5,426 người dùng',
-                style: TextStyle(
-                  color: Color(0xFF7D8EA3),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          Text(
+            'Hiển thị $totalCount người dùng',
+            style: const TextStyle(
+              color: Color(0xFF7D8EA3),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _PageIconButton(
-                icon: Icons.keyboard_double_arrow_left_rounded,
-                onTap: () => onPageChanged(1),
-              ),
-              _PageIconButton(
-                icon: Icons.chevron_left_rounded,
-                onTap: () => onPageChanged(math.max(1, currentPage - 1)),
-              ),
-              for (final page in const [1, 2, 3, 4, 5])
-                _PageNumberButton(
-                  page: page,
-                  isSelected: currentPage == page,
-                  onTap: () => onPageChanged(page),
-                ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '...',
-                  style: TextStyle(
-                    color: Color(0xFF7D8EA3),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
               _PageNumberButton(
-                page: 543,
-                isSelected: currentPage == 543,
-                onTap: () => onPageChanged(543),
-              ),
-              _PageIconButton(
-                icon: Icons.chevron_right_rounded,
-                onTap: () => onPageChanged(math.min(543, currentPage + 1)),
+                page: 1,
+                isSelected: true,
+                onTap: () => onPageChanged(1),
               ),
             ],
           ),
@@ -1674,7 +2016,7 @@ class _ProfileAvatar extends StatelessWidget {
     required this.size,
   });
 
-  final _AdminUser? user;
+  final AdminUserModel? user;
   final double size;
 
   @override
@@ -1683,31 +2025,33 @@ class _ProfileAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                (source?.avatarColor ?? const Color(0xFF8ECDF7))
-                    .withValues(alpha: 0.92),
-                (source?.avatarColor ?? const Color(0xFF47C7B5))
-                    .withValues(alpha: 0.55),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              _getInitial(source?.name ?? 'Admin'),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.36,
-                fontWeight: FontWeight.w900,
+        ClipOval(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  (source?.avatarColor ?? const Color(0xFF8ECDF7))
+                      .withValues(alpha: 0.92),
+                  (source?.avatarColor ?? const Color(0xFF47C7B5))
+                      .withValues(alpha: 0.55),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
+            child: source != null && source.profileImageUrl.trim().isNotEmpty
+                ? Image.network(
+                    source.profileImageUrl.trim(),
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _AvatarInitial(source: source, size: size),
+                  )
+                : _AvatarInitial(source: source, size: size),
           ),
         ),
         if (source?.isOnline ?? false)
@@ -1725,6 +2069,30 @@ class _ProfileAvatar extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AvatarInitial extends StatelessWidget {
+  const _AvatarInitial({
+    required this.source,
+    required this.size,
+  });
+
+  final AdminUserModel? source;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        _getInitial(source?.displayName ?? 'Admin'),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
@@ -2106,9 +2474,9 @@ const TextStyle _detailLabelStyle = TextStyle(
 Color _statusColor(String status) {
   switch (status) {
     case 'Hoạt động':
-    case 'Đã xác minh':
+    case 'Đã hoàn tất':
       return const Color(0xFF22B573);
-    case 'Chờ xác minh':
+    case 'Chưa hoàn tất':
       return const Color(0xFFF59E0B);
     case 'Tạm khóa':
       return const Color(0xFFFF5B6E);
@@ -2132,191 +2500,14 @@ const List<_AdminMenuItem> _adminMenus = [
   _AdminMenuItem(label: 'Cài đặt', icon: Icons.settings_outlined),
 ];
 
-const List<String> _roleOptions = ['Tất cả', 'Người dùng', 'Chủ trọ'];
-const List<String> _statusOptions = ['Tất cả', 'Hoạt động', 'Chờ xác minh', 'Tạm khóa'];
-const List<String> _verificationOptions = ['Tất cả', 'Đã xác minh', 'Chưa xác minh'];
-
-const List<_AdminUserStat> _adminUserStats = [
-  _AdminUserStat(
-    title: 'Tổng người dùng',
-    value: '5,426',
-    changeText: '+8.3%',
-    isPositive: true,
-    icon: Icons.groups_2_outlined,
-    accent: AppColors.blue,
-  ),
-  _AdminUserStat(
-    title: 'Người thuê',
-    value: '4,126',
-    changeText: '+9.1%',
-    isPositive: true,
-    icon: Icons.person_pin_circle_outlined,
-    accent: Color(0xFF22B573),
-  ),
-  _AdminUserStat(
-    title: 'Chủ trọ',
-    value: '1,132',
-    changeText: '+6.4%',
-    isPositive: true,
-    icon: Icons.home_work_outlined,
-    accent: Color(0xFF9B5CFF),
-  ),
-  _AdminUserStat(
-    title: 'Tài khoản bị khóa',
-    value: '168',
-    changeText: '+12.3%',
-    isPositive: false,
-    icon: Icons.lock_outline_rounded,
-    accent: Color(0xFFF59E0B),
-  ),
+const List<String> _roleOptions = ['Tất cả', 'Người thuê', 'Chủ trọ'];
+const List<String> _statusOptions = ['Tất cả', 'Hoạt động', 'Tạm khóa'];
+const List<String> _verificationOptions = [
+  'Tất cả',
+  'Đã hoàn tất',
+  'Chưa hoàn tất',
 ];
 
-const List<_AdminUser> _adminUsers = [
-  _AdminUser(
-    id: 'USR-001',
-    name: 'Nguyễn Văn Bình',
-    email: 'binh.nv@gmail.com',
-    role: 'Chủ trọ',
-    phone: '0901 234 567',
-    status: 'Hoạt động',
-    joinedAt: '19/05/2025\n09:15',
-    location: 'TP. Hồ Chí Minh',
-    verifiedAt: '10/05/2025',
-    postCount: 23,
-    reportCount: 2,
-    avatarColor: Color(0xFF2F9BEF),
-    isOnline: true,
-  ),
-  _AdminUser(
-    id: 'USR-002',
-    name: 'Trần Thị Mai',
-    email: 'mai.tt@gmail.com',
-    role: 'Người dùng',
-    phone: '0912 345 678',
-    status: 'Hoạt động',
-    joinedAt: '19/05/2025\n08:45',
-    location: 'Hà Nội',
-    verifiedAt: '11/05/2025',
-    postCount: 4,
-    reportCount: 0,
-    avatarColor: Color(0xFF47C7B5),
-    isOnline: true,
-  ),
-  _AdminUser(
-    id: 'USR-003',
-    name: 'Lê Minh Tuấn',
-    email: 'tuanlm@gmail.com',
-    role: 'Người dùng',
-    phone: '0934 567 890',
-    status: 'Chờ xác minh',
-    joinedAt: '19/05/2025\n08:30',
-    location: 'TP. Hồ Chí Minh',
-    verifiedAt: 'Đang chờ',
-    postCount: 1,
-    reportCount: 1,
-    avatarColor: Color(0xFFF59E0B),
-  ),
-  _AdminUser(
-    id: 'USR-004',
-    name: 'Phạm Văn Hùng',
-    email: 'hungpv@gmail.com',
-    role: 'Chủ trọ',
-    phone: '0918 765 432',
-    status: 'Tạm khóa',
-    joinedAt: '19/05/2025\n07:50',
-    location: 'TP. Hồ Chí Minh',
-    verifiedAt: '04/05/2025',
-    postCount: 11,
-    reportCount: 5,
-    avatarColor: Color(0xFFFF5B6E),
-  ),
-  _AdminUser(
-    id: 'USR-005',
-    name: 'Đỗ Thu Hằng',
-    email: 'hang.dt@gmail.com',
-    role: 'Người dùng',
-    phone: '0922 334 455',
-    status: 'Hoạt động',
-    joinedAt: '19/05/2025\n07:20',
-    location: 'Tân Bình',
-    verifiedAt: '08/05/2025',
-    postCount: 2,
-    reportCount: 0,
-    avatarColor: Color(0xFF8B5CF6),
-    isOnline: true,
-  ),
-  _AdminUser(
-    id: 'USR-006',
-    name: 'Hoàng Thị Lan',
-    email: 'lanht@gmail.com',
-    role: 'Chủ trọ',
-    phone: '0909 876 543',
-    status: 'Chờ xác minh',
-    joinedAt: '18/05/2025\n22:10',
-    location: 'Cầu Giấy',
-    verifiedAt: 'Đang chờ',
-    postCount: 8,
-    reportCount: 1,
-    avatarColor: Color(0xFF22B573),
-  ),
-  _AdminUser(
-    id: 'USR-007',
-    name: 'Nguyễn Thành Đạt',
-    email: 'datnt@gmail.com',
-    role: 'Người dùng',
-    phone: '0916 123 789',
-    status: 'Hoạt động',
-    joinedAt: '18/05/2025\n20:32',
-    location: 'Đà Nẵng',
-    verifiedAt: '09/05/2025',
-    postCount: 0,
-    reportCount: 0,
-    avatarColor: Color(0xFF2F9BEF),
-  ),
-  _AdminUser(
-    id: 'USR-008',
-    name: 'Vũ Thị Huyền',
-    email: 'huyen.vt@gmail.com',
-    role: 'Người dùng',
-    phone: '0933 222 111',
-    status: 'Tạm khóa',
-    joinedAt: '18/05/2025\n18:05',
-    location: 'TP. Hồ Chí Minh',
-    verifiedAt: '01/05/2025',
-    postCount: 1,
-    reportCount: 3,
-    avatarColor: Color(0xFFFF8A4C),
-  ),
-  _AdminUser(
-    id: 'USR-009',
-    name: 'Bùi Anh Khoa',
-    email: 'khoa.ba@gmail.com',
-    role: 'Chủ trọ',
-    phone: '0944 555 666',
-    status: 'Hoạt động',
-    joinedAt: '18/05/2025\n16:48',
-    location: 'Hà Nội',
-    verifiedAt: '07/05/2025',
-    postCount: 17,
-    reportCount: 1,
-    avatarColor: Color(0xFF47C7B5),
-    isOnline: true,
-  ),
-  _AdminUser(
-    id: 'USR-010',
-    name: 'Trương Minh Anh',
-    email: 'anh.tm@gmail.com',
-    role: 'Người dùng',
-    phone: '0911 888 999',
-    status: 'Chờ xác minh',
-    joinedAt: '18/05/2025\n15:20',
-    location: 'Cần Thơ',
-    verifiedAt: 'Đang chờ',
-    postCount: 0,
-    reportCount: 0,
-    avatarColor: Color(0xFF9B5CFF),
-  ),
-];
 
 class _AdminMenuItem {
   const _AdminMenuItem({
@@ -2346,34 +2537,3 @@ class _AdminUserStat {
   final Color accent;
 }
 
-class _AdminUser {
-  const _AdminUser({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.phone,
-    required this.status,
-    required this.joinedAt,
-    required this.location,
-    required this.verifiedAt,
-    required this.postCount,
-    required this.reportCount,
-    required this.avatarColor,
-    this.isOnline = false,
-  });
-
-  final String id;
-  final String name;
-  final String email;
-  final String role;
-  final String phone;
-  final String status;
-  final String joinedAt;
-  final String location;
-  final String verifiedAt;
-  final int postCount;
-  final int reportCount;
-  final Color avatarColor;
-  final bool isOnline;
-}

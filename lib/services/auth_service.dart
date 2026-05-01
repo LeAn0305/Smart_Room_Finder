@@ -20,6 +20,35 @@ class AuthService {
   static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  static const String accountLockedMessage =
+      'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.';
+
+  // =========================
+  // KIỂM TRA TÀI KHOẢN BỊ KHÓA
+  // Đọc users/{uid}.status sau khi đăng nhập thành công.
+  // Nếu status là "locked" thì đăng xuất ngay và chặn người dùng vào app.
+  // Nếu status thiếu, null hoặc khác "locked" thì mặc định xem như active.
+  // =========================
+  static Future<void> _ensureCurrentUserNotLocked(User user) async {
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final data = doc.data();
+    final status = data?['status']?.toString().trim().toLowerCase();
+
+    if (status != 'locked') return;
+
+    final lockedReason = data?['lockedReason']?.toString().trim();
+    final resolvedReason = lockedReason == null || lockedReason.isEmpty
+        ? 'Không có lý do cụ thể.'
+        : lockedReason;
+
+    await signOut();
+
+    throw FirebaseAuthException(
+      code: 'account-locked',
+      message: '$accountLockedMessage Lý do: $resolvedReason',
+    );
+  }
+
   // =========================
   // ROLE HELPERS
   // =========================
@@ -39,6 +68,7 @@ class AuthService {
 
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
+      await _ensureCurrentUserNotLocked(cred.user!);
     }
 
     return cred;
@@ -61,6 +91,8 @@ class AuthService {
         message: 'Không tìm thấy tài khoản admin hiện tại',
       );
     }
+
+    await _ensureCurrentUserNotLocked(user);
 
     final doc = await _firestore.collection('users').doc(user.uid).get();
     final data = doc.data();
@@ -148,6 +180,7 @@ class AuthService {
 
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
+      await _ensureCurrentUserNotLocked(cred.user!);
     }
 
     return cred;
@@ -193,6 +226,7 @@ class AuthService {
 
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
+      await _ensureCurrentUserNotLocked(cred.user!);
     }
 
     return cred;

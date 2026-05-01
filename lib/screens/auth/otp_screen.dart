@@ -63,6 +63,164 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     );
   }
 
+  String _lockedReasonFromMessage(String? message) {
+    final text = message?.trim();
+    if (text == null || text.isEmpty) return 'Không có lý do cụ thể.';
+
+    const reasonLabel = 'Lý do:';
+    final reasonIndex = text.indexOf(reasonLabel);
+    if (reasonIndex == -1) return text;
+
+    final reason = text.substring(reasonIndex + reasonLabel.length).trim();
+    return reason.isEmpty ? 'Không có lý do cụ thể.' : reason;
+  }
+
+  Future<void> _showLockedAccountDialog(String? message) async {
+    if (!mounted) return;
+
+    final reason = _lockedReasonFromMessage(message);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE9E2),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFFFB59F),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.lock_rounded,
+                      color: Color(0xFFE85D3F),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Tài khoản đã bị khóa',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Tài khoản của bạn hiện đang bị tạm khóa bởi quản trị viên.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4EC),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFFFCDBD),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Lý do',
+                          style: TextStyle(
+                            color: Color(0xFFC94D35),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          reason,
+                          style: const TextStyle(
+                            color: Color(0xFF884333),
+                            fontSize: 14,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ quản trị viên để được hỗ trợ.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13.5,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        foregroundColor: AppColors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Đã hiểu',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _startResendTimer() {
     _resendSeconds = 60;
     Future.doWhile(() async {
@@ -133,7 +291,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
       String message = 'Xác minh OTP thất bại';
 
-      if (e.code == 'invalid-verification-code') {
+      if (e.code == 'account-locked') {
+        await _showLockedAccountDialog(
+          e.message ?? AuthService.accountLockedMessage,
+        );
+        return;
+      } else if (e.code == 'invalid-verification-code') {
         message = 'Mã OTP không đúng';
       } else if (e.code == 'session-expired') {
         message = 'Mã OTP đã hết hạn';
