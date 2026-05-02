@@ -138,6 +138,17 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ảnh chính')));
       return;
     }
+    
+    // Add location validation
+    if (_latitude == null || _longitude == null || (_latitude == 0.0 && _longitude == 0.0)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Vui lòng chọn vị trí phòng trên bản đồ trước khi đăng.'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
     setState(() => _isLoading = true);
     String finalMainImg = _mainImage ?? '';
     if (_mainImage != null && !_mainImage!.startsWith('http') && !_mainImage!.startsWith('assets/')) {

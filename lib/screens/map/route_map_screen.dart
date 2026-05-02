@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -32,6 +34,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
   Future<void> _loadRoute() async {
     try {
+      // Platform check for GPS accuracy warning
+      if (kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux))) {
+        await _showPlatformWarning();
+      }
+
       if (widget.room.latitude == 0.0 || widget.room.longitude == 0.0) {
         _showErrorDialog('Phòng này chưa có tọa độ để chỉ đường');
         if (mounted) setState(() => _isLoading = false);
@@ -149,6 +156,32 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       _showError('Có lỗi xảy ra: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showPlatformWarning() async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Lưu ý vị trí'),
+          ],
+        ),
+        content: const Text(
+          'Bạn đang sử dụng thiết bị máy tính hoặc trình duyệt web. Vị trí hiện tại có thể không chính xác bằng thiết bị di động có GPS. '
+          'Để có trải nghiệm chỉ đường tốt nhất, vui lòng sử dụng ứng dụng trên điện thoại.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String message) {

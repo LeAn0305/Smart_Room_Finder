@@ -158,6 +158,16 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                     const SizedBox(height: 8),
                                     GestureDetector(
                                       onTap: () {
+                                        if (room.latitude == 0 || room.longitude == 0) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Phòng này chưa có tọa độ để chỉ đường.'),
+                                              backgroundColor: Colors.orange,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                          return;
+                                        }
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
