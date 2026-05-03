@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "154072375713",
+    "project_id": "smart-room-finder-app-firebase",
+    "storage_bucket": "smart-room-finder-app-firebase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:154072375713:android:c281b06fa515de96462be0",
+        "android_client_info": {
+          "package_name": "com.example.smart_room_finder"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "154072375713-snru8hj1ra0dbf5pefr2jcet0u63i2h4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smart_room_finder",
+            "certificate_hash": "31f2f0898274655ef4bb97354ee0ce06d8f503d2"
+          }
+        },
+        {
+          "client_id": "154072375713-atrtea208242p9i1421jbv5bstl5a64j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeXHGaDXbotYlIMc1wVIiwzOpq2dES_Jc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "154072375713-atrtea208242p9i1421jbv5bstl5a64j.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "154072375713-2kr93nqvgaupkojj7oetdu46jjqsf0tm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smartRoomFinder"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
