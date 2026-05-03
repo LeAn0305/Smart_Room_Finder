@@ -10,7 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/image_service.dart';
-
+import 'package:latlong2/latlong.dart';
+import 'package:smart_room_finder/screens/map/map_picker_screen.dart';
 class PostRoomScreen extends StatefulWidget {
   final RoomModel? editRoom;
   const PostRoomScreen({super.key, this.editRoom});
@@ -31,7 +32,15 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   int _durationDays = 30;
   final List<String> _selectedAmenities = [];
   bool _isLoading = false;
-  List<String> _images = [];
+  // _mainImage / _subImages: lưu URL http (ảnh cũ khi edit) hoặc path để preview
+  String? _mainImage;
+  List<String> _subImages = [];
+  // _mainXFile / _subXFiles: lưu XFile khi người dùng vừa chọn ảnh mới
+  // Dùng để upload qua uploadXFile() (hỗ trợ Web, đúng ContentType)
+  XFile? _mainXFile;
+  final List<XFile> _subXFiles = [];
+  double? _latitude;
+  double? _longitude;
   final ImagePicker _picker = ImagePicker();
 
   bool get isEditing => widget.editRoom != null;
@@ -56,10 +65,13 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
       _selectedDirection = r.direction;
       _bedrooms = r.bedrooms;
       _selectedAmenities.addAll(r.amenities);
+      _latitude = r.latitude != 0 ? r.latitude : null;
+      _longitude = r.longitude != 0 ? r.longitude : null;
+      if (r.imageUrl.isNotEmpty) {
+        _mainImage = r.imageUrl;
+      }
       if (r.images.isNotEmpty) {
-        _images = List.from(r.images);
-      } else if (r.imageUrl.isNotEmpty) {
-        _images = [r.imageUrl];
+        _subImages = List.from(r.images);
       }
     }
   }
@@ -71,12 +83,13 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickMainImage() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          _images.add(image.path);
+          _mainXFile = image;       // lưu XFile để upload đúng ContentType
+          _mainImage = image.path;  // lưu path để preview
         });
       }
     } catch (e) {
@@ -84,16 +97,52 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
-  void _removeImage(int index) {
+  Future<void> _pickSubImage() async {
+    if (_subImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tối đa 5 ảnh phụ')));
+      return;
+    }
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _subXFiles.add(image);       // lưu XFile để upload
+          _subImages.add(image.path);  // lưu path để preview
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeSubImage(int index) {
     setState(() {
-      _images.removeAt(index);
+      _subImages.removeAt(index);
+      // Xóa XFile tương ứng nếu là ảnh mới (chưa upload)
+      // _subXFiles song song với _subImages chỉ cho ảnh mới chọn
+      // Vì ảnh cũ (http URL) không có trong _subXFiles,
+      // chỉ xóa nếu index hợp lệ trong _subXFiles
+      if (index < _subXFiles.length) {
+        _subXFiles.removeAt(index);
+      }
     });
   }
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
-    final uploadedUrls = await ImageService().uploadImagesList(_images);
-    final room = _buildRoom(isDraft: true, uploadedUrls: uploadedUrls);
+    String finalMainImg = _mainImage ?? '';
+    if (_mainXFile != null) {
+      // Ảnh mới chọn: upload qua XFile (hỗ trợ Web, đúng ContentType)
+      finalMainImg = await ImageService().uploadXFile(_mainXFile!);
+    } else if (_mainImage != null &&
+        !_mainImage!.startsWith('http') &&
+        !_mainImage!.startsWith('assets/')) {
+      // Fallback cho Mobile nếu không có XFile
+      finalMainImg = await ImageService().uploadImage(_mainImage!);
+    }
+    // Upload ảnh phụ: phân biệt ảnh mới (XFile) và ảnh cũ (http URL)
+    final uploadedUrls = await _uploadSubImages();
+    final room = _buildRoom(isDraft: true, mainImgUrl: finalMainImg, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
       if (isEditing) {
@@ -110,11 +159,65 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
+  /// Upload ảnh phụ: ảnh mới dùng XFile, ảnh cũ (http) giữ nguyên URL.
+  Future<List<String>> _uploadSubImages() async {
+    final urls = <String>[];
+    final svc = ImageService();
+    // Ảnh phụ trong _subImages: có thể là http (ảnh cũ) hoặc local path (ảnh mới)
+    // _subXFiles chứa XFile cho các ảnh mới được chọn (theo thứ tự thêm vào)
+    int xfileIndex = 0;
+    for (final path in _subImages) {
+      if (path.startsWith('http')) {
+        // Ảnh cũ đã có URL — giữ nguyên
+        urls.add(path);
+      } else if (path.startsWith('assets/')) {
+        urls.add(path);
+      } else {
+        // Ảnh mới: dùng XFile nếu còn trong _subXFiles
+        if (xfileIndex < _subXFiles.length) {
+          final url = await svc.uploadXFile(_subXFiles[xfileIndex]);
+          xfileIndex++;
+          if (url.isNotEmpty) urls.add(url);
+        } else {
+          // Fallback Mobile
+          final url = await svc.uploadImage(path);
+          if (url.isNotEmpty) urls.add(url);
+        }
+      }
+    }
+    return urls;
+  }
+
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_mainImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ảnh chính')));
+      return;
+    }
+
+    // Kiểm tra vị trí
+    if (_latitude == null || _longitude == null || (_latitude == 0.0 && _longitude == 0.0)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Vui lòng chọn vị trí phòng trên bản đồ trước khi đăng.'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
     setState(() => _isLoading = true);
-    final uploadedUrls = await ImageService().uploadImagesList(_images);
-    final room = _buildRoom(isDraft: false, uploadedUrls: uploadedUrls);
+    String finalMainImg = _mainImage ?? '';
+    if (_mainXFile != null) {
+      // Ảnh mới chọn: upload qua XFile (hỗ trợ Web, đúng ContentType)
+      finalMainImg = await ImageService().uploadXFile(_mainXFile!);
+    } else if (_mainImage != null &&
+        !_mainImage!.startsWith('http') &&
+        !_mainImage!.startsWith('assets/')) {
+      // Fallback cho Mobile nếu không có XFile
+      finalMainImg = await ImageService().uploadImage(_mainImage!);
+    }
+    final uploadedUrls = await _uploadSubImages();
+    final room = _buildRoom(isDraft: false, mainImgUrl: finalMainImg, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
       if (isEditing) {
@@ -131,9 +234,9 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
-  RoomModel _buildRoom({required bool isDraft, List<String>? uploadedUrls}) {
+  RoomModel _buildRoom({required bool isDraft, required String mainImgUrl, List<String>? uploadedUrls}) {
   final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  final finalImages = (uploadedUrls != null && uploadedUrls.isNotEmpty) ? uploadedUrls : _images;
+  final finalImages = uploadedUrls ?? [];
 
   return RoomModel(
     id: isEditing
@@ -146,13 +249,15 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     description: _descCtrl.text.trim(),
     price: double.tryParse(_priceCtrl.text.trim()) ?? 0,
     address: _addressCtrl.text.trim(),
-    imageUrl: finalImages.isNotEmpty
-        ? finalImages.first
+    imageUrl: mainImgUrl.isNotEmpty
+        ? mainImgUrl
         : 'assets/images/room_studio_luxury.png',
     images: finalImages,
     rating: isEditing ? widget.editRoom!.rating : 0.0,
     type: _selectedType,
     location: 'TP. Ho Chi Minh',
+    latitude: _latitude ?? 0.0,
+    longitude: _longitude ?? 0.0,
     amenities: _selectedAmenities,
     area: double.tryParse(_areaCtrl.text.trim()) ?? 0,
     bedrooms: _bedrooms,
@@ -282,37 +387,78 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   Widget _buildImagePicker() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle('Anh phong'),
+      _sectionTitle('Ảnh chính (Bắt buộc)'),
+      const SizedBox(height: 12),
+      GestureDetector(
+        onTap: _pickMainImage,
+        child: Container(
+          width: double.infinity, height: 160,
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 2),
+          ),
+          child: _mainImage != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Stack(fit: StackFit.expand, children: [
+                    _mainImage!.startsWith('assets/')
+                        ? Image.asset(_mainImage!, fit: BoxFit.cover)
+                        : _mainImage!.startsWith('http') || kIsWeb
+                            ? Image.network(_mainImage!, fit: BoxFit.cover)
+                            : Image.file(File(_mainImage!), fit: BoxFit.cover),
+                    Positioned(top: 8, right: 8, child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                    )),
+                  ]),
+                )
+              : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(color: AppColors.mintSoft, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_photo_alternate_rounded, color: AppColors.teal, size: 28)),
+                  const SizedBox(height: 8),
+                  const Text('Thêm ảnh chính', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w600, fontSize: 14)),
+                ]),
+        ),
+      ),
+      const SizedBox(height: 20),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _sectionTitle('Ảnh phụ (Tối đa 5 ảnh)'),
+          Text('${_subImages.length}/5', style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+        ],
+      ),
       const SizedBox(height: 12),
       SizedBox(
-        height: 120,
+        height: 100,
         child: ListView(scrollDirection: Axis.horizontal, children: [
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              width: 120, height: 120,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 2),
+          if (_subImages.length < 5)
+            GestureDetector(
+              onTap: _pickSubImage,
+              child: Container(
+                width: 100, height: 100,
+                margin: const EdgeInsets.only(right: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.teal.withValues(alpha: 0.4), width: 2, style: BorderStyle.solid),
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.add_rounded, color: AppColors.teal, size: 28),
+                  const SizedBox(height: 4),
+                  const Text('Thêm', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w600, fontSize: 12)),
+                ]),
               ),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Container(padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(color: AppColors.mintSoft, shape: BoxShape.circle),
-                    child: const Icon(Icons.add_photo_alternate_rounded, color: AppColors.teal, size: 24)),
-                const SizedBox(height: 6),
-                const Text('Them anh', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w600, fontSize: 12)),
-              ]),
             ),
-          ),
-          ..._images.asMap().entries.map((entry) {
+          ..._subImages.asMap().entries.map((entry) {
             final int index = entry.key;
             final String imgPath = entry.value;
             final isAsset = imgPath.startsWith('assets/');
             final isNetwork = imgPath.startsWith('http');
             
             return Container(
-              width: 120, height: 120,
+              width: 100, height: 100,
               margin: const EdgeInsets.only(right: 10),
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
               child: ClipRRect(
@@ -324,7 +470,7 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                           ? Image.network(imgPath, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft))
                           : Image.file(File(imgPath), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: AppColors.mintSoft)),
                   Positioned(top: 4, right: 4, child: GestureDetector(
-                    onTap: () => _removeImage(index),
+                    onTap: () => _removeSubImage(index),
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
@@ -342,7 +488,36 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   Widget _buildMapPlaceholder() {
     return GestureDetector(
-      onTap: () {},
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MapPickerScreen(
+              initialLocation: _latitude != null && _longitude != null
+                  ? LatLng(_latitude!, _longitude!)
+                  : null,
+            ),
+          ),
+        );
+        if (result != null && result is Map<String, dynamic>) {
+          setState(() {
+            final LatLng loc = result['location'];
+            _latitude = loc.latitude;
+            _longitude = loc.longitude;
+            
+            // Auto-fill address if empty
+            if (_addressCtrl.text.isEmpty || _addressCtrl.text == 'TP. Ho Chi Minh') {
+              _addressCtrl.text = result['address'] ?? '';
+            }
+          });
+        } else if (result != null && result is LatLng) {
+          // Backward compatibility if picker still returns just LatLng
+          setState(() {
+            _latitude = result.latitude;
+            _longitude = result.longitude;
+          });
+        }
+      },
       child: Container(
         height: 120, width: double.infinity,
         decoration: BoxDecoration(
@@ -358,10 +533,11 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
           Center(child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(12)),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.my_location_rounded, color: Colors.white, size: 16),
-              SizedBox(width: 8),
-              Text('Chon vi tri tren ban do', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.my_location_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(_latitude != null && _longitude != null ? 'Đã chọn vị trí' : 'Chọn vị trí trên bản đồ', 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
             ]),
           )),
         ]),

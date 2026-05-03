@@ -1,9 +1,14 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
+import 'package:smart_room_finder/screens/map/route_map_screen.dart';
+import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
+import 'package:smart_room_finder/screens/room_detail/widgets/review_section.dart';
 import 'package:smart_room_finder/services/view_history_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
@@ -17,10 +22,12 @@ class RoomDetailScreen extends StatefulWidget {
 
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int _selectedImage = 0;
+  late RoomModel _room;
 
   @override
   void initState() {
     super.initState();
+    _room = widget.room;
     _saveViewHistory();
   }
 
@@ -33,20 +40,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   List<String> get _images {
-    final base = [widget.room.imageUrl];
-    final extras = [
-      'assets/images/room_studio_luxury.png',
-      'assets/images/room_apartment_mini.png',
-      'assets/images/room_muji_studio.png',
-      'assets/images/room_apartment_horizon.png',
-    ].where((e) => e != widget.room.imageUrl).take(3).toList();
-
+    final base = [_room.imageUrl];
+    final extras = _room.images.where((e) => e != _room.imageUrl).toList();
     return [...base, ...extras];
   }
 
   @override
   Widget build(BuildContext context) {
-    final room = widget.room;
+    final room = _room;
     final isWideScreen = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(
@@ -109,7 +110,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '(124)',
+                                    '(${room.totalReviews})',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppColors.textSecondary.withValues(alpha: 
@@ -143,13 +144,53 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                               ),
                               const SizedBox(width: 6),
                               Expanded(
-                                child: Text(
-                                  room.address,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      room.address,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: () {
+                                        if (room.latitude == 0 || room.longitude == 0) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Phòng này chưa có tọa độ để chỉ đường.'),
+                                              backgroundColor: Colors.orange,
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => RouteMapScreen(room: room),
+                                          ),
+                                        );
+                                      },
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.directions_rounded, size: 16, color: AppColors.teal),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Chỉ đường',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.teal,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -241,6 +282,29 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                 )
                                 .toList(),
                           ),
+                          const SizedBox(height: 20),
+                          const Divider(color: AppColors.mintSoft),
+                          const SizedBox(height: 20),
+                          ReviewSection(
+                            room: room,
+                            onReviewAdded: () async {
+                              // Fetch updated rooms
+                              final provider = Provider.of<RoomProvider>(context, listen: false);
+                              await provider.fetchRooms();
+                              
+                              final updatedRooms = provider.allRooms;
+                              final updatedRoom = updatedRooms.firstWhere(
+                                (r) => r.id == _room.id,
+                                orElse: () => _room,
+                              );
+                              
+                              if (mounted) {
+                                setState(() {
+                                  _room = updatedRoom;
+                                });
+                              }
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -262,6 +326,17 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   ),
                   Row(
                     children: [
+                      _circleBtn(Icons.flag_rounded, () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (context) => ReportBottomSheet(room: room),
+                        );
+                      }),
+                      const SizedBox(width: 10),
                       _circleBtn(Icons.share_rounded, () {}),
                       const SizedBox(width: 10),
                       _circleBtn(
@@ -363,7 +438,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.teal.withOpacity(0.4),
+                              color: AppColors.teal.withValues(alpha: 0.4),
                               blurRadius: 14,
                               offset: const Offset(0, 6),
                             ),
