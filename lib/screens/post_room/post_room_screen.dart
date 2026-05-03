@@ -32,8 +32,13 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   int _durationDays = 30;
   final List<String> _selectedAmenities = [];
   bool _isLoading = false;
+  // _mainImage / _subImages: lưu URL http (ảnh cũ khi edit) hoặc path để preview
   String? _mainImage;
   List<String> _subImages = [];
+  // _mainXFile / _subXFiles: lưu XFile khi người dùng vừa chọn ảnh mới
+  // Dùng để upload qua uploadXFile() (hỗ trợ Web, đúng ContentType)
+  XFile? _mainXFile;
+  final List<XFile> _subXFiles = [];
   double? _latitude;
   double? _longitude;
   final ImagePicker _picker = ImagePicker();
@@ -82,7 +87,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() => _mainImage = image.path);
+        setState(() {
+          _mainXFile = image;       // lưu XFile để upload đúng ContentType
+          _mainImage = image.path;  // lưu path để preview
+        });
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
@@ -97,7 +105,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        setState(() => _subImages.add(image.path));
+        setState(() {
+          _subXFiles.add(image);       // lưu XFile để upload
+          _subImages.add(image.path);  // lưu path để preview
+        });
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
@@ -105,16 +116,32 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   }
 
   void _removeSubImage(int index) {
-    setState(() => _subImages.removeAt(index));
+    setState(() {
+      _subImages.removeAt(index);
+      // Xóa XFile tương ứng nếu là ảnh mới (chưa upload)
+      // _subXFiles song song với _subImages chỉ cho ảnh mới chọn
+      // Vì ảnh cũ (http URL) không có trong _subXFiles,
+      // chỉ xóa nếu index hợp lệ trong _subXFiles
+      if (index < _subXFiles.length) {
+        _subXFiles.removeAt(index);
+      }
+    });
   }
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
     String finalMainImg = _mainImage ?? '';
-    if (_mainImage != null && !_mainImage!.startsWith('http') && !_mainImage!.startsWith('assets/')) {
+    if (_mainXFile != null) {
+      // Ảnh mới chọn: upload qua XFile (hỗ trợ Web, đúng ContentType)
+      finalMainImg = await ImageService().uploadXFile(_mainXFile!);
+    } else if (_mainImage != null &&
+        !_mainImage!.startsWith('http') &&
+        !_mainImage!.startsWith('assets/')) {
+      // Fallback cho Mobile nếu không có XFile
       finalMainImg = await ImageService().uploadImage(_mainImage!);
     }
-    final uploadedUrls = await ImageService().uploadImagesList(_subImages);
+    // Upload ảnh phụ: phân biệt ảnh mới (XFile) và ảnh cũ (http URL)
+    final uploadedUrls = await _uploadSubImages();
     final room = _buildRoom(isDraft: true, mainImgUrl: finalMainImg, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {
@@ -132,14 +159,43 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     }
   }
 
+  /// Upload ảnh phụ: ảnh mới dùng XFile, ảnh cũ (http) giữ nguyên URL.
+  Future<List<String>> _uploadSubImages() async {
+    final urls = <String>[];
+    final svc = ImageService();
+    // Ảnh phụ trong _subImages: có thể là http (ảnh cũ) hoặc local path (ảnh mới)
+    // _subXFiles chứa XFile cho các ảnh mới được chọn (theo thứ tự thêm vào)
+    int xfileIndex = 0;
+    for (final path in _subImages) {
+      if (path.startsWith('http')) {
+        // Ảnh cũ đã có URL — giữ nguyên
+        urls.add(path);
+      } else if (path.startsWith('assets/')) {
+        urls.add(path);
+      } else {
+        // Ảnh mới: dùng XFile nếu còn trong _subXFiles
+        if (xfileIndex < _subXFiles.length) {
+          final url = await svc.uploadXFile(_subXFiles[xfileIndex]);
+          xfileIndex++;
+          if (url.isNotEmpty) urls.add(url);
+        } else {
+          // Fallback Mobile
+          final url = await svc.uploadImage(path);
+          if (url.isNotEmpty) urls.add(url);
+        }
+      }
+    }
+    return urls;
+  }
+
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_mainImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ảnh chính')));
       return;
     }
-    
-    // Add location validation
+
+    // Kiểm tra vị trí
     if (_latitude == null || _longitude == null || (_latitude == 0.0 && _longitude == 0.0)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Vui lòng chọn vị trí phòng trên bản đồ trước khi đăng.'),
@@ -151,10 +207,16 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
     setState(() => _isLoading = true);
     String finalMainImg = _mainImage ?? '';
-    if (_mainImage != null && !_mainImage!.startsWith('http') && !_mainImage!.startsWith('assets/')) {
+    if (_mainXFile != null) {
+      // Ảnh mới chọn: upload qua XFile (hỗ trợ Web, đúng ContentType)
+      finalMainImg = await ImageService().uploadXFile(_mainXFile!);
+    } else if (_mainImage != null &&
+        !_mainImage!.startsWith('http') &&
+        !_mainImage!.startsWith('assets/')) {
+      // Fallback cho Mobile nếu không có XFile
       finalMainImg = await ImageService().uploadImage(_mainImage!);
     }
-    final uploadedUrls = await ImageService().uploadImagesList(_subImages);
+    final uploadedUrls = await _uploadSubImages();
     final room = _buildRoom(isDraft: false, mainImgUrl: finalMainImg, uploadedUrls: uploadedUrls);
     setState(() => _isLoading = false);
     if (mounted) {

@@ -1,5 +1,5 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -26,50 +26,70 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
   String _duration = '';
   bool _isLoading = true;
 
+  // Kiểm tra Desktop/Web — dùng flutter/foundation.dart, không dùng dart:io
+  static final bool _isDesktopOrWeb = kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux;
+
+  // Dùng flag state để hiện cảnh báo vị trí Desktop/Web trong UI,
+  // KHÔNG gọi showDialog trong async context để tránh lỗi Localizations.
+  bool _showDesktopWarning = false;
+
   @override
   void initState() {
     super.initState();
-    _loadRoute();
+
+    // Gọi _loadRoute() sau khi frame đầu tiên đã build xong
+    // để tránh lỗi dependOnInheritedWidgetOfExactType.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadRoute();
+    });
   }
 
   Future<void> _loadRoute() async {
-    try {
-      // Platform check for GPS accuracy warning
-      if (kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux))) {
-        await _showPlatformWarning();
-      }
-
-      if (widget.room.latitude == 0.0 || widget.room.longitude == 0.0) {
+    // Kiểm tra tọa độ phòng — phải làm trước mọi thứ khác
+    if (widget.room.latitude == 0.0 || widget.room.longitude == 0.0) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         _showErrorDialog('Phòng này chưa có tọa độ để chỉ đường');
-        if (mounted) setState(() => _isLoading = false);
-        return;
       }
-      final destination = LatLng(widget.room.latitude, widget.room.longitude);
+      return;
+    }
 
-      LatLng? origin;
+    final destination = LatLng(widget.room.latitude, widget.room.longitude);
 
-      if (widget.userLocation != null) {
-        origin = widget.userLocation;
-      } else {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        LocationPermission permission = await Geolocator.checkPermission();
+    // Hiện cảnh báo Desktop/Web qua state flag (không dùng showDialog async)
+    if (_isDesktopOrWeb && mounted) {
+      setState(() => _showDesktopWarning = true);
+    }
 
-        if (!serviceEnabled ||
-            permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          if (permission == LocationPermission.denied) {
-            permission = await Geolocator.requestPermission();
-          }
+    LatLng? origin;
+
+    if (widget.userLocation != null) {
+      origin = widget.userLocation;
+    } else {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (!serviceEnabled ||
+          permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
         }
+      }
 
-        if (!serviceEnabled ||
-            permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
+      if (!serviceEnabled ||
+          permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _isLoading = false);
           _showErrorDialog(
             'Hiện tại chưa lấy được tọa độ chính xác của vị trí của bạn. Nếu bạn vẫn muốn sử dụng chức năng này, chức năng này có thể sai lệch do vị trí của bạn đang không xác định.',
           );
-          if (mounted) setState(() => _isLoading = false);
-          // Move camera to destination
+          // Di chuyển camera đến vị trí phòng
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
               try {
@@ -77,46 +97,48 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               } catch (_) {}
             }
           });
-          return;
         }
-
-        Position? pos;
-        try {
-          pos = await Geolocator.getCurrentPosition().timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              throw Exception('Lỗi lấy vị trí: Hết thời gian chờ');
-            },
-          );
-        } catch (e) {
-          _showErrorDialog(
-            'Không thể lấy vị trí hiện tại của bạn. Vui lòng kiểm tra lại GPS hoặc quyền truy cập vị trí.',
-          );
-          if (mounted) {
-            setState(() => _isLoading = false);
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                try {
-                  _mapController.move(destination, 13);
-                } catch (_) {}
-              }
-            });
-          }
-          return;
-        }
-        origin = LatLng(pos.latitude, pos.longitude);
-      }
-
-      if (mounted && origin != null) {
-        setState(() => _currentLocation = origin);
-      }
-
-      if (origin == null) {
-        _showError('Không thể xác định vị trí khởi đầu. Vui lòng thử lại.');
-        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition().timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            throw Exception('Lỗi lấy vị trí: Hết thời gian chờ');
+          },
+        );
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showError(
+            'Không thể lấy vị trí hiện tại của bạn. Vui lòng kiểm tra lại GPS hoặc quyền truy cập vị trí.',
+          );
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              try {
+                _mapController.move(destination, 13);
+              } catch (_) {}
+            }
+          });
+        }
+        return;
+      }
+      origin = LatLng(pos.latitude, pos.longitude);
+    }
+
+    if (mounted && origin != null) {
+      setState(() => _currentLocation = origin);
+    }
+
+    if (origin == null) {
+      _showError('Không thể xác định vị trí khởi đầu. Vui lòng thử lại.');
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
       final result = await DirectionsService.getDirections(
         origin: origin,
         destination: destination,
@@ -130,7 +152,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           _isLoading = false;
         });
 
-        // Fit bounds
+        // Fit bounds để hiện toàn bộ tuyến đường
         final bounds = LatLngBounds.fromPoints([
           origin,
           destination,
@@ -158,37 +180,11 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     }
   }
 
-  Future<void> _showPlatformWarning() async {
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Lưu ý vị trí'),
-          ],
-        ),
-        content: const Text(
-          'Bạn đang sử dụng thiết bị máy tính hoặc trình duyệt web. Vị trí hiện tại có thể không chính xác bằng thiết bị di động có GPS. '
-          'Để có trải nghiệm chỉ đường tốt nhất, vui lòng sử dụng ứng dụng trên điện thoại.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đã hiểu'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
   }
 
@@ -286,6 +282,59 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               ),
             ],
           ),
+
+          // Cảnh báo vị trí Desktop/Web — hiện dưới dạng banner inline trong UI,
+          // KHÔNG dùng showDialog async để tránh lỗi Localizations trên Desktop/Web.
+          if (_showDesktopWarning)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFF3CD),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFFFE08A), width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFF856404),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Vị trí trên máy tính/trình duyệt có thể không chính xác bằng GPS trên điện thoại.',
+                          style: TextStyle(
+                            color: Color(0xFF856404),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _showDesktopWarning = false),
+                        child: const Icon(
+                          Icons.close,
+                          color: Color(0xFF856404),
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           if (_isLoading)
             const Center(
               child: Card(

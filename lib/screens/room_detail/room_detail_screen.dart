@@ -438,7 +438,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.teal.withOpacity(0.4),
+                              color: AppColors.teal.withValues(alpha: 0.4),
                               blurRadius: 14,
                               offset: const Offset(0, 6),
                             ),
