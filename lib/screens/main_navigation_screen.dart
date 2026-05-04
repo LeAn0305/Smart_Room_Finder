@@ -5,7 +5,9 @@ import 'package:smart_room_finder/core/l10n/language_provider.dart';
 import 'package:smart_room_finder/screens/home/home_screen.dart';
 import 'package:smart_room_finder/screens/map/map_screen.dart';
 import 'package:smart_room_finder/screens/favorite/favorite_screen.dart';
+import 'package:smart_room_finder/screens/chat/chat_screen.dart';
 import 'package:smart_room_finder/screens/profile/profile_screen.dart';
+import 'package:smart_room_finder/services/chat_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -21,6 +23,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const HomeScreen(),
     const MapScreen(),
     const FavoriteScreen(),
+    const ChatScreen(),
     const ProfileScreen(),
   ];
 
@@ -62,6 +65,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             BottomNavigationBarItem(
                 icon: const Icon(Icons.favorite_rounded),
                 label: lang.tr('nav_favorite')),
+            BottomNavigationBarItem(
+                icon: StreamBuilder<int>(
+                  stream: ChatService.totalUnreadStream(),
+                  builder: (context, snap) {
+                    final count = snap.data ?? 0;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded),
+                        if (count > 0)
+                          Positioned(
+                            top: -4,
+                            right: -6,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                color: Colors.redAccent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                label: 'Chat'),
             BottomNavigationBarItem(
                 icon: const Icon(Icons.person_rounded),
                 label: lang.tr('nav_profile')),

@@ -14,6 +14,7 @@ import 'package:smart_room_finder/screens/my_room/my_room_screen.dart';
 import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
+import 'package:smart_room_finder/screens/chat/chat_screen.dart';
 
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
@@ -376,7 +377,7 @@ void _onLogout() {
                         icon: Icons.message_outlined,
                         label: 'Tin nhắn / Chat',
                         subtitle: 'Nhắn tin với chủ phòng',
-                        onTap: () => _showComingSoon(),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
                       ),
                       _buildMenuItem(
                         icon: Icons.assignment_outlined,
