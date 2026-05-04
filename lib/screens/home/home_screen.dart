@@ -4,16 +4,12 @@ import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
-import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
-import 'package:smart_room_finder/services/fcm_service.dart';
-import 'package:smart_room_finder/services/notification_permission_service.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
-import 'package:smart_room_finder/screens/notification/notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +20,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategory = 'Tất cả';
-  UserModel? _currentUser;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   int _bannerPage = 0;
@@ -65,7 +60,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUser();
 
     _searchCtrl.addListener(
       () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()),
@@ -81,21 +75,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       await favoriteProvider.syncFavoritesForCurrentUser();
-
-      // Xin quyền notification (Android 13+) và khởi tạo FCM
-      if (mounted) {
-        // Android: xin quyền qua permission_handler
-        // Web: Firebase Messaging tự xử lý khi gọi getToken()
-        // Windows/Desktop: bỏ qua
-        final granted = await NotificationPermissionService.requestWithExplanation(context);
-        if (granted) {
-          await FCMService.initFCM();
-        } else {
-          // Trên Web, vẫn thử init FCM (browser sẽ hỏi quyền)
-          if (!mounted) return;
-          await FCMService.initFCM();
-        }
-      }
     });
 
     Future.delayed(const Duration(seconds: 3), _autoScroll);
@@ -112,243 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(seconds: 3), _autoScroll);
   }
 
-  Future<void> _loadUser() async {
-    final u = await AuthService.getCurrentUserData();
-    if (mounted) {
-      setState(() {
-        _currentUser = u;
-      });
-    }
-  }
-
   void _toggleFavorite(RoomModel room) {
     context.read<FavoriteProvider>().toggleFavorite(room.id);
-  }
-
-  /// Mở filter sheet trực tiếp từ Home (không qua màn trung gian).
-  /// Sau khi bấm Áp dụng sẽ push sang SearchResultScreen với các filter đã chọn.
-  void _showHomeFilterSheet(BuildContext context) {
-    // Các giá trị filter tạm thời trong sheet
-    String tempType = 'Tất cả';
-    String tempLocation = 'Tất cả';
-    String tempPrice = 'Tất cả';
-    String tempArea = 'Tất cả';
-    Set<String> tempAmenities = {};
-
-    final types = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
-    final locations = ['Tất cả', 'Quận 1', 'Quận 3', 'Quận 7', 'Quận 10', 'Bình Thạnh', 'Tân Bình', 'Gò Vấp', 'Thủ Đức'];
-    final priceRanges = [
-      'Tất cả', 'Dưới 1 triệu', '1 - 5 triệu', '5 - 10 triệu',
-      '10 - 15 triệu', '15 - 20 triệu', 'Trên 20 triệu',
-    ];
-    final areaRanges = [
-      'Tất cả', 'Dưới 20m²', '20 - 40m²', '40 - 60m²', '60 - 100m²', 'Trên 100m²',
-    ];
-    final amenities = [
-      ('Wifi', Icons.wifi_rounded),
-      ('Máy lạnh', Icons.ac_unit_rounded),
-      ('Tủ lạnh', Icons.kitchen_rounded),
-      ('Máy giặt', Icons.local_laundry_service_rounded),
-      ('Bếp', Icons.outdoor_grill_rounded),
-      ('Chỗ để xe', Icons.directions_car_rounded),
-      ('Bảo vệ', Icons.security_rounded),
-      ('Hồ bơi', Icons.pool_rounded),
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Container(
-          height: MediaQuery.of(context).size.height * 0.85,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40, height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-              ),
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Bộ lọc nâng cao',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        tempType = 'Tất cả';
-                        tempLocation = 'Tất cả';
-                        tempPrice = 'Tất cả';
-                        tempArea = 'Tất cả';
-                        tempAmenities.clear();
-                      }),
-                      child: const Text('Xóa tất cả', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700)),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Loại phòng
-                      _filterSheetLabel('🏠 Loại phòng'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: types.map((t) => _filterSheetChip(
-                          label: t, selected: tempType == t,
-                          onTap: () => setSheetState(() => tempType = t),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                      // Khu vực
-                      _filterSheetLabel('📍 Khu vực'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: locations.map((l) => _filterSheetChip(
-                          label: l, selected: tempLocation == l,
-                          onTap: () => setSheetState(() => tempLocation = l),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                      // Khoảng giá
-                      _filterSheetLabel('💰 Khoảng giá'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: priceRanges.map((p) => _filterSheetChip(
-                          label: p, selected: tempPrice == p,
-                          onTap: () => setSheetState(() => tempPrice = p),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                      // Diện tích
-                      _filterSheetLabel('📐 Diện tích'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: areaRanges.map((a) => _filterSheetChip(
-                          label: a, selected: tempArea == a,
-                          onTap: () => setSheetState(() => tempArea = a),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                      // Tiện ích
-                      _filterSheetLabel('✨ Tiện ích'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8, runSpacing: 8,
-                        children: amenities.map((a) {
-                          final sel = tempAmenities.contains(a.$1);
-                          return GestureDetector(
-                            onTap: () => setSheetState(() {
-                              if (sel) tempAmenities.remove(a.$1);
-                              else tempAmenities.add(a.$1);
-                            }),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: sel ? AppColors.teal.withValues(alpha: 0.1) : Colors.grey[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: sel ? AppColors.teal : Colors.grey[200]!,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(a.$2, size: 15, color: sel ? AppColors.teal : AppColors.textSecondary),
-                                  const SizedBox(width: 6),
-                                  Text(a.$1, style: TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w600,
-                                    color: sel ? AppColors.tealDark : AppColors.textPrimary,
-                                  )),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-              // Nút Áp dụng — đóng sheet và push sang SearchResultScreen với filter
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx); // Đóng sheet
-                      // Push sang SearchResultScreen với filter đã chọn
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SearchResultScreen(
-                            initialType: tempType,
-                            initialLocation: tempLocation,
-                            initialPrice: tempPrice,
-                            initialArea: tempArea,
-                            initialAmenities: Set.from(tempAmenities),
-                          ),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    child: const Text('Áp dụng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _filterSheetLabel(String text) => Text(text,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
-
-  Widget _filterSheetChip({required String label, required bool selected, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.teal : Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? AppColors.teal : Colors.grey[200]!, width: 1.5),
-        ),
-        child: Text(label, style: TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w700,
-          color: selected ? Colors.white : AppColors.textPrimary,
-        )),
-      ),
-    );
   }
 
   List<RoomModel> _applyFilters(List<RoomModel> rooms, PreferenceProvider pref) {
@@ -381,11 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Dùng _currentUser nếu đã load xong; không fallback về sampleUsers để tránh hiển thị sai tên
-    final user = _currentUser;
-    final displayName = user?.name ?? '...';
-    final displayAvatar = user?.profileImageUrl ?? '';
-    final displayLocation = user?.location ?? 'TP. Hồ Chí Minh';
+    final user = UserModel.sampleUsers.first;
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -419,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Text(
-                              displayName,
+                              user.name,
                               style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
@@ -428,43 +168,28 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        Row(
-                          children: [
-                            // Icon chuông thông báo
-                            GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const NotificationScreen(),
-                                ),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.06),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.teal, width: 2),
+                          ),
+                          child: CircleAvatar(
+                            radius: 24,
+                            backgroundColor: AppColors.mintGreen,
+                            backgroundImage: user.profileImageUrl.isNotEmpty
+                                ? NetworkImage(user.profileImageUrl)
+                                : null,
+                            child: user.profileImageUrl.isEmpty
+                                ? Text(
+                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: AppColors.teal,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Avatar user — dùng _UserAvatar để handle lỗi load ảnh
-                            _UserAvatar(
-                              imageUrl: displayAvatar,
-                              displayName: displayName,
-                            ),
-                          ],
+                                  )
+                                : null,
+                          ),
                         ),
                       ],
                     ),
@@ -511,11 +236,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 )
                               : GestureDetector(
-                                  onTap: () {
-                                    // Mở filter sheet trực tiếp từ Home
-                                    // Sau khi Áp dụng sẽ push sang SearchResultScreen với filter đã chọn
-                                    _showHomeFilterSheet(context);
-                                  },
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const SearchResultScreen(),
+                                    ),
+                                  ),
                                   child: const Icon(
                                     Icons.tune_rounded,
                                     color: AppColors.teal,
@@ -544,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          displayLocation,
+                          user.location,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w600,
@@ -877,64 +604,4 @@ class _BannerData {
     required this.subtitle,
     required this.badge,
   });
-}
-
-/// Widget hiển thị avatar user, fallback về chữ cái đầu tên nếu không có ảnh hoặc lỗi load
-class _UserAvatar extends StatelessWidget {
-  final String imageUrl;
-  final String displayName;
-
-  const _UserAvatar({required this.imageUrl, required this.displayName});
-
-  @override
-  Widget build(BuildContext context) {
-    final initials = displayName.isNotEmpty
-        ? displayName.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
-        : '?';
-
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.teal.withValues(alpha: 0.15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: imageUrl.isNotEmpty
-            ? Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => _buildInitials(initials),
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return _buildInitials(initials);
-                },
-              )
-            : _buildInitials(initials),
-      ),
-    );
-  }
-
-  Widget _buildInitials(String initials) {
-    return Container(
-      color: AppColors.teal.withValues(alpha: 0.15),
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: AppColors.teal,
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
-          ),
-        ),
-      ),
-    );
-  }
 }

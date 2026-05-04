@@ -31,7 +31,6 @@ class UserModel {
   final bool hasSelectedRole;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final String? fcmToken;
 
   const UserModel({
     required this.id,
@@ -44,7 +43,6 @@ class UserModel {
     this.hasSelectedRole = false,
     this.createdAt,
     this.updatedAt,
-    this.fcmToken,
   });
 
   factory UserModel.fromFirebase(Map<String, dynamic> json, String docId) {
@@ -61,7 +59,6 @@ class UserModel {
       hasSelectedRole: json['hasSelectedRole'] ?? (parsedRole != null),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
-      fcmToken: json['fcmToken'],
     );
   }
 
@@ -76,7 +73,6 @@ class UserModel {
       'updatedAt': updatedAt?.toIso8601String(),
       'role': role?.value,
       'hasSelectedRole': hasSelectedRole,
-      if (fcmToken != null) 'fcmToken': fcmToken,
     };
   }
 
@@ -91,7 +87,6 @@ class UserModel {
           DateTime.now().toIso8601String(),
       'role': role?.value,
       'hasSelectedRole': hasSelectedRole,
-      if (fcmToken != null) 'fcmToken': fcmToken,
     };
   }
 
@@ -107,7 +102,6 @@ class UserModel {
     String? phoneNumber,
     DateTime? createdAt,
     DateTime? updatedAt,
-    String? fcmToken,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -120,7 +114,6 @@ class UserModel {
       updatedAt: updatedAt ?? this.updatedAt,
       role: clearRole ? null : (role ?? this.role),
       hasSelectedRole: hasSelectedRole ?? this.hasSelectedRole,
-      fcmToken: fcmToken ?? this.fcmToken,
     );
   }
 
