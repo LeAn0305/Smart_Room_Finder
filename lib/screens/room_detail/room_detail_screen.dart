@@ -688,7 +688,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           ),
         ),
         GestureDetector(
-          onTap: () => _openChatWithOwner(context),
+          onTap: () async => _openChatWithOwner(context),
           child: _actionBtn(
             Icons.chat_bubble_rounded,
             AppColors.teal.withValues(alpha: 0.1),
@@ -714,6 +714,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     }
 
     final room = widget.room;
+
+    // Nếu là chủ phòng thì không chat với chính mình
     if (room.ownerId == uid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đây là phòng của bạn')),
@@ -721,20 +723,48 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       return;
     }
 
+    // Hiện loading
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Đang mở chat...'),
+            ],
+          ),
+          duration: Duration(seconds: 10),
+          backgroundColor: AppColors.teal,
+        ),
+      );
+    }
+
     try {
       final now = DateTime.now().toIso8601String();
+      final displayName =
+          FirebaseAuth.instance.currentUser?.displayName ?? 'Người thuê';
+
       final chat = ChatModel(
         id: '',
         roomId: room.id,
         roomTitle: room.title,
-        roomImageUrl: room.imageUrl.isNotEmpty ? room.imageUrl : room.mainImageUrl,
-        ownerId: room.ownerId,
+        roomImageUrl:
+            room.imageUrl.isNotEmpty ? room.imageUrl : room.mainImageUrl,
+        ownerId: room.ownerId.isNotEmpty ? room.ownerId : uid,
         ownerName: room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà',
         renterId: uid,
-        renterName: FirebaseAuth.instance.currentUser?.displayName ?? 'Người thuê',
+        renterName: displayName,
         lastMessage: '',
         lastSenderId: uid,
-        participants: [uid, room.ownerId],
+        participants: [uid, room.ownerId.isNotEmpty ? room.ownerId : uid],
         createdAt: now,
         updatedAt: now,
       );
@@ -743,14 +773,21 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       final chatWithId = chat.copyWith(id: chatId);
 
       if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => ChatDetailScreen(chat: chatWithId)),
       );
     } catch (e) {
+      debugPrint('❌ Lỗi mở chat: $e');
       if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text('Không thể mở chat: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
