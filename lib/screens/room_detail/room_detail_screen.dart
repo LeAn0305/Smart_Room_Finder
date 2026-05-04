@@ -2,13 +2,18 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 import 'package:smart_room_finder/screens/map/route_map_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/review_section.dart';
+import 'package:smart_room_finder/screens/application/send_application_screen.dart';
+import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
+import 'package:smart_room_finder/services/chat_service.dart';
 import 'package:smart_room_finder/services/view_history_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
@@ -422,10 +427,21 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
+                        final uid = FirebaseAuth.instance.currentUser?.uid;
+                        if (uid == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng đăng nhập để đặt phòng'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
+                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BookingStatusScreen(room: room),
+                            builder: (_) =>
+                                SendApplicationScreen(room: room),
                           ),
                         );
                       },
@@ -640,6 +656,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   Widget _buildHostSection() {
+    final room = widget.room;
     return Row(
       children: [
         const CircleAvatar(
@@ -651,16 +668,16 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Nguyễn Văn A',
-                style: TextStyle(
+              Text(
+                room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
                 ),
               ),
               Text(
-                'Chủ nhà siêu cấp • 5 năm kinh nghiệm',
+                'Chủ nhà • Smart Room Finder',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary.withValues(alpha: 0.8),
@@ -670,15 +687,72 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             ],
           ),
         ),
-        _actionBtn(
-          Icons.chat_bubble_rounded,
-          AppColors.teal.withValues(alpha: 0.1),
-          AppColors.teal,
+        GestureDetector(
+          onTap: () => _openChatWithOwner(context),
+          child: _actionBtn(
+            Icons.chat_bubble_rounded,
+            AppColors.teal.withValues(alpha: 0.1),
+            AppColors.teal,
+          ),
         ),
         const SizedBox(width: 10),
         _actionBtn(Icons.phone_rounded, AppColors.teal, Colors.white),
       ],
     );
+  }
+
+  Future<void> _openChatWithOwner(BuildContext context) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đăng nhập để nhắn tin'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final room = widget.room;
+    if (room.ownerId == uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đây là phòng của bạn')),
+      );
+      return;
+    }
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      final chat = ChatModel(
+        id: '',
+        roomId: room.id,
+        roomTitle: room.title,
+        roomImageUrl: room.imageUrl.isNotEmpty ? room.imageUrl : room.mainImageUrl,
+        ownerId: room.ownerId,
+        ownerName: room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà',
+        renterId: uid,
+        renterName: FirebaseAuth.instance.currentUser?.displayName ?? 'Người thuê',
+        lastMessage: '',
+        lastSenderId: uid,
+        participants: [uid, room.ownerId],
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final chatId = await ChatService.getOrCreateChat(chat);
+      final chatWithId = chat.copyWith(id: chatId);
+
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChatDetailScreen(chat: chatWithId)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 
   Widget _actionBtn(IconData icon, Color bg, Color iconColor) {
