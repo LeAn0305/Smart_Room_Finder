@@ -10,7 +10,7 @@ class ChatService {
   static String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   // ── Stream danh sách chat realtime ──────────────────────
-  // Sort ở phía client theo updatedAt descending (tránh composite index)
+  // Dùng participants arrayContains để cả chủ nhà lẫn người thuê đều thấy
   static Stream<List<ChatModel>> myChatsStream() {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
@@ -22,6 +22,50 @@ class ChatService {
       final list = s.docs
           .map((d) => ChatModel.fromMap(d.data(), d.id))
           .toList();
+      // Sort mới nhất lên đầu
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return list;
+    });
+  }
+
+  // ── Stream chat theo renterId (fallback cho chủ nhà) ────
+  // Dùng khi ownerId trong document là fake (sample data)
+  static Stream<List<ChatModel>> ownerChatsStream() {
+    final uid = _uid;
+    if (uid == null) return const Stream.empty();
+
+    return _chats
+        .where('ownerId', isEqualTo: uid)
+        .snapshots()
+        .map((s) {
+      final list = s.docs
+          .map((d) => ChatModel.fromMap(d.data(), d.id))
+          .toList();
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return list;
+    });
+  }
+
+  // ── Stream kết hợp cả 2 (participants + ownerId) ────────
+  static Stream<List<ChatModel>> allMyChatsStream() {
+    final uid = _uid;
+    if (uid == null) return const Stream.empty();
+
+    // Kết hợp 2 stream: theo participants và theo ownerId
+    final s1 = _chats.where('participants', arrayContains: uid).snapshots();
+
+    return s1.asyncMap((snap1) async {
+      final snap2 = await _chats.where('ownerId', isEqualTo: uid).get();
+
+      final map = <String, ChatModel>{};
+      for (final d in snap1.docs) {
+        map[d.id] = ChatModel.fromMap(d.data(), d.id);
+      }
+      for (final d in snap2.docs) {
+        map[d.id] = ChatModel.fromMap(d.data(), d.id);
+      }
+
+      final list = map.values.toList();
       list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return list;
     });
@@ -40,16 +84,30 @@ class ChatService {
 
   // ── Tạo hoặc lấy chat ───────────────────────────────────
   static Future<String> getOrCreateChat(ChatModel chat) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Chưa đăng nhập');
+
+    // Tìm chat đã tồn tại theo roomId + renterId
+    // (không filter ownerId vì ownerId có thể là fake từ sample data)
     final existing = await _chats
         .where('roomId', isEqualTo: chat.roomId)
         .where('renterId', isEqualTo: chat.renterId)
-        .where('ownerId', isEqualTo: chat.ownerId)
         .limit(1)
         .get();
 
     if (existing.docs.isNotEmpty) return existing.docs.first.id;
 
-    final ref = await _chats.add(chat.toMap());
+    // Tạo mới — đảm bảo participants chứa cả 2 UID thật
+    final participants = <String>{chat.renterId};
+    if (chat.ownerId.isNotEmpty && chat.ownerId != chat.renterId) {
+      participants.add(chat.ownerId);
+    }
+
+    final chatToSave = chat.copyWith(
+      participants: participants.toList(),
+    );
+
+    final ref = await _chats.add(chatToSave.toMap());
     return ref.id;
   }
 
@@ -109,8 +167,20 @@ class ChatService {
         .where('participants', arrayContains: uid)
         .snapshots()
         .asyncMap((chatsSnap) async {
+      // Lấy thêm chat theo ownerId (phòng thật từ Firestore)
+      final ownerSnap =
+          await _chats.where('ownerId', isEqualTo: uid).get();
+
+      final map = <String, DocumentSnapshot>{};
+      for (final d in chatsSnap.docs) {
+        map[d.id] = d;
+      }
+      for (final d in ownerSnap.docs) {
+        map[d.id] = d;
+      }
+
       int total = 0;
-      for (final chatDoc in chatsSnap.docs) {
+      for (final chatDoc in map.values) {
         final unread = await chatDoc.reference
             .collection('messages')
             .where('isRead', isEqualTo: false)

@@ -82,7 +82,7 @@ class ChatScreen extends StatelessWidget {
 
   Widget _buildChatList(BuildContext context, String uid) {
     return StreamBuilder<List<ChatModel>>(
-      stream: ChatService.myChatsStream(),
+      stream: ChatService.allMyChatsStream(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -168,8 +168,14 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Xác định đúng vai trò dựa trên UID thực tế
     final isOwner = chat.ownerId == currentUid;
-    final otherName = isOwner ? chat.renterName : chat.ownerName;
+    final isRenter = chat.renterId == currentUid;
+    
+    // Tên người kia: nếu là chủ → hiện tên người thuê, ngược lại
+    final otherName = isOwner
+        ? chat.renterName
+        : (isRenter ? chat.ownerName : chat.ownerName);
     final isLastSentByMe = chat.lastSenderId == currentUid;
     final lastMsg = chat.lastMessage.isEmpty ? 'Bắt đầu cuộc trò chuyện' : chat.lastMessage;
     final timeStr = _formatTime(chat.updatedAt);
