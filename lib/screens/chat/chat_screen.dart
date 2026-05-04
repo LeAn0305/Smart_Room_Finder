@@ -169,14 +169,14 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Xác định đúng vai trò dựa trên UID thực tế
     final isOwner = chat.ownerId == currentUid;
     final isRenter = chat.renterId == currentUid;
     
-    // Tên và UID người kia
+    // Tên người kia: nếu là chủ → hiện tên người thuê, ngược lại
     final otherName = isOwner
         ? chat.renterName
         : (isRenter ? chat.ownerName : chat.ownerName);
-    final otherUid = isOwner ? chat.renterId : chat.ownerId;
     final isLastSentByMe = chat.lastSenderId == currentUid;
     final lastMsg = chat.lastMessage.isEmpty ? 'Bắt đầu cuộc trò chuyện' : chat.lastMessage;
     final timeStr = _formatTime(chat.updatedAt);
