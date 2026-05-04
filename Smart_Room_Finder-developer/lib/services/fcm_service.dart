@@ -1,93 +1,96 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, debugPrint, defaultTargetPlatform, TargetPlatform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:smart_room_finder/services/local_notifications_service.dart';
 
 class FCMService {
-  static final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
+  /// Kiểm tra nền tảng có hỗ trợ FCM không (Android, iOS, Web)
+  /// Windows/Linux/macOS desktop KHÔNG hỗ trợ FCM
+  static bool get _supportsFCM {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
 
   static Future<void> initFCM() async {
-    // Không hỗ trợ Windows/Desktop, tránh lỗi FlutterLocalNotificationsPlugin
-    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+    // Không hỗ trợ Windows/Linux/macOS desktop — bỏ qua hoàn toàn
+    if (!_supportsFCM) {
+      debugPrint('FCMService: Nền tảng không hỗ trợ FCM, bỏ qua khởi tạo.');
       return;
     }
 
     try {
-      // 1. Cấu hình Local Notifications để nhận thông báo khi app đang mở (Foreground)
-      const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      const DarwinInitializationSettings initializationSettingsIOS =
-          DarwinInitializationSettings();
-      const InitializationSettings initializationSettings =
-          InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsIOS,
-      );
+      // 1. Khởi tạo Local Notifications (chỉ Android/iOS, KHÔNG Windows)
+      await LocalNotificationsService.initialize();
 
-      await _localNotifications.initialize(initializationSettings);
+      // 2. Lắng nghe thông báo foreground (Android/iOS)
+      if (LocalNotificationsService.isSupported) {
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          final notification = message.notification;
+          if (notification != null) {
+            LocalNotificationsService.showNotification(
+              id: notification.hashCode,
+              title: notification.title ?? '',
+              body: notification.body ?? '',
+            );
+          }
+        });
+      }
 
-      // Cấu hình Channel cho Android
-      const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'high_importance_channel', // id
-        'High Importance Notifications', // title
-        description: 'This channel is used for important notifications.',
-        importance: Importance.max,
-      );
+      // 3. Xin quyền notification (bắt buộc trên Web để browser hiện popup)
+      //    Trên Android quyền đã được xin qua NotificationPermissionService
+      if (kIsWeb) {
+        final settings = await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        debugPrint('FCMService: Web notification permission = ${settings.authorizationStatus}');
+      }
 
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
-
-      // 2. Lắng nghe FCM Token và lưu lên Firestore
+      // 4. Lấy và lưu FCM Token vào Firestore
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Lấy token hiện tại
         final token = await FirebaseMessaging.instance.getToken();
         if (token != null) {
           await _saveTokenToFirestore(user.uid, token);
         }
 
-        // Lắng nghe token bị thay đổi
+        // Lắng nghe token refresh
         FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
           _saveTokenToFirestore(user.uid, newToken);
         });
       }
-
-      // 3. Lắng nghe thông báo khi app đang chạy (Foreground)
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final notification = message.notification;
-        final android = message.notification?.android;
-
-        if (notification != null && android != null) {
-          _localNotifications.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                channel.id,
-                channel.name,
-                channelDescription: channel.description,
-                icon: '@mipmap/ic_launcher',
-              ),
-            ),
-          );
-        }
-      });
     } catch (e) {
       debugPrint('Lỗi khởi tạo FCM: $e');
     }
   }
 
+  /// Lưu FCM token vào Firestore, phân biệt web/android/ios token
   static Future<void> _saveTokenToFirestore(String uid, String token) async {
     try {
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      final Map<String, dynamic> updateData = {
         'fcmToken': token,
-      });
+        'notificationsEnabled': true,
+      };
+
+      // Lưu thêm field riêng theo nền tảng để dễ phân biệt
+      if (kIsWeb) {
+        updateData['webFcmToken'] = token;
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
+        updateData['androidFcmToken'] = token;
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        updateData['iosFcmToken'] = token;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set(updateData, SetOptions(merge: true));
+
+      debugPrint('FCMService: Đã lưu token cho uid=$uid (web=$kIsWeb)');
     } catch (e) {
       debugPrint('Không thể lưu FCM Token: $e');
     }

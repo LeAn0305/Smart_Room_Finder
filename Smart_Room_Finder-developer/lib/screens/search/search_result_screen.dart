@@ -24,7 +24,25 @@ String _sanitizeAmenity(String str) {
 
 class SearchResultScreen extends StatefulWidget {
   final String? initialSearch;
-  const SearchResultScreen({super.key, this.initialSearch});
+  /// Nếu true, tự động mở filter sheet khi màn hình khởi động
+  final bool openFilterOnStart;
+  /// Các filter ban đầu được truyền từ Home filter sheet
+  final String? initialType;
+  final String? initialLocation;
+  final String? initialPrice;
+  final String? initialArea;
+  final Set<String>? initialAmenities;
+
+  const SearchResultScreen({
+    super.key,
+    this.initialSearch,
+    this.openFilterOnStart = false,
+    this.initialType,
+    this.initialLocation,
+    this.initialPrice,
+    this.initialArea,
+    this.initialAmenities,
+  });
 
   @override
   State<SearchResultScreen> createState() => _SearchResultScreenState();
@@ -50,16 +68,24 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     ('Trên 100m²', 100, null),
   ];
 
-  /// Alias mapping cho tiện ích — hỗ trợ nhiều cách viết
+  /// Alias mapping cho tiện ích — hỗ trợ nhiều cách viết (có dấu/không dấu/viết tắt)
   static const Map<String, List<String>> _amenityAliases = {
-    'Wifi': ['wifi', 'wi-fi', 'internet'],
-    'Máy lạnh': ['may lanh', 'máy lạnh', 'dieu hoa', 'điều hòa', 'điều hoà', 'ac'],
-    'Tủ lạnh': ['tu lanh', 'tủ lạnh'],
-    'Máy giặt': ['may giat', 'máy giặt', 'giặt'],
-    'Bếp': ['bep', 'bếp', 'nấu ăn', 'nau an'],
-    'Chỗ để xe': ['cho de xe', 'chỗ để xe', 'để xe', 'de xe', 'hầm xe', 'ham xe', 'gửi xe', 'gui xe'],
-    'Bảo vệ': ['bao ve', 'bảo vệ', 'an ninh', 'security'],
-    'Hồ bơi': ['ho boi', 'hồ bơi', 'pool', 'bể bơi', 'be boi'],
+    'Wifi': ['wifi', 'wi-fi', 'internet', 'mang', 'mạng'],
+    'Máy lạnh': [
+      'may lanh', 'máy lạnh', 'maylanh',
+      'dieu hoa', 'điều hòa', 'điều hoà', 'dieuhoa',
+      'ac', 'air', 'lanh',
+    ],
+    'Tủ lạnh': ['tu lanh', 'tủ lạnh', 'tulanh', 'refrigerator', 'fridge'],
+    'Máy giặt': ['may giat', 'máy giặt', 'maygiat', 'giat', 'giặt', 'washing'],
+    'Bếp': ['bep', 'bếp', 'nấu ăn', 'nau an', 'bếp nấu', 'bep nau', 'kitchen'],
+    'Chỗ để xe': [
+      'cho de xe', 'chỗ để xe', 'để xe', 'de xe',
+      'hầm xe', 'ham xe', 'gửi xe', 'gui xe',
+      'parking', 'xe', 'garage',
+    ],
+    'Bảo vệ': ['bao ve', 'bảo vệ', 'an ninh', 'anninh', 'security', 'guard'],
+    'Hồ bơi': ['ho boi', 'hồ bơi', 'hoboi', 'pool', 'bể bơi', 'be boi', 'swim'],
   };
 
   final List<String> _types = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
@@ -91,7 +117,21 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     super.initState();
     _searchCtrl = TextEditingController(text: widget.initialSearch ?? '');
     _searchCtrl.addListener(_applyFilters);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _applyFilters());
+
+    // Áp dụng filter ban đầu nếu được truyền từ Home
+    if (widget.initialType != null) _selectedType = widget.initialType!;
+    if (widget.initialLocation != null) _selectedLocation = widget.initialLocation!;
+    if (widget.initialPrice != null) _selectedPrice = widget.initialPrice!;
+    if (widget.initialArea != null) _selectedArea = widget.initialArea!;
+    if (widget.initialAmenities != null) _selectedAmenities.addAll(widget.initialAmenities!);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyFilters();
+      // Nếu được yêu cầu mở filter sheet ngay khi vào màn
+      if (widget.openFilterOnStart) {
+        _showFilterSheet();
+      }
+    });
   }
 
   @override
@@ -406,7 +446,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                         _selectedLocation = tempLocation;
                         _selectedPrice = tempPrice;
                         _selectedArea = tempArea;
-                        _selectedAmenities = tempAmenities;
+                        _selectedAmenities.clear();
+                        _selectedAmenities.addAll(tempAmenities);
                       });
                       Navigator.pop(context);
                       _applyFilters();
