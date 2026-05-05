@@ -172,7 +172,7 @@ class _ChatTile extends StatelessWidget {
     // Xác định đúng vai trò dựa trên UID thực tế
     final isOwner = chat.ownerId == currentUid;
     final isRenter = chat.renterId == currentUid;
-    
+    final otherUid = isOwner ? chat.renterId : chat.ownerId;
     // Tên người kia: nếu là chủ → hiện tên người thuê, ngược lại
     final otherName = isOwner
         ? chat.renterName
