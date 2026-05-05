@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
+import 'package:smart_room_finder/services/user_service.dart';
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -168,14 +169,14 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Xác định đúng vai trò dựa trên UID thực tế
     final isOwner = chat.ownerId == currentUid;
     final isRenter = chat.renterId == currentUid;
     
-    // Tên người kia: nếu là chủ → hiện tên người thuê, ngược lại
+    // Tên và UID người kia
     final otherName = isOwner
         ? chat.renterName
         : (isRenter ? chat.ownerName : chat.ownerName);
+    final otherUid = isOwner ? chat.renterId : chat.ownerId;
     final isLastSentByMe = chat.lastSenderId == currentUid;
     final lastMsg = chat.lastMessage.isEmpty ? 'Bắt đầu cuộc trò chuyện' : chat.lastMessage;
     final timeStr = _formatTime(chat.updatedAt);
@@ -219,7 +220,7 @@ class _ChatTile extends StatelessWidget {
                 child: Row(
                   children: [
                     // Avatar
-                    _buildAvatar(otherName),
+                    _buildAvatar(otherName, otherUid),
                     const SizedBox(width: 14),
                     // Content
                     Expanded(
@@ -329,27 +330,50 @@ class _ChatTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(String name) {
+  Widget _buildAvatar(String name, String otherUid) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.teal, AppColors.blue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+    return FutureBuilder(
+      future: UserService.getUserById(otherUid),
+      builder: (context, snap) {
+        final imageUrl = snap.data?.profileImageUrl ?? '';
+        return Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.teal, AppColors.blue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
           ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _avatarInitial(initial),
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return _avatarInitial(initial);
+                    },
+                  )
+                : _avatarInitial(initial),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _avatarInitial(String initial) {
+    return Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/message_model.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
+import 'package:smart_room_finder/services/user_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ChatModel chat;
@@ -18,20 +20,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _msgCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   bool _isSending = false;
+  UserModel? _otherUser;
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
   String get _name =>
       FirebaseAuth.instance.currentUser?.displayName ?? 'Người dùng';
 
   bool get _isOwner => widget.chat.ownerId == _uid;
+  String get _otherUid => _isOwner ? widget.chat.renterId : widget.chat.ownerId;
   String get _otherName =>
       _isOwner ? widget.chat.renterName : widget.chat.ownerName;
 
   @override
   void initState() {
     super.initState();
-    // Đánh dấu đã đọc khi mở chat
     ChatService.markMessagesAsRead(widget.chat.id);
+    _loadOtherUser();
+  }
+
+  Future<void> _loadOtherUser() async {
+    final user = await UserService.getUserById(_otherUid);
+    if (mounted) setState(() => _otherUser = user);
   }
 
   @override
@@ -116,34 +125,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       title: Row(
         children: [
-          // Avatar
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.teal, AppColors.blue],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                _otherName.isNotEmpty ? _otherName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
+          // Avatar thật từ Firestore
+          _buildOtherAvatar(size: 38, radius: 12),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _otherName,
+                  _otherUser?.name ?? _otherName,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -264,7 +254,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             return Column(
               children: [
                 if (showDate) _buildDateDivider(msg.createdAt),
-                _MessageBubble(message: msg, isMe: isMe),
+                _MessageBubble(
+                  message: msg,
+                  isMe: isMe,
+                  otherAvatarUrl: _otherUser?.profileImageUrl ?? '',
+                ),
               ],
             );
           },
@@ -413,6 +407,50 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  Widget _buildOtherAvatar({double size = 30, double radius = 10}) {
+    final initial =
+        (_otherUser?.name ?? _otherName).isNotEmpty
+            ? (_otherUser?.name ?? _otherName)[0].toUpperCase()
+            : '?';
+    final imageUrl = _otherUser?.profileImageUrl ?? '';
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.teal, AppColors.blue],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _initialWidget(initial, size),
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _initialWidget(initial, size),
+              )
+            : _initialWidget(initial, size),
+      ),
+    );
+  }
+
+  Widget _initialWidget(String initial, double size) {
+    return Center(
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.4,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
   bool _isDifferentDay(String a, String b) {
     final da = DateTime.tryParse(a);
     final db = DateTime.tryParse(b);
@@ -495,8 +533,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 class _MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe;
+  final String otherAvatarUrl;
 
-  const _MessageBubble({required this.message, required this.isMe});
+  const _MessageBubble({
+    required this.message,
+    required this.isMe,
+    this.otherAvatarUrl = '',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -519,16 +562,15 @@ class _MessageBubble extends StatelessWidget {
                     colors: [AppColors.teal, AppColors.blue]),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Center(
-                child: Text(
-                  message.senderName.isNotEmpty
-                      ? message.senderName[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: otherAvatarUrl.isNotEmpty
+                    ? Image.network(
+                        otherAvatarUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _initial(),
+                      )
+                    : _initial(),
               ),
             ),
           ],
@@ -616,5 +658,19 @@ class _MessageBubble extends StatelessWidget {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  Widget _initial() {
+    final name = message.senderName.isNotEmpty ? message.senderName[0].toUpperCase() : '?';
+    return Center(
+      child: Text(
+        name,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
