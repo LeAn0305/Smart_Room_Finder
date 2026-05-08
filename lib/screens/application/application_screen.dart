@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/application_model.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/services/application_service.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 
@@ -26,11 +28,14 @@ class ApplicationScreen extends StatefulWidget {
 class _ApplicationScreenState extends State<ApplicationScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
+  UserRole? _userRole;
+  bool _isLoadingRole = true;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _loadUserRole();
 
     // Nếu vừa gửi đơn xong → tự mở chat
     if (widget.openChatId != null) {
@@ -38,6 +43,19 @@ class _ApplicationScreenState extends State<ApplicationScreen>
         _openChatById(widget.openChatId!);
       });
     }
+  }
+
+  Future<void> _loadUserRole() async {
+    final user = await AuthService.getCurrentUserData();
+    if (!mounted) return;
+    setState(() {
+      _userRole = user?.role;
+      _isLoadingRole = false;
+      // Chủ trọ → mặc định mở tab "Nhận được" (index 1)
+      if (_userRole == UserRole.landlord) {
+        _tabCtrl.index = 1;
+      }
+    });
   }
 
   @override
@@ -62,6 +80,14 @@ class _ApplicationScreenState extends State<ApplicationScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingRole) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.teal)),
+      );
+    }
+
+    final isLandlord = _userRole == UserRole.landlord;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -77,23 +103,39 @@ class _ApplicationScreenState extends State<ApplicationScreen>
           child: Column(
             children: [
               _buildTopBar(),
-              _buildTabBar(),
+              // Chỉ hiện TabBar nếu không xác định được role (fallback)
+              if (_userRole == null) _buildTabBar(),
               Expanded(
-                child: TabBarView(
-                  controller: _tabCtrl,
-                  children: [
-                    _ApplicationList(
-                      stream: ApplicationService.myApplicationsStream(),
-                      emptyLabel: 'Bạn chưa gửi đơn nào',
-                      highlightId: widget.highlightApplicationId,
-                    ),
-                    _ApplicationList(
-                      stream: ApplicationService.ownerApplicationsStream(),
-                      emptyLabel: 'Chưa có đơn nào từ người thuê',
-                      isOwnerView: true,
-                    ),
-                  ],
-                ),
+                child: _userRole == null
+                    // Không xác định role → hiện cả 2 tab
+                    ? TabBarView(
+                        controller: _tabCtrl,
+                        children: [
+                          _ApplicationList(
+                            stream: ApplicationService.myApplicationsStream(),
+                            emptyLabel: 'Bạn chưa gửi đơn nào',
+                            highlightId: widget.highlightApplicationId,
+                          ),
+                          _ApplicationList(
+                            stream: ApplicationService.ownerApplicationsStream(),
+                            emptyLabel: 'Chưa có đơn nào từ người thuê',
+                            isOwnerView: true,
+                          ),
+                        ],
+                      )
+                    : isLandlord
+                        // Chủ trọ → chỉ hiện đơn nhận được
+                        ? _ApplicationList(
+                            stream: ApplicationService.ownerApplicationsStream(),
+                            emptyLabel: 'Chưa có đơn nào từ người thuê',
+                            isOwnerView: true,
+                          )
+                        // Người thuê → chỉ hiện đơn của tôi
+                        : _ApplicationList(
+                            stream: ApplicationService.myApplicationsStream(),
+                            emptyLabel: 'Bạn chưa gửi đơn nào',
+                            highlightId: widget.highlightApplicationId,
+                          ),
               ),
             ],
           ),
