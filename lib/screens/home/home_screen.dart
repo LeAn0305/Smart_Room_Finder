@@ -8,6 +8,8 @@ import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
+import 'package:smart_room_finder/services/chat_service.dart';
+import 'package:smart_room_finder/screens/notification/notification_screen.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
@@ -450,28 +452,98 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.teal, width: 2),
-                          ),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundColor: AppColors.mintGreen,
-                            backgroundImage: displayImageUrl.isNotEmpty
-                                ? NetworkImage(displayImageUrl)
-                                : null,
-                            child: displayImageUrl.isEmpty
-                                ? Text(
-                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                        // ── Chuông + Avatar ──────────────────
+                        Row(
+                          children: [
+                            // Icon chuông thông báo
+                            StreamBuilder<int>(
+                              stream: ChatService.totalUnreadStream(),
+                              builder: (context, snap) {
+                                final unread = snap.data ?? 0;
+                                return GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const NotificationScreen(),
                                     ),
-                                  )
-                                : null,
-                          ),
+                                  ),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.06),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.notifications_rounded,
+                                          color: AppColors.teal,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      if (unread > 0)
+                                        Positioned(
+                                          top: 0,
+                                          right: 0,
+                                          child: Container(
+                                            width: 18,
+                                            height: 18,
+                                            decoration: const BoxDecoration(
+                                              color: Colors.redAccent,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                unread > 9 ? '9+' : '$unread',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            // Avatar
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.teal, width: 2),
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: AppColors.mintGreen,
+                                backgroundImage: displayImageUrl.isNotEmpty
+                                    ? NetworkImage(displayImageUrl)
+                                    : null,
+                                child: displayImageUrl.isEmpty
+                                    ? Text(
+                                        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
