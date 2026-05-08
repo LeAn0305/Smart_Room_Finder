@@ -17,14 +17,14 @@ class ApplicationService {
     final uid = _uid;
     if (uid == null) return null;
 
+    // Query theo renterId trước, lọc roomId ở client để tránh cần composite index
     final snap = await _col
-        .where('roomId', isEqualTo: roomId)
         .where('renterId', isEqualTo: uid)
-        .limit(1)
         .get();
 
-    if (snap.docs.isEmpty) return null;
-    return ApplicationModel.fromMap(snap.docs.first.data(), snap.docs.first.id);
+    final docs = snap.docs.where((d) => d.data()['roomId'] == roomId).toList();
+    if (docs.isEmpty) return null;
+    return ApplicationModel.fromMap(docs.first.data(), docs.first.id);
   }
 
   // ── Gửi đơn đặt phòng + tạo chat ────────────────────────
@@ -101,10 +101,14 @@ class ApplicationService {
 
     return _col
         .where('renterId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) =>
-            s.docs.map((d) => ApplicationModel.fromMap(d.data(), d.id)).toList());
+        .map((s) {
+          final list = s.docs
+              .map((d) => ApplicationModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   // ── Stream đơn của chủ nhà ───────────────────────────────
@@ -114,10 +118,14 @@ class ApplicationService {
 
     return _col
         .where('ownerId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((s) =>
-            s.docs.map((d) => ApplicationModel.fromMap(d.data(), d.id)).toList());
+        .map((s) {
+          final list = s.docs
+              .map((d) => ApplicationModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   // ── Cập nhật trạng thái đơn ──────────────────────────────
