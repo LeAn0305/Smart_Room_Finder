@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   int _bannerPage = 0;
   final PageController _bannerCtrl = PageController();
+  UserModel? _currentUser;
 
   final List<String> _categories = [
     'Tất cả',
@@ -65,6 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
       () => setState(() => _searchQuery = _searchCtrl.text.toLowerCase()),
     );
 
+    // Load user thật từ Firebase
+    _loadCurrentUser();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
@@ -78,6 +84,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     Future.delayed(const Duration(seconds: 3), _autoScroll);
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await AuthService.getCurrentUserData();
+    if (mounted) setState(() => _currentUser = user);
   }
 
   void _autoScroll() {
@@ -125,7 +136,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = UserModel.sampleUsers.first;
+    final displayName = _currentUser?.name ??
+        FirebaseAuth.instance.currentUser?.displayName ??
+        'Bạn';
+    final displayImageUrl = _currentUser?.profileImageUrl ??
+        FirebaseAuth.instance.currentUser?.photoURL ??
+        '';
+    final displayLocation = _currentUser?.location ?? 'TP. Hồ Chí Minh';
     final roomProvider = context.watch<RoomProvider>();
     final pref = context.watch<PreferenceProvider>();
     final favoriteProvider = context.watch<FavoriteProvider>();
@@ -159,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             Text(
-                              user.name,
+                              displayName,
                               style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
@@ -177,12 +194,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: CircleAvatar(
                             radius: 24,
                             backgroundColor: AppColors.mintGreen,
-                            backgroundImage: user.profileImageUrl.isNotEmpty
-                                ? NetworkImage(user.profileImageUrl)
+                            backgroundImage: displayImageUrl.isNotEmpty
+                                ? NetworkImage(displayImageUrl)
                                 : null,
-                            child: user.profileImageUrl.isEmpty
+                            child: displayImageUrl.isEmpty
                                 ? Text(
-                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -271,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          user.location,
+                          displayLocation,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w600,
