@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/application_model.dart';
-import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/services/application_service.dart';
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
