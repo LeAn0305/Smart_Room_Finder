@@ -15,6 +15,7 @@ import 'package:smart_room_finder/screens/auth/change_password_screen.dart';
 import 'package:smart_room_finder/screens/history/view_history_screen.dart';
 import 'package:smart_room_finder/screens/support/support_screen.dart';
 import 'package:smart_room_finder/screens/chat/chat_screen.dart';
+import 'package:smart_room_finder/screens/application/application_screen.dart';
 
 import 'package:smart_room_finder/core/providers/favorite_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
@@ -383,7 +384,7 @@ void _onLogout() {
                         icon: Icons.assignment_outlined,
                         label: 'Đơn yêu cầu / Applications',
                         subtitle: 'Xem đơn yêu cầu',
-                        onTap: () => _showComingSoon(),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplicationScreen())),
                       ),
                       _buildMenuItem(
                         icon: Icons.history_rounded,
