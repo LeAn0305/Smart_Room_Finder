@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/models/application_model.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/services/application_service.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
@@ -22,11 +23,25 @@ class _SendApplicationScreenState extends State<SendApplicationScreen> {
   final _messageCtrl = TextEditingController();
   DateTime? _moveInDate;
   bool _isSubmitting = false;
+  bool _isCheckingDuplicate = true;
+  ApplicationModel? _existingApplication;
 
   @override
   void initState() {
     super.initState();
     _prefillUserInfo();
+    _checkExistingApplication();
+  }
+
+  Future<void> _checkExistingApplication() async {
+    final existing = await ApplicationService.getExistingApplication(
+      roomId: widget.room.id,
+    );
+    if (!mounted) return;
+    setState(() {
+      _existingApplication = existing;
+      _isCheckingDuplicate = false;
+    });
   }
 
   Future<void> _prefillUserInfo() async {
@@ -115,7 +130,24 @@ class _SendApplicationScreenState extends State<SendApplicationScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      _showSnack('Gửi đơn thất bại: $e', isError: true);
+      final msg = e.toString();
+      if (msg.contains('DUPLICATE:')) {
+        final appId = msg.split('DUPLICATE:').last;
+        _showSnack('Bạn đã gửi đơn cho phòng này rồi!', isError: true);
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ApplicationScreen(
+              highlightApplicationId: appId,
+            ),
+          ),
+          (route) => route.isFirst,
+        );
+      } else {
+        _showSnack('Gửi đơn thất bại: $e', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -156,7 +188,185 @@ class _SendApplicationScreenState extends State<SendApplicationScreen> {
           child: Container(height: 1, color: AppColors.mintGreen),
         ),
       ),
-      body: Form(
+      body: _isCheckingDuplicate
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.teal),
+            )
+          : _existingApplication != null
+              ? _buildAlreadySentView(room)
+              : _buildForm(room),
+    );
+  }
+
+  // ── Đã gửi đơn rồi ──────────────────────────────────────
+  Widget _buildAlreadySentView(RoomModel room) {
+    final app = _existingApplication!;
+    final statusColor = _statusColor(app.status);
+    final statusLabel = _statusLabel(app.status);
+    final statusIcon = _statusIcon(app.status);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          _buildRoomCard(room),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                  color: statusColor.withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(statusIcon, color: statusColor, size: 40),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Bạn đã gửi đơn cho phòng này',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Mỗi tài khoản chỉ được gửi 1 đơn cho mỗi phòng.\nBạn có thể xem trạng thái đơn trong mục "Đơn của tôi".',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ApplicationScreen(
+                      highlightApplicationId: app.id,
+                    ),
+                  ),
+                  (route) => route.isFirst,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.assignment_rounded, size: 18),
+              label: const Text(
+                'Xem đơn của tôi',
+                style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.redAccent;
+      case 'cancelled':
+        return Colors.grey;
+      case 'completed':
+        return AppColors.teal;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'approved':
+        return 'Đã duyệt';
+      case 'rejected':
+        return 'Đã từ chối';
+      case 'cancelled':
+        return 'Đã hủy';
+      case 'completed':
+        return 'Hoàn tất';
+      default:
+        return 'Đang chờ duyệt';
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'approved':
+        return Icons.check_circle_rounded;
+      case 'rejected':
+        return Icons.cancel_rounded;
+      case 'cancelled':
+        return Icons.block_rounded;
+      case 'completed':
+        return Icons.task_alt_rounded;
+      default:
+        return Icons.pending_rounded;
+    }
+  }
+
+  // ── Form gửi đơn ─────────────────────────────────────────
+  Widget _buildForm(RoomModel room) {
+    return Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -315,8 +525,7 @@ class _SendApplicationScreenState extends State<SendApplicationScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildRoomCard(RoomModel room) {

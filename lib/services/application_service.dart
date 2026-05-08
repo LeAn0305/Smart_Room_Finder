@@ -10,6 +10,23 @@ class ApplicationService {
 
   static String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
+  // ── Kiểm tra đã gửi đơn cho phòng này chưa ─────────────
+  static Future<ApplicationModel?> getExistingApplication({
+    required String roomId,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return null;
+
+    final snap = await _col
+        .where('roomId', isEqualTo: roomId)
+        .where('renterId', isEqualTo: uid)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+    return ApplicationModel.fromMap(snap.docs.first.data(), snap.docs.first.id);
+  }
+
   // ── Gửi đơn đặt phòng + tạo chat ────────────────────────
   static Future<({String applicationId, String chatId})> submitApplication({
     required String roomId,
@@ -24,6 +41,12 @@ class ApplicationService {
   }) async {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
+
+    // Kiểm tra đã có đơn cho phòng này chưa
+    final existing = await getExistingApplication(roomId: roomId);
+    if (existing != null) {
+      throw Exception('DUPLICATE:${existing.id}');
+    }
 
     final now = DateTime.now().toIso8601String();
 
