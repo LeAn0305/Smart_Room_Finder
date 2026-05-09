@@ -70,7 +70,8 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
-      await FCMService.onUserLogin();
+      // Khởi tạo FCM sau khi đăng nhập thành công
+      await FCMService.initialize();
     }
 
     return cred;
@@ -183,7 +184,7 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
-      await FCMService.onUserLogin();
+      await FCMService.initialize();
     }
 
     return cred;
@@ -230,7 +231,7 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
-      await FCMService.onUserLogin();
+      await FCMService.initialize();
     }
 
     return cred;
