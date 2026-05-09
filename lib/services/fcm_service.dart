@@ -133,6 +133,7 @@ class FCMService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(0);
 
+    // Query đơn giản chỉ 1 field, không cần composite index
     return _db
         .collection('users')
         .doc(uid)
@@ -154,6 +155,7 @@ class FCMService {
         .where('isRead', isEqualTo: false)
         .get();
 
+    if (snap.docs.isEmpty) return;
     final batch = _db.batch();
     for (final doc in snap.docs) {
       batch.update(doc.reference, {'isRead': true});
@@ -166,15 +168,25 @@ class FCMService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();
 
+    // Không dùng orderBy để tránh cần composite index
+    // Sort ở client thay thế
     return _db
         .collection('users')
         .doc(uid)
         .collection('notifications')
-        .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((s) => s.docs
-            .map((d) => {'id': d.id, ...d.data()})
-            .toList());
+        .map((s) {
+          final list = s.docs
+              .map((d) => {'id': d.id, ...d.data()})
+              .toList();
+          // Sort mới nhất lên đầu ở client
+          list.sort((a, b) {
+            final aTime = (a['createdAt'] as String?) ?? '';
+            final bTime = (b['createdAt'] as String?) ?? '';
+            return bTime.compareTo(aTime);
+          });
+          return list;
+        });
   }
 }
