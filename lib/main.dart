@@ -11,6 +11,7 @@ import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/splash/splash_screen.dart';
 import 'package:smart_room_finder/screens/welcome/welcome_screen.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Khởi tạo FCM (skip tự động trên Windows/Linux/macOS)
+  await FCMService.initialize();
 
   runApp(
     MultiProvider(

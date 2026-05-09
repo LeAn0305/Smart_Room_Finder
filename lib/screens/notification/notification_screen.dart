@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/screens/chat/chat_screen.dart';
+import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/screens/application/application_screen.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
+import 'package:smart_room_finder/services/chat_service.dart';
 
-class NotificationScreen extends StatelessWidget {
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
+
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Đánh dấu tất cả đã đọc khi mở màn hình
+    FCMService.markAllRead();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,185 +66,244 @@ class _NotificationBody extends StatelessWidget {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // ── Tin nhắn chưa đọc ───────────────────────────
-        _buildSection(
-          context,
-          icon: Icons.chat_bubble_rounded,
-          color: AppColors.teal,
-          title: 'Tin nhắn',
-          subtitle: 'Xem các cuộc trò chuyện',
-          stream: FirebaseFirestore.instance
-              .collection('chats')
-              .where('participants', arrayContains: _uid)
-              .snapshots()
-              .asyncMap((snap) async {
-            int total = 0;
-            for (final doc in snap.docs) {
-              final unread = await doc.reference
-                  .collection('messages')
-                  .where('isRead', isEqualTo: false)
-                  .where('senderId', isNotEqualTo: _uid)
-                  .get();
-              total += unread.docs.length;
-            }
-            return total;
-          }),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const ChatScreen()),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // ── Đơn yêu cầu ─────────────────────────────────
-        _buildSection(
-          context,
-          icon: Icons.assignment_rounded,
-          color: Colors.orange,
-          title: 'Đơn yêu cầu',
-          subtitle: 'Xem đơn thuê phòng',
-          stream: FirebaseFirestore.instance
-              .collection('applications')
-              .where('ownerId', isEqualTo: _uid)
-              .where('status', isEqualTo: 'pending')
-              .snapshots()
-              .map((s) => s.docs.length),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ApplicationScreen()),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // ── Đơn của tôi (renter) ─────────────────────────
-        _buildSection(
-          context,
-          icon: Icons.home_rounded,
-          color: AppColors.blue,
-          title: 'Đơn của tôi',
-          subtitle: 'Trạng thái đơn thuê phòng',
-          stream: FirebaseFirestore.instance
-              .collection('applications')
-              .where('renterId', isEqualTo: _uid)
-              .where('status', whereIn: ['accepted', 'rejected'])
-              .snapshots()
-              .map((s) => s.docs.length),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ApplicationScreen()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSection(
-    BuildContext context, {
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required Stream<int> stream,
-    required VoidCallback onTap,
-  }) {
-    return StreamBuilder<int>(
-      stream: stream,
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: FCMService.notificationsStream(),
       builder: (context, snap) {
-        final count = snap.data ?? 0;
-        return GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: AppColors.teal));
+        }
+
+        final notifications = snap.data ?? [];
+
+        if (notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icon, color: color, size: 24),
-                    ),
-                    if (count > 0)
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            count > 99 ? '99+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        count > 0
-                            ? '$count thông báo mới'
-                            : subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: count > 0
-                              ? color
-                              : AppColors.textSecondary,
-                          fontWeight: count > 0
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: AppColors.teal.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.notifications_none_rounded,
+                    size: 52,
+                    color: AppColors.teal.withValues(alpha: 0.5),
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textSecondary),
+                const SizedBox(height: 16),
+                const Text(
+                  'Chưa có thông báo nào',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Thông báo tin nhắn và đơn thuê\nsẽ xuất hiện ở đây',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
               ],
             ),
-          ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: notifications.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, i) {
+            final n = notifications[i];
+            return _NotificationTile(
+              notification: n,
+              onTap: () => _handleTap(context, n),
+            );
+          },
         );
       },
     );
   }
+
+  void _handleTap(BuildContext context, Map<String, dynamic> n) async {
+    final type = n['type'] as String? ?? '';
+    final refId = n['refId'] as String? ?? '';
+
+    if (type == 'message' && refId.isNotEmpty) {
+      // Mở chat detail
+      try {
+        final chatDoc = await ChatService.getChatById(refId);
+        if (chatDoc == null || !context.mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ChatDetailScreen(chat: chatDoc)),
+        );
+      } catch (_) {}
+    } else if (type == 'application_approved' ||
+        type == 'application_rejected') {
+      // Mở màn hình đơn yêu cầu
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ApplicationScreen(
+            highlightApplicationId: refId.isNotEmpty ? refId : null,
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  final Map<String, dynamic> notification;
+  final VoidCallback onTap;
+
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final type = notification['type'] as String? ?? '';
+    final title = notification['title'] as String? ?? '';
+    final body = notification['body'] as String? ?? '';
+    final isRead = notification['isRead'] as bool? ?? true;
+    final createdAt = notification['createdAt'] as String? ?? '';
+
+    final info = _typeInfo(type);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isRead ? Colors.white : AppColors.teal.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isRead
+                ? Colors.white
+                : AppColors.teal.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: info.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(info.icon, color: info.color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isRead
+                                ? FontWeight.w600
+                                : FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (!isRead)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.teal,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    body,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatTime(createdAt),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _TypeInfo _typeInfo(String type) {
+    switch (type) {
+      case 'message':
+        return _TypeInfo(Icons.chat_bubble_rounded, AppColors.teal);
+      case 'application_approved':
+        return _TypeInfo(Icons.check_circle_rounded, Colors.green);
+      case 'application_rejected':
+        return _TypeInfo(Icons.cancel_rounded, Colors.redAccent);
+      default:
+        return _TypeInfo(Icons.notifications_rounded, AppColors.teal);
+    }
+  }
+
+  String _formatTime(String iso) {
+    if (iso.isEmpty) return '';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Vừa xong';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+    if (diff.inDays < 7) return '${diff.inDays} ngày trước';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _TypeInfo {
+  final IconData icon;
+  final Color color;
+  _TypeInfo(this.icon, this.color);
 }

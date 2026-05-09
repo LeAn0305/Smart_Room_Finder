@@ -9,6 +9,7 @@ import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 import 'package:smart_room_finder/screens/notification/notification_screen.dart';
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
@@ -490,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             // Icon chuông thông báo
                             StreamBuilder<int>(
-                              stream: ChatService.totalUnreadStream(),
+                              stream: FCMService.unreadNotificationStream(),
                               builder: (context, snap) {
                                 final unread = snap.data ?? 0;
                                 return GestureDetector(

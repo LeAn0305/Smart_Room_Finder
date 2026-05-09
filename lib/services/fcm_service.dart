@@ -2,32 +2,32 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Chỉ import firebase_messaging và flutter_local_notifications trên mobile/web
-// Không import trên Windows/Linux/macOS desktop để tránh lỗi platform
+// firebase_messaging hỗ trợ Android, iOS, Web — skip runtime trên desktop
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 class FCMService {
   static final _db = FirebaseFirestore.instance;
 
-  /// Khởi tạo FCM — skip hoàn toàn trên Windows/Linux/macOS desktop
+  // ── Khởi tạo FCM ────────────────────────────────────────
   static Future<void> initialize() async {
-    // Skip trên desktop platforms (Windows, Linux, macOS)
-    if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux ||
-        defaultTargetPlatform == TargetPlatform.macOS)) {
+    // Skip trên Windows/Linux/macOS desktop
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
       debugPrint('⚠️ FCMService: skip trên desktop platform');
       return;
     }
 
     try {
-      // Xin quyền notification
       final messaging = FirebaseMessaging.instance;
+
+      // Xin quyền notification
       final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
-
       debugPrint('🔔 Notification permission: ${settings.authorizationStatus}');
 
       // Lấy và lưu FCM token
@@ -35,7 +35,7 @@ class FCMService {
 
       // Lắng nghe token refresh
       messaging.onTokenRefresh.listen((token) async {
-        await _updateTokenInFirestore(token, isWeb: kIsWeb);
+        await _updateTokenInFirestore(token);
       });
 
       // Foreground message handler
@@ -47,13 +47,23 @@ class FCMService {
     }
   }
 
+  // ── Lưu FCM token sau khi đăng nhập ─────────────────────
+  static Future<void> onUserLogin() async {
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      return;
+    }
+    await _saveToken();
+  }
+
   static Future<void> _saveToken() async {
     try {
       final messaging = FirebaseMessaging.instance;
       String? token;
 
       if (kIsWeb) {
-        // Web cần VAPID key — nếu chưa có thì bỏ qua
         try {
           token = await messaging.getToken();
         } catch (e) {
@@ -66,38 +76,105 @@ class FCMService {
 
       if (token == null) return;
       debugPrint('✅ FCM Token: ${token.substring(0, 20)}...');
-      await _updateTokenInFirestore(token, isWeb: kIsWeb);
+      await _updateTokenInFirestore(token);
     } catch (e) {
       debugPrint('❌ _saveToken error: $e');
     }
   }
 
-  static Future<void> _updateTokenInFirestore(String token,
-      {required bool isWeb}) async {
+  static Future<void> _updateTokenInFirestore(String token) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
     try {
-      final field = isWeb ? 'webFcmToken' : 'androidFcmToken';
+      final field = kIsWeb ? 'webFcmToken' : 'androidFcmToken';
       await _db.collection('users').doc(uid).set({
         field: token,
         'fcmToken': token,
         'notificationsEnabled': true,
         'updatedAt': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
-      debugPrint('✅ FCM token saved to Firestore ($field)');
+      debugPrint('✅ FCM token saved ($field)');
     } catch (e) {
       debugPrint('❌ _updateTokenInFirestore error: $e');
     }
   }
 
-  /// Gọi sau khi user đăng nhập để lưu token
-  static Future<void> onUserLogin() async {
-    if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux ||
-        defaultTargetPlatform == TargetPlatform.macOS)) {
-      return;
+  // ── Lưu in-app notification vào Firestore ───────────────
+  // Dùng để hiển thị badge/list thông báo trong app
+  static Future<void> saveNotification({
+    required String toUid,       // uid người nhận
+    required String title,
+    required String body,
+    required String type,        // 'message' | 'application_approved' | 'application_rejected'
+    String? refId,               // chatId hoặc applicationId
+  }) async {
+    try {
+      await _db
+          .collection('users')
+          .doc(toUid)
+          .collection('notifications')
+          .add({
+        'title': title,
+        'body': body,
+        'type': type,
+        'refId': refId ?? '',
+        'isRead': false,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('✅ Notification saved → $toUid ($type)');
+    } catch (e) {
+      debugPrint('❌ saveNotification error: $e');
     }
-    await _saveToken();
+  }
+
+  // ── Đếm notification chưa đọc ───────────────────────────
+  static Stream<int> unreadNotificationStream() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value(0);
+
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((s) => s.docs.length);
+  }
+
+  // ── Đánh dấu tất cả đã đọc ──────────────────────────────
+  static Future<void> markAllRead() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final snap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
+  }
+
+  // ── Stream danh sách notifications ──────────────────────
+  static Stream<List<Map<String, dynamic>>> notificationsStream() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Stream.empty();
+
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => {'id': d.id, ...d.data()})
+            .toList());
   }
 }

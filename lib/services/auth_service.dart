@@ -4,6 +4,7 @@ import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart';
 import 'package:smart_room_finder/core/config/google_oauth_config.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:flutter/foundation.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -69,6 +70,7 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
+      await FCMService.onUserLogin();
     }
 
     return cred;
@@ -181,6 +183,7 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
+      await FCMService.onUserLogin();
     }
 
     return cred;
@@ -227,6 +230,7 @@ class AuthService {
     if (cred.user != null) {
       await _syncUserToFirestore(cred.user!);
       await _ensureCurrentUserNotLocked(cred.user!);
+      await FCMService.onUserLogin();
     }
 
     return cred;
