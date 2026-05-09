@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _filterType = 'Tất cả';
   String _filterLocation = 'Tất cả';
   String _filterPrice = 'Tất cả';
+  String _filterArea = 'Tất cả';
   final Set<String> _filterAmenities = {};
 
   final List<String> _filterTypes = ['Tất cả', 'Chung cư', 'Phòng trọ', 'Nhà riêng', 'Biệt thự'];
@@ -45,6 +46,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ('10 - 15 triệu', 10000000, 15000000),
     ('15 - 20 triệu', 15000000, 20000000),
     ('Trên 20 triệu', 20000000, null),
+  ];
+  // (label, minArea m², maxArea m²) — null = không giới hạn
+  final List<(String, double, double?)> _areaRanges = [
+    ('Tất cả', 0, null),
+    ('Dưới 20m²', 0, 20),
+    ('20 - 30m²', 20, 30),
+    ('30 - 50m²', 30, 50),
+    ('50 - 80m²', 50, 80),
+    ('Trên 80m²', 80, null),
   ];
   final List<(String, IconData)> _amenityList = [
     ('Wifi', Icons.wifi_rounded),
@@ -62,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_filterType != 'Tất cả') c++;
     if (_filterLocation != 'Tất cả') c++;
     if (_filterPrice != 'Tất cả') c++;
+    if (_filterArea != 'Tất cả') c++;
     c += _filterAmenities.length;
     return c;
   }
@@ -193,6 +204,15 @@ class _HomeScreenState extends State<HomeScreen> {
       result = result.where((r) => r.price <= priceRange.$3!).toList();
     }
 
+    // Filter diện tích
+    final areaRange = _areaRanges.firstWhere((a) => a.$1 == _filterArea);
+    if (areaRange.$2 > 0) {
+      result = result.where((r) => r.area >= areaRange.$2).toList();
+    }
+    if (areaRange.$3 != null) {
+      result = result.where((r) => r.area <= areaRange.$3!).toList();
+    }
+
     // Filter tiện ích (normalize dấu)
     if (_filterAmenities.isNotEmpty) {
       result = result.where((r) {
@@ -238,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String tmpType = _filterType;
     String tmpLocation = _filterLocation;
     String tmpPrice = _filterPrice;
+    String tmpArea = _filterArea;
     final tmpAmenities = Set<String>.from(_filterAmenities);
 
     showModalBottomSheet(
@@ -270,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         tmpType = 'Tất cả';
                         tmpLocation = 'Tất cả';
                         tmpPrice = 'Tất cả';
+                        tmpArea = 'Tất cả';
                         tmpAmenities.clear();
                       }),
                       child: const Text('Xóa tất cả',
@@ -309,6 +331,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: _priceRanges.map((p) => _sheetChip(
                           label: p.$1, selected: tmpPrice == p.$1,
                           onTap: () => setSheet(() => tmpPrice = p.$1),
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 20),
+                      _sheetLabel('📐 Diện tích'),
+                      const SizedBox(height: 10),
+                      Wrap(spacing: 8, runSpacing: 8,
+                        children: _areaRanges.map((a) => _sheetChip(
+                          label: a.$1, selected: tmpArea == a.$1,
+                          onTap: () => setSheet(() => tmpArea = a.$1),
                         )).toList(),
                       ),
                       const SizedBox(height: 20),
@@ -357,6 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _filterType = tmpType;
                         _filterLocation = tmpLocation;
                         _filterPrice = tmpPrice;
+                        _filterArea = tmpArea;
                         _filterAmenities.clear();
                         _filterAmenities.addAll(tmpAmenities);
                       });
