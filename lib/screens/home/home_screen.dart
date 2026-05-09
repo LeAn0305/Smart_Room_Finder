@@ -16,7 +16,8 @@ import 'package:smart_room_finder/screens/search/search_result_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onSwitchToProfile;
+  const HomeScreen({super.key, this.onSwitchToProfile});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -552,27 +553,32 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 10),
                             // Avatar
-                            Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.teal, width: 2),
-                              ),
-                              child: CircleAvatar(
-                                radius: 24,
-                                backgroundColor: AppColors.mintGreen,
-                                backgroundImage: displayImageUrl.isNotEmpty
-                                    ? NetworkImage(displayImageUrl)
-                                    : null,
-                                child: displayImageUrl.isEmpty
-                                    ? Text(
-                                        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
+                            GestureDetector(
+                              onTap: () {
+                                widget.onSwitchToProfile?.call();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.teal, width: 2),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: AppColors.mintGreen,
+                                  backgroundImage: displayImageUrl.isNotEmpty
+                                      ? NetworkImage(displayImageUrl)
+                                      : null,
+                                  child: displayImageUrl.isEmpty
+                                      ? Text(
+                                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
                               ),
                             ),
                           ],
