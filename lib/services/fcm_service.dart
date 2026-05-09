@@ -15,20 +15,24 @@ class FCMService {
         (defaultTargetPlatform == TargetPlatform.windows ||
             defaultTargetPlatform == TargetPlatform.linux ||
             defaultTargetPlatform == TargetPlatform.macOS)) {
-      debugPrint('⚠️ FCMService: skip trên desktop platform');
       return;
     }
 
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // Xin quyền notification
+      // Xin quyền notification — nếu bị denied thì bỏ qua, không crash
       final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
-      debugPrint('🔔 Notification permission: ${settings.authorizationStatus}');
+
+      // Nếu bị denied hoặc không được cấp quyền → skip, không lỗi
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
+          settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        return;
+      }
 
       // Lấy và lưu FCM token
       await _saveToken();
@@ -42,8 +46,8 @@ class FCMService {
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('📩 FCM foreground: ${message.notification?.title}');
       });
-    } catch (e) {
-      debugPrint('❌ FCMService.initialize error: $e');
+    } catch (_) {
+      // Bỏ qua mọi lỗi FCM — không ảnh hưởng app
     }
   }
 
@@ -66,8 +70,8 @@ class FCMService {
       if (kIsWeb) {
         try {
           token = await messaging.getToken();
-        } catch (e) {
-          debugPrint('⚠️ Web FCM token error (VAPID missing?): $e');
+        } catch (_) {
+          // VAPID key chưa cấu hình hoặc permission bị block — bỏ qua
           return;
         }
       } else {
@@ -75,10 +79,9 @@ class FCMService {
       }
 
       if (token == null) return;
-      debugPrint('✅ FCM Token: ${token.substring(0, 20)}...');
       await _updateTokenInFirestore(token);
-    } catch (e) {
-      debugPrint('❌ _saveToken error: $e');
+    } catch (_) {
+      // Bỏ qua lỗi token
     }
   }
 
@@ -94,9 +97,8 @@ class FCMService {
         'notificationsEnabled': true,
         'updatedAt': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
-      debugPrint('✅ FCM token saved ($field)');
-    } catch (e) {
-      debugPrint('❌ _updateTokenInFirestore error: $e');
+    } catch (_) {
+      // Bỏ qua lỗi Firestore
     }
   }
 
