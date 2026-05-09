@@ -651,6 +651,27 @@ class _ApplicationCard extends StatelessWidget {
                               fontSize: 13, fontWeight: FontWeight.w700)),
                     ),
                   ),
+                  // Nút xóa đơn cho chủ trọ (đơn đã xử lý xong)
+                  if (isOwnerView &&
+                      (application.status == 'approved' ||
+                          application.status == 'rejected' ||
+                          application.status == 'cancelled')) ...[
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => _confirmDelete(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.redAccent.withValues(alpha: 0.3)),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded,
+                            color: Colors.redAccent, size: 20),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -672,6 +693,64 @@ class _ApplicationCard extends StatelessWidget {
         child: Icon(icon, color: color, size: 18),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+            SizedBox(width: 10),
+            Text('Xóa đơn yêu cầu',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: const Text(
+          'Bạn có chắc muốn xóa đơn này khỏi danh sách không?\nHành động này không thể hoàn tác.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Xóa',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ApplicationService.deleteApplication(application.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa đơn yêu cầu'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 
   String _formatDate(String iso) {

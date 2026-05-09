@@ -138,6 +138,11 @@ class ApplicationService {
     });
   }
 
+  // ── Xóa đơn (chủ trọ xóa khỏi danh sách) ──────────────
+  static Future<void> deleteApplication(String applicationId) async {
+    await _col.doc(applicationId).delete();
+  }
+
   // ── Hủy đơn ─────────────────────────────────────────────
   static Future<void> cancelApplication(String applicationId) async {
     await updateStatus(applicationId, 'cancelled');
