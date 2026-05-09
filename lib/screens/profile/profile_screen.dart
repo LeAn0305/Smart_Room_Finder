@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,6 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _notificationsEnabled = true;
 
   File? _avatarFile;
+  Uint8List? _avatarBytes; // dùng cho web
   final StorageService _storageService = StorageService();
   
   // Stats tính từ dữ liệu mẫu  
@@ -101,38 +104,58 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
   Future<void> _pickAvatar(ImageSource source) async {
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
+      if (kIsWeb) {
+        // Web: dùng image_picker web (trả về XFile với bytes)
+        final picker = ImagePicker();
+        final picked = await picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
+        );
+        if (picked == null) return;
 
-      if (picked == null) return;
+        final bytes = await picked.readAsBytes();
+        final mimeType = picked.mimeType ?? 'image/jpeg';
 
-      final file = File(picked.path);
+        if (mounted) setState(() => _avatarBytes = bytes);
 
-      if (mounted) {
-        setState(() => _avatarFile = file);
+        await _showControlledSnackBar('Đang tải ảnh lên...', backgroundColor: AppColors.teal);
+
+        final imageUrl = await _storageService.uploadProfileImageBytes(bytes, mimeType);
+
+        await AuthService.updateUserProfile(
+          name: _user?.name ?? '',
+          location: _user?.location ?? '',
+          profileImageUrl: imageUrl,
+        );
+
+        await _loadUserProfile();
+        if (!mounted) return;
+        await _showControlledSnackBar('Cập nhật ảnh đại diện thành công');
+      } else {
+        // Mobile/Desktop
+        final picker = ImagePicker();
+        final picked = await picker.pickImage(source: source, imageQuality: 85);
+        if (picked == null) return;
+
+        final file = File(picked.path);
+        if (mounted) setState(() => _avatarFile = file);
+
+        await _showControlledSnackBar('Đang tải ảnh lên...', backgroundColor: AppColors.teal);
+
+        final imageUrl = await _storageService.uploadProfileImage(file);
+
+        await AuthService.updateUserProfile(
+          name: _user?.name ?? '',
+          location: _user?.location ?? '',
+          profileImageUrl: imageUrl,
+        );
+
+        await _loadUserProfile();
+        if (!mounted) return;
+        await _showControlledSnackBar('Cập nhật ảnh đại diện thành công');
       }
-
-      await _showControlledSnackBar('Đang tải ảnh lên...', backgroundColor: AppColors.teal);
-
-      final imageUrl = await _storageService.uploadProfileImage(file);
-
-      await AuthService.updateUserProfile(
-        name: _user?.name ?? '',
-        location: _user?.location ?? '',
-        profileImageUrl: imageUrl,
-      );
-
-      await _loadUserProfile();
-
-      if (!mounted) return;
-
-      await _showControlledSnackBar('Cập nhật ảnh đại diện thành công');
     } catch (e) {
       if (!mounted) return;
-
       await _showControlledSnackBar(
         'Không thể cập nhật ảnh đại diện: $e',
         backgroundColor: Colors.redAccent,
@@ -141,6 +164,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showImageSourcePicker() {
+    if (kIsWeb) {
+      // Trên web không có camera → chọn ảnh trực tiếp
+      _pickAvatar(ImageSource.gallery);
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -535,12 +563,14 @@ void _onLogout() {
             child: Padding(
               padding: const EdgeInsets.all(3),
               child: CircleAvatar(
-                backgroundImage: _avatarFile != null
-                    ? FileImage(_avatarFile!)
-                    : (displayImageUrl.isNotEmpty
+                backgroundImage: _avatarBytes != null
+                    ? MemoryImage(_avatarBytes!) as ImageProvider
+                    : _avatarFile != null
+                        ? FileImage(_avatarFile!)
+                        : (displayImageUrl.isNotEmpty
                         ? NetworkImage(displayImageUrl)
                         : null),
-                child: _avatarFile == null && displayImageUrl.isEmpty
+                child: _avatarBytes == null && _avatarFile == null && displayImageUrl.isEmpty
                     ? Text(
                         displayName.isNotEmpty
                             ? displayName[0].toUpperCase()
