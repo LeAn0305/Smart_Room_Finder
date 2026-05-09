@@ -145,6 +145,7 @@ class _ApplicationScreenState extends State<ApplicationScreen>
   }
 
   Widget _buildTopBar() {
+    final isLandlord = _userRole == UserRole.landlord;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
       child: Row(
@@ -163,10 +164,10 @@ class _ApplicationScreenState extends State<ApplicationScreen>
               ),
             ),
           const SizedBox(width: 12),
-          const Text(
-            'Đơn yêu cầu',
-            style: TextStyle(
-              fontSize: 24,
+          Text(
+            isLandlord ? 'Tiếp nhận đơn yêu cầu' : 'Đơn yêu cầu',
+            style: const TextStyle(
+              fontSize: 22,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
@@ -296,9 +297,7 @@ class _ApplicationCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isHighlighted
-              ? AppColors.teal
-              : Colors.white,
+          color: isHighlighted ? AppColors.teal : Colors.white,
           width: isHighlighted ? 2 : 1,
         ),
         boxShadow: [
@@ -313,10 +312,11 @@ class _ApplicationCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header
+          // ── Header ──────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Room image
                 ClipRRect(
@@ -342,16 +342,6 @@ class _ApplicationCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isOwnerView
-                            ? 'Từ: ${application.renterName}'
-                            : 'Chủ nhà: ${application.ownerName}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
                       const SizedBox(height: 6),
                       // Status badge
                       Container(
@@ -364,8 +354,7 @@ class _ApplicationCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(status.icon,
-                                size: 12, color: status.color),
+                            Icon(status.icon, size: 12, color: status.color),
                             const SizedBox(width: 4),
                             Text(
                               status.label,
@@ -385,7 +374,101 @@ class _ApplicationCard extends StatelessWidget {
             ),
           ),
 
-          // Info row
+          // ── Thông tin người thuê (chỉ hiện bên chủ trọ) ─
+          if (isOwnerView) ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.mintLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.teal.withValues(alpha: 0.15), width: 1),
+              ),
+              child: Column(
+                children: [
+                  // Tên người thuê
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.person_rounded,
+                            size: 14, color: AppColors.teal),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          application.renterName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // SĐT
+                  if (application.renterPhone.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.phone_rounded,
+                              size: 14, color: Colors.green),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          application.renterPhone,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  // Ngày gửi đơn
+                  if (application.createdAt.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.access_time_rounded,
+                              size: 14, color: Colors.orange),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Gửi lúc: ${_formatDate(application.createdAt)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // ── Ngày dọn vào ─────────────────────────────────
           if (application.expectedMoveInDate != null &&
               application.expectedMoveInDate!.isNotEmpty)
             Padding(
@@ -406,6 +489,7 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ),
 
+          // ── Lời nhắn ─────────────────────────────────────
           if (application.message.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
@@ -438,66 +522,138 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ),
 
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Row(
-              children: [
-                // Xem tiến độ
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openBookingStatus(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.teal,
-                      side: const BorderSide(color: AppColors.teal),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    icon: const Icon(Icons.timeline_rounded, size: 16),
-                    label: const Text('Tiến độ',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700)),
+          // ── Nút hành động ────────────────────────────────
+          if (isOwnerView && application.status == 'pending')
+            // Chủ trọ + đơn đang chờ → hiện nút Duyệt / Từ chối nổi bật
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openBookingStatus(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.teal,
+                            side: const BorderSide(color: AppColors.teal),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          icon: const Icon(Icons.timeline_rounded, size: 16),
+                          label: const Text('Tiến độ',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openChat(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.teal,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+                          label: const Text('Nhắn tin',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 10),
-                // Nhắn tin
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _openChat(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    icon: const Icon(Icons.chat_bubble_rounded, size: 16),
-                    label: const Text('Nhắn tin',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-                // Nếu là chủ nhà: thêm nút duyệt/từ chối
-                if (isOwnerView &&
-                    application.status == 'pending') ...[
-                  const SizedBox(width: 10),
-                  _iconBtn(
-                    Icons.check_rounded,
-                    Colors.green,
-                    () => _updateStatus(context, 'approved'),
-                  ),
-                  const SizedBox(width: 6),
-                  _iconBtn(
-                    Icons.close_rounded,
-                    Colors.redAccent,
-                    () => _updateStatus(context, 'rejected'),
+                  const SizedBox(height: 10),
+                  // Nút Duyệt / Từ chối to và rõ ràng
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _updateStatus(context, 'approved'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.check_circle_rounded, size: 18),
+                          label: const Text('Chấp nhận',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _updateStatus(context, 'rejected'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.cancel_rounded, size: 18),
+                          label: const Text('Từ chối',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ],
+              ),
+            )
+          else
+            // Người thuê hoặc đơn đã xử lý → nút thường
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openBookingStatus(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.teal,
+                        side: const BorderSide(color: AppColors.teal),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.timeline_rounded, size: 16),
+                      label: const Text('Tiến độ',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openChat(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.teal,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+                      label: const Text('Nhắn tin',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -516,6 +672,12 @@ class _ApplicationCard extends StatelessWidget {
         child: Icon(icon, color: color, size: 18),
       ),
     );
+  }
+
+  String _formatDate(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _openChat(BuildContext context) async {
