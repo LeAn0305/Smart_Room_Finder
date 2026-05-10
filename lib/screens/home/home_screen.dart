@@ -7,10 +7,14 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
+<<<<<<< Updated upstream
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
 import 'package:smart_room_finder/services/fcm_service.dart';
 import 'package:smart_room_finder/screens/notification/notification_screen.dart';
+=======
+import 'package:smart_room_finder/widgets/ai_chat_box.dart';
+>>>>>>> Stashed changes
 import 'package:smart_room_finder/widgets/room_card.dart';
 import 'package:smart_room_finder/widgets/section_title.dart';
 import 'package:smart_room_finder/screens/search/search_result_screen.dart';
@@ -78,6 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
     c += _filterAmenities.length;
     return c;
   }
+
+  // Chat box state — managed by AIChatBox widget
+
 
   final List<String> _categories = [
     'Tất cả',
@@ -151,6 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
       curve: Curves.easeInOut,
     );
     Future.delayed(const Duration(seconds: 3), _autoScroll);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _bannerCtrl.dispose();
+    super.dispose();
   }
 
   void _toggleFavorite(RoomModel room) {
@@ -449,12 +463,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final favoriteProvider = context.watch<FavoriteProvider>();
     final filtered = _applyFilters(roomProvider.activePublicRooms, pref);
 
-    return Scaffold(
-      backgroundColor: AppColors.mintLight,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.mintLight,
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Column(
@@ -707,6 +723,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 16),
 
+                  // AI Feature Buttons — removed, replaced by floating chat
+
                   _buildCategoryFilter(),
 
                   const SizedBox(height: 4),
@@ -809,6 +827,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    ),
+
+        // ── Floating AI Chat Box ───────────────────────────
+        const Positioned(
+          right: 16,
+          bottom: 24,
+          child: AIChatBox(),
+        ),
+      ],
     );
   }
 

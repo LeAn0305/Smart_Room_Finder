@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/screens/ai/ai_faq_widget.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -80,6 +81,11 @@ class _SupportScreenState extends State<SupportScreen> {
                     children: [
                       // Contact info
                       _buildContactCard(),
+                      const SizedBox(height: 20),
+                      // AI FAQ
+                      _buildSectionLabel('🤖 Hỏi đáp AI'),
+                      const SizedBox(height: 10),
+                      const AIFaqWidget(),
                       const SizedBox(height: 20),
                       // FAQ
                       _buildSectionLabel('Câu hỏi thường gặp'),

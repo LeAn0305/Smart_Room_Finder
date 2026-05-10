@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 
 class PostApprovalScreen extends StatefulWidget {
   const PostApprovalScreen({super.key});
@@ -119,6 +120,12 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   Future<void> _approveRoom(String roomId) async {
     final db = FirebaseFirestore.instance;
     final now = Timestamp.now();
+
+    // Lấy ownerId từ room document để gửi notification
+    final roomDoc = await db.collection('rooms').doc(roomId).get();
+    final ownerId = roomDoc.data()?['ownerId'] as String? ?? '';
+    final roomTitle = roomDoc.data()?['title'] as String? ?? 'phòng của bạn';
+
     final historyEntry = RoomReviewHistory(
       id: db.collection('_').doc().id,
       time: now.toDate(),
@@ -133,6 +140,18 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
       'updatedAt': now,
       'reviewHistory': FieldValue.arrayUnion([historyEntry.toMap()]),
     });
+
+    // Gửi notification cho owner
+    if (ownerId.isNotEmpty) {
+      await FCMService.saveNotification(
+        toUid: ownerId,
+        title: '✅ Bài đăng đã được xác minh!',
+        body: 'Phòng "$roomTitle" của bạn đã được Admin xác minh và hiển thị công khai.',
+        type: 'room_verified',
+        refId: roomId,
+      );
+    }
+
     _removeListingFromState(roomId);
   }
 
@@ -432,15 +451,15 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
     required String body,
   }) async {
     try {
-      await db.collection('notifications').add({
-        'receiverId': ownerId,
-        'roomId': roomId,
-        'type': type,
-        'title': title,
-        'body': body,
-        'isRead': false,
-        'createdAt': Timestamp.now(),
-      });
+      // Dùng FCMService để lưu vào đúng collection notifications của user
+      // → owner sẽ thấy trong NotificationScreen của app
+      await FCMService.saveNotification(
+        toUid: ownerId,
+        title: title,
+        body: body,
+        type: type,
+        refId: roomId,
+      );
     } catch (e) {
       // Không để lỗi notification ảnh hưởng luồng chính
       debugPrint('[Admin] Lỗi gửi notification: $e');

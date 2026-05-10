@@ -6,12 +6,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/map/route_map_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/review_section.dart';
 import 'package:smart_room_finder/screens/application/send_application_screen.dart';
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
+import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
 import 'package:smart_room_finder/services/view_history_service.dart';
 
@@ -27,12 +29,19 @@ class RoomDetailScreen extends StatefulWidget {
 class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int _selectedImage = 0;
   late RoomModel _room;
+  UserModel? _currentUser;
 
   @override
   void initState() {
     super.initState();
     _room = widget.room;
     _saveViewHistory();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await AuthService.getCurrentUserData();
+    if (mounted) setState(() => _currentUser = user);
   }
 
   Future<void> _saveViewHistory() async {
@@ -436,6 +445,26 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           );
                           return;
                         }
+                        // Chặn chủ trọ đặt chính phòng của mình
+                        if (uid == room.ownerId) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đây là phòng của bạn'),
+                              backgroundColor: AppColors.teal,
+                            ),
+                          );
+                          return;
+                        }
+                        // Chặn admin dùng flow thuê phòng
+                        if (_currentUser?.role == UserRole.admin) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Tài khoản Admin không thể đặt phòng'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -447,22 +476,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                       child: Container(
                         height: 56,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.teal, AppColors.tealDark],
+                          gradient: LinearGradient(
+                            colors: _isOwnerOrAdmin(room)
+                                ? [Colors.grey.shade400, Colors.grey.shade500]
+                                : [AppColors.teal, AppColors.tealDark],
                           ),
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.teal.withValues(alpha: 0.4),
+                              color: (_isOwnerOrAdmin(room)
+                                      ? Colors.grey
+                                      : AppColors.teal)
+                                  .withValues(alpha: 0.4),
                               blurRadius: 14,
                               offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'Đặt lịch ngay',
-                            style: TextStyle(
+                            _getBookingButtonLabel(room),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -855,5 +889,21 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       default:
         return Icons.check_circle_outline_rounded;
     }
+  }
+
+  String _getBookingButtonLabel(RoomModel room) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return 'Đặt lịch ngay';
+    if (uid == room.ownerId) return 'Đây là phòng của bạn';
+    if (_currentUser?.role == UserRole.admin) return 'Không thể đặt phòng';
+    return 'Đặt lịch ngay';
+  }
+
+  bool _isOwnerOrAdmin(RoomModel room) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    if (uid == room.ownerId) return true;
+    if (_currentUser?.role == UserRole.admin) return true;
+    return false;
   }
 }

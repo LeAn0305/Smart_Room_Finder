@@ -43,6 +43,11 @@ class ApplicationService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
+    // Chặn chủ trọ gửi đơn cho chính phòng của mình
+    if (uid == ownerId) {
+      throw Exception('Bạn không thể gửi đơn cho phòng của chính mình');
+    }
+
     // Kiểm tra đã có đơn cho phòng này chưa
     final existing = await getExistingApplication(roomId: roomId);
     if (existing != null) {
@@ -71,6 +76,14 @@ class ApplicationService {
       updatedAt: now,
     );
     await appRef.set(application.toMap());
+
+    // Gửi notification cho owner khi có đơn mới
+    _sendNewApplicationNotification(
+      toUid: ownerId,
+      renterName: renterName,
+      roomTitle: roomTitle,
+      applicationId: appRef.id,
+    );
 
     // 2. Tạo hoặc lấy chat liên kết
     final chat = ChatModel(
@@ -141,6 +154,25 @@ class ApplicationService {
     // Gửi notification cho người thuê khi đơn được duyệt/từ chối
     if (status == 'approved' || status == 'rejected') {
       _sendApplicationStatusNotification(applicationId, status);
+    }
+  }
+
+  static Future<void> _sendNewApplicationNotification({
+    required String toUid,
+    required String renterName,
+    required String roomTitle,
+    required String applicationId,
+  }) async {
+    try {
+      await FCMService.saveNotification(
+        toUid: toUid,
+        title: '📩 Đơn thuê phòng mới!',
+        body: '$renterName vừa gửi yêu cầu thuê phòng "$roomTitle".',
+        type: 'new_application',
+        refId: applicationId,
+      );
+    } catch (_) {
+      // Không để lỗi notification ảnh hưởng việc gửi đơn
     }
   }
 

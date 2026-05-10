@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Checkout & Pull Developer trước khi tạo nhánh",
+  "description": "Tự động chạy git checkout developer và git pull origin developer mỗi khi người dùng muốn tạo nhánh mới",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git checkout developer && git pull origin developer"
+  }
+}

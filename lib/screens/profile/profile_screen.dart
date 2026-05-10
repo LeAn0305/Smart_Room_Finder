@@ -374,18 +374,21 @@ void _onLogout() {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRoomScreen()));
                         },
                       ),
-                      _buildMenuItem(
-                        icon: Icons.message_outlined,
-                        label: 'Tin nhắn / Chat',
-                        subtitle: 'Nhắn tin với chủ phòng',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
-                      ),
-                      _buildMenuItem(
-                        icon: Icons.assignment_outlined,
-                        label: 'Đơn yêu cầu / Applications',
-                        subtitle: 'Xem đơn yêu cầu',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplicationScreen())),
-                      ),
+                      // Ẩn Chat và Application với Admin
+                      if (_user?.role != UserRole.admin) ...[
+                        _buildMenuItem(
+                          icon: Icons.message_outlined,
+                          label: 'Tin nhắn / Chat',
+                          subtitle: 'Nhắn tin với chủ phòng',
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
+                        ),
+                        _buildMenuItem(
+                          icon: Icons.assignment_outlined,
+                          label: 'Đơn yêu cầu / Applications',
+                          subtitle: 'Xem đơn yêu cầu',
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplicationScreen())),
+                        ),
+                      ],
                       _buildMenuItem(
                         icon: Icons.history_rounded,
                         label: lang.tr('view_history'),

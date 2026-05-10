@@ -8,6 +8,10 @@ import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/services/application_service.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
+<<<<<<< Updated upstream
+=======
+import 'package:smart_room_finder/services/chat_service.dart';
+>>>>>>> Stashed changes
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 
@@ -760,17 +764,63 @@ class _ApplicationCard extends StatelessWidget {
   }
 
   Future<void> _openChat(BuildContext context) async {
-    try {
-      final chat =
-          await ApplicationService.getChatForApplication(application.id);
-      if (chat == null || !context.mounted) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đăng nhập để nhắn tin'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(children: [
+          SizedBox(width: 18, height: 18,
+            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+          SizedBox(width: 12),
+          Text('Đang mở chat...'),
+        ]),
+        duration: Duration(seconds: 10),
+        backgroundColor: AppColors.teal,
+      ),
+    );
+
+    try {
+      final now = DateTime.now().toIso8601String();
+      final chatModel = ChatModel(
+        id: '',
+        roomId: application.roomId,
+        roomTitle: application.roomTitle,
+        roomImageUrl: application.roomImageUrl,
+        ownerId: application.ownerId,
+        ownerName: application.ownerName,
+        renterId: application.renterId,
+        renterName: application.renterName,
+        lastMessage: '',
+        lastMessageTime: now,
+        lastSenderId: '',
+        participants: [application.ownerId, application.renterId],
+        updatedAt: now,
+      );
+
+      final chatId = await ChatService.getOrCreateChat(chatModel);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      final chat = chatModel.copyWith(id: chatId);
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => ChatDetailScreen(chat: chat)),
       );
     } catch (e) {
       if (!context.mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Không thể mở chat: $e'),

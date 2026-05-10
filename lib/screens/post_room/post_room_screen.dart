@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/services/image_service.dart';
+import 'package:smart_room_finder/services/gemini_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:smart_room_finder/screens/map/map_picker_screen.dart';
 class PostRoomScreen extends StatefulWidget {
@@ -302,6 +303,17 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
                     const SizedBox(height: 12),
                     _field(_descCtrl, 'Mo ta chi tiet', Icons.description_rounded, maxLines: 3,
                         validator: (v) => v!.isEmpty ? 'Vui long nhap mo ta' : null),
+                    const SizedBox(height: 8),
+                    // Nút AI tự viết mô tả
+                    _AIDescriptionButton(
+                      onGenerate: (desc) => setState(() => _descCtrl.text = desc),
+                      getTitleCtrl: () => _titleCtrl.text,
+                      getPriceCtrl: () => _priceCtrl.text,
+                      getAddressCtrl: () => _addressCtrl.text,
+                      getAreaCtrl: () => _areaCtrl.text,
+                      getSelectedType: () => _selectedType,
+                      getSelectedAmenities: () => _selectedAmenities,
+                    ),
                     const SizedBox(height: 20),
                     _sectionTitle('Loai phong'),
                     const SizedBox(height: 12),
@@ -727,6 +739,121 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.teal, width: 1.5)),
         errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent, width: 1.5)),
         focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent, width: 1.5)),
+      ),
+    );
+  }
+}
+
+
+// ── AI Description Button ────────────────────────────────────
+class _AIDescriptionButton extends StatefulWidget {
+  final Function(String) onGenerate;
+  final String Function() getTitleCtrl;
+  final String Function() getPriceCtrl;
+  final String Function() getAddressCtrl;
+  final String Function() getAreaCtrl;
+  final RoomType Function() getSelectedType;
+  final List<String> Function() getSelectedAmenities;
+
+  const _AIDescriptionButton({
+    required this.onGenerate,
+    required this.getTitleCtrl,
+    required this.getPriceCtrl,
+    required this.getAddressCtrl,
+    required this.getAreaCtrl,
+    required this.getSelectedType,
+    required this.getSelectedAmenities,
+  });
+
+  @override
+  State<_AIDescriptionButton> createState() => _AIDescriptionButtonState();
+}
+
+class _AIDescriptionButtonState extends State<_AIDescriptionButton> {
+  bool _isGenerating = false;
+
+  Future<void> _generate() async {
+    final title = widget.getTitleCtrl();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập tên phòng trước'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isGenerating = true);
+
+    final typeMap = {
+      RoomType.studio: 'Phòng trọ',
+      RoomType.apartment: 'Chung cư',
+      RoomType.house: 'Nhà riêng',
+      RoomType.villa: 'Biệt thự',
+    };
+
+    final desc = await GeminiService.generateRoomDescription(
+      title: title,
+      roomType: typeMap[widget.getSelectedType()] ?? 'Phòng trọ',
+      price: double.tryParse(widget.getPriceCtrl()) ?? 0,
+      area: double.tryParse(widget.getAreaCtrl()) ?? 0,
+      address: widget.getAddressCtrl(),
+      amenities: widget.getSelectedAmenities(),
+    );
+
+    setState(() => _isGenerating = false);
+
+    if (desc.isNotEmpty) {
+      widget.onGenerate(desc);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✨ AI đã tạo mô tả cho phòng của bạn'),
+            backgroundColor: AppColors.teal,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _isGenerating ? null : _generate,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: _isGenerating
+              ? null
+              : const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
+          color: _isGenerating ? Colors.grey[200] : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _isGenerating
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.grey),
+                  )
+                : const Icon(Icons.auto_awesome_rounded,
+                    color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              _isGenerating ? 'AI đang viết...' : '✨ AI tự viết mô tả',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _isGenerating ? Colors.grey : Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
