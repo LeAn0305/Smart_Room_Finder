@@ -20,7 +20,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
   List<Widget> get _pages => [
-    const HomeScreen(),
+    HomeScreen(onSwitchToProfile: () => setState(() => _selectedIndex = 4)),
     const MapScreen(),
     const FavoriteScreen(),
     const ChatScreen(),

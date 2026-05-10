@@ -19,6 +19,9 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // KHÔNG gọi FCMService.initialize() ở đây
+  // FCM sẽ được khởi tạo sau khi user đăng nhập (trong AuthService)
+
   runApp(
     MultiProvider(
       providers: [

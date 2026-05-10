@@ -7,7 +7,6 @@ import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
-import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 import 'package:smart_room_finder/screens/map/route_map_screen.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/report_bottom_sheet.dart';
 import 'package:smart_room_finder/screens/room_detail/widgets/review_section.dart';

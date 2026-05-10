@@ -98,10 +98,19 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         if (priceRange.$2 > 0 && r.price < priceRange.$2) return false;
         if (priceRange.$3 != null && r.price > priceRange.$3!) return false;
 
-        // Tiện ích
+        // Tiện ích — normalize dấu/không dấu
         if (_selectedAmenities.isNotEmpty) {
-          final hasAll = _selectedAmenities.every((a) =>
-              r.amenities.any((ra) => ra.toLowerCase().contains(a.toLowerCase())));
+          final hasAll = _selectedAmenities.every((selected) {
+            final selectedNorm = _normalize(selected);
+            return r.amenities.any((ra) {
+              final raNorm = _normalize(ra);
+              // Kiểm tra chứa hoặc alias
+              return raNorm.contains(selectedNorm) ||
+                  selectedNorm.contains(raNorm) ||
+                  _amenityAliases(selected).any((alias) =>
+                      raNorm.contains(_normalize(alias)));
+            });
+          });
           if (!hasAll) return false;
         }
 
@@ -495,6 +504,32 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         ),
       ),
     );
+  }
+
+  /// Normalize chuỗi: lowercase + bỏ dấu tiếng Việt
+  String _normalize(String s) {
+    final withDiacritics = 'àáảãạăắặẳẵằâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ';
+    final withoutDiacritics = 'aaaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiioooooooooooooooooouuuuuuuuuuuyyyyyd';
+    var result = s.toLowerCase();
+    for (var i = 0; i < withDiacritics.length; i++) {
+      result = result.replaceAll(withDiacritics[i], withoutDiacritics[i]);
+    }
+    return result;
+  }
+
+  /// Alias cho từng tiện ích để match dữ liệu có dấu/không dấu
+  List<String> _amenityAliases(String amenity) {
+    final map = <String, List<String>>{
+      'Wifi': ['wifi', 'wi-fi', 'mang', 'mạng', 'internet'],
+      'Máy lạnh': ['may lanh', 'máy lạnh', 'dieu hoa', 'điều hòa', 'lanh', 'air', 'ac'],
+      'Tủ lạnh': ['tu lanh', 'tủ lạnh', 'refrigerator', 'fridge', 'tulanh'],
+      'Máy giặt': ['may giat', 'máy giặt', 'washing', 'maygiat'],
+      'Bếp': ['bep', 'bếp', 'kitchen', 'bep nau', 'bếp nấu'],
+      'Chỗ để xe': ['cho de xe', 'chỗ để xe', 'parking', 'xe', 'garage', 'ham xe', 'hầm xe'],
+      'Bảo vệ': ['bao ve', 'bảo vệ', 'security', 'an ninh', 'guard'],
+      'Hồ bơi': ['ho boi', 'hồ bơi', 'pool', 'swim', 'hoboi'],
+    };
+    return map[amenity] ?? [amenity.toLowerCase()];
   }
 
   Widget _activeChip(String label, VoidCallback onRemove) {

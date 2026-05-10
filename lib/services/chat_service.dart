@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/message_model.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 
 class ChatService {
   static final _db = FirebaseFirestore.instance;
@@ -82,6 +83,13 @@ class ChatService {
             s.docs.map((d) => MessageModel.fromMap(d.data(), d.id)).toList());
   }
 
+  // ── Lấy chat theo ID ────────────────────────────────────
+  static Future<ChatModel?> getChatById(String chatId) async {
+    final doc = await _chats.doc(chatId).get();
+    if (!doc.exists) return null;
+    return ChatModel.fromMap(doc.data()!, doc.id);
+  }
+
   // ── Tạo hoặc lấy chat ───────────────────────────────────
   static Future<String> getOrCreateChat(ChatModel chat) async {
     final uid = _uid;
@@ -123,6 +131,40 @@ class ChatService {
       'updatedAt': msg.createdAt,
     });
     await batch.commit();
+
+    // Gửi in-app notification cho người nhận
+    _sendMessageNotification(chatId, msg);
+  }
+
+  static Future<void> _sendMessageNotification(
+      String chatId, MessageModel msg) async {
+    try {
+      final chatDoc = await _chats.doc(chatId).get();
+      if (!chatDoc.exists) return;
+
+      final chat = ChatModel.fromMap(chatDoc.data()!, chatDoc.id);
+      final uid = msg.senderId;
+
+      // Xác định người nhận (người kia trong cuộc trò chuyện)
+      final recipientUid =
+          chat.ownerId == uid ? chat.renterId : chat.ownerId;
+      if (recipientUid.isEmpty || recipientUid == uid) return;
+
+      final senderName = chat.ownerId == uid ? chat.ownerName : chat.renterName;
+      final preview = msg.text.length > 50
+          ? '${msg.text.substring(0, 50)}...'
+          : msg.text;
+
+      await FCMService.saveNotification(
+        toUid: recipientUid,
+        title: 'Tin nhắn mới từ $senderName',
+        body: preview,
+        type: 'message',
+        refId: chatId,
+      );
+    } catch (e) {
+      // Không để lỗi notification ảnh hưởng việc gửi tin
+    }
   }
 
   // ── Đánh dấu đã đọc ─────────────────────────────────────

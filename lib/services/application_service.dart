@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/models/application_model.dart';
 import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
+import 'package:smart_room_finder/services/fcm_service.dart';
 
 class ApplicationService {
   static final _db = FirebaseFirestore.instance;
@@ -136,6 +137,34 @@ class ApplicationService {
       'note': note,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+
+    // Gửi notification cho người thuê khi đơn được duyệt/từ chối
+    if (status == 'approved' || status == 'rejected') {
+      _sendApplicationStatusNotification(applicationId, status);
+    }
+  }
+
+  static Future<void> _sendApplicationStatusNotification(
+      String applicationId, String status) async {
+    try {
+      final doc = await _col.doc(applicationId).get();
+      if (!doc.exists) return;
+
+      final app = ApplicationModel.fromMap(doc.data()!, doc.id);
+      final isApproved = status == 'approved';
+
+      await FCMService.saveNotification(
+        toUid: app.renterId,
+        title: isApproved ? '🎉 Đơn thuê được chấp nhận!' : '❌ Đơn thuê bị từ chối',
+        body: isApproved
+            ? 'Chủ nhà đã chấp nhận đơn thuê phòng "${app.roomTitle}" của bạn.'
+            : 'Chủ nhà đã từ chối đơn thuê phòng "${app.roomTitle}".',
+        type: isApproved ? 'application_approved' : 'application_rejected',
+        refId: applicationId,
+      );
+    } catch (e) {
+      // Không để lỗi notification ảnh hưởng việc cập nhật đơn
+    }
   }
 
   // ── Xóa đơn (chủ trọ xóa khỏi danh sách) ──────────────
