@@ -72,6 +72,14 @@ class ApplicationService {
     );
     await appRef.set(application.toMap());
 
+    // Gửi notification cho owner khi có đơn mới
+    _sendNewApplicationNotification(
+      toUid: ownerId,
+      renterName: renterName,
+      roomTitle: roomTitle,
+      applicationId: appRef.id,
+    );
+
     // 2. Tạo hoặc lấy chat liên kết
     final chat = ChatModel(
       id: '',
@@ -127,6 +135,25 @@ class ApplicationService {
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });
+  }
+
+  static Future<void> _sendNewApplicationNotification({
+    required String toUid,
+    required String renterName,
+    required String roomTitle,
+    required String applicationId,
+  }) async {
+    try {
+      await FCMService.saveNotification(
+        toUid: toUid,
+        title: '📩 Đơn thuê phòng mới!',
+        body: '$renterName vừa gửi yêu cầu thuê phòng "$roomTitle".',
+        type: 'new_application',
+        refId: applicationId,
+      );
+    } catch (_) {
+      // Không để lỗi notification ảnh hưởng việc gửi đơn
+    }
   }
 
   // ── Cập nhật trạng thái đơn ──────────────────────────────

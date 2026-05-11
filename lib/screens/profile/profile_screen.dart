@@ -378,7 +378,7 @@ void _onLogout() {
                         icon: Icons.message_outlined,
                         label: 'Tin nhắn / Chat',
                         subtitle: 'Nhắn tin với chủ phòng',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen())),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen(showBackButton: true))),
                       ),
                       _buildMenuItem(
                         icon: Icons.assignment_outlined,

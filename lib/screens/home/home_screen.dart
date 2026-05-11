@@ -816,7 +816,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         SizedBox(
-          height: 130,
+          height: 150,
           child: PageView.builder(
             controller: _bannerCtrl,
             onPageChanged: (i) => setState(() => _bannerPage = i),
