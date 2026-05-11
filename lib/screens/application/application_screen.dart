@@ -8,10 +8,7 @@ import 'package:smart_room_finder/models/chat_model.dart';
 import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/services/application_service.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-<<<<<<< Updated upstream
-=======
 import 'package:smart_room_finder/services/chat_service.dart';
->>>>>>> Stashed changes
 import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/screens/booking/booking_status_screen.dart';
 
@@ -805,6 +802,7 @@ class _ApplicationCard extends StatelessWidget {
         lastMessageTime: now,
         lastSenderId: '',
         participants: [application.ownerId, application.renterId],
+        createdAt: now,
         updatedAt: now,
       );
 
