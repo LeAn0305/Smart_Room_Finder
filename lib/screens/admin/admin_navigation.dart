@@ -9,38 +9,44 @@ import 'package:smart_room_finder/screens/admin/admin_PostApproval_screen.dart';
 // =========================
 // ADMIN NAVIGATION HELPERS
 // =========================
+
+void _openAdminScreen(BuildContext context, Widget screen) {
+  final rootNavigator = Navigator.of(context, rootNavigator: true);
+  final localNavigator = Navigator.of(context);
+
+  // Nếu đang mở Drawer/Menu trên mobile thì đóng trước.
+  if (localNavigator.canPop()) {
+    localNavigator.pop();
+  }
+
+  // Đợi Drawer đóng xong rồi mới chuyển màn để tránh lỗi Navigator stack trên Android.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    rootNavigator.push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+  });
+}
+
 void openAdminDashboard(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-  );
+  _openAdminScreen(context, const AdminDashboardScreen());
 }
 
 void openPostApproval(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const PostApprovalScreen()),
-  );
+  _openAdminScreen(context, const PostApprovalScreen());
 }
 
 void openAdminUsers(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const AdminUserScreen()),
-  );
+  _openAdminScreen(context, const AdminUserScreen());
 }
 
 void openAdminReports(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const AdminReportScreen()),
-  );
+  _openAdminScreen(context, const AdminReportScreen());
 }
 
 void openAdminSupport(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const AdminSupportScreen()),
-  );
+  _openAdminScreen(context, const AdminSupportScreen());
 }
 
 void openAdminSettings(BuildContext context) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
-  );
+  _openAdminScreen(context, const AdminSettingsScreen());
 }

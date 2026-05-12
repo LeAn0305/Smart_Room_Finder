@@ -100,90 +100,94 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
   }
 
   Future<void> _showLockUserDialog(AdminUserModel user) async {
-    if (user.isAdmin) {
-      _showAdminSnackBar('Không thể khóa tài khoản Admin.', isError: true);
-      return;
-    }
+  if (user.isAdmin) {
+    _showAdminSnackBar('Không thể khóa tài khoản Admin.', isError: true);
+    return;
+  }
 
-    final reasonController = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Khóa tài khoản',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Bạn có chắc muốn khóa tài khoản ${user.displayName}?',
-              style: const TextStyle(
-                color: Color(0xFF5C6D82),
-                fontSize: 13,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
+  String lockReason = '';
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: const Text(
+        'Khóa tài khoản',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bạn có chắc muốn khóa tài khoản ${user.displayName}?',
+            style: const TextStyle(
+              color: Color(0xFF5C6D82),
+              fontSize: 13,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Nhập lý do khóa tài khoản',
-                filled: true,
-                fillColor: const Color(0xFFF7FAFE),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide:
-                      const BorderSide(color: Color(0xFFFF5B6E), width: 1.4),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Hủy'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF5B6E),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 14),
+          TextField(
+            maxLines: 3,
+            onChanged: (value) {
+              lockReason = value;
+            },
+            decoration: InputDecoration(
+              hintText: 'Nhập lý do khóa tài khoản',
+              filled: true,
+              fillColor: const Color(0xFFF7FAFE),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
               ),
-            ),
-            child: const Text(
-              'Xác nhận khóa',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE3EBF5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide:
+                    const BorderSide(color: Color(0xFFFF5B6E), width: 1.4),
+              ),
             ),
           ),
         ],
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF5B6E),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text(
+            'Xác nhận khóa',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    ),
+  );
 
-    final reason = reasonController.text.trim().isEmpty
-        ? 'Vi phạm quy định sử dụng'
-        : reasonController.text.trim();
-    reasonController.dispose();
+  if (confirmed != true) return;
+  if (!mounted) return;
 
-    if (confirmed != true) return;
-    await _lockUser(user, reason);
-  }
+  final reason = lockReason.trim().isEmpty
+      ? 'Vi phạm quy định sử dụng'
+      : lockReason.trim();
+
+  await _lockUser(user, reason);
+}
 
   Future<void> _showUnlockUserDialog(AdminUserModel user) async {
     final confirmed = await showDialog<bool>(
