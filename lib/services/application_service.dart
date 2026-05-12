@@ -176,24 +176,7 @@ class ApplicationService {
     }
   }
 
-  static Future<void> _sendNewApplicationNotification({
-    required String toUid,
-    required String renterName,
-    required String roomTitle,
-    required String applicationId,
-  }) async {
-    try {
-      await FCMService.saveNotification(
-        toUid: toUid,
-        title: '📩 Đơn thuê phòng mới!',
-        body: '$renterName vừa gửi yêu cầu thuê phòng "$roomTitle".',
-        type: 'new_application',
-        refId: applicationId,
-      );
-    } catch (_) {
-      // Không để lỗi notification ảnh hưởng việc gửi đơn
-    }
-  }
+
 
   static Future<void> _sendApplicationStatusNotification(
       String applicationId, String status) async {
