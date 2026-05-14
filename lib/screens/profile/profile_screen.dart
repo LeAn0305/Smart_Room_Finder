@@ -344,6 +344,20 @@ void _onLogout() {
                         subtitle: lang.tr('edit_profile_subtitle'),
                         onTap: () => _showEditProfile(),
                       ),
+                      if (_user?.email == '1@gmail.com')
+                        _buildMenuItem(
+                          icon: Icons.cloud_upload_outlined,
+                          label: 'Import 20 PhĂ²ng trá»  tá»« DSPT',
+                          subtitle: 'Nháº­p dá»¯ liá»‡u tá»« file DOCX lĂªn Firestore',
+                          iconColor: Colors.orangeAccent,
+                          onTap: () async {
+                            final provider = context.read<RoomProvider>();
+                            await provider.importDsptRooms();
+                            if (mounted) {
+                              await _showControlledSnackBar('Ä Ă£ nháº­p dá»¯ liá»‡u thĂ nh cĂ´ng!');
+                            }
+                          },
+                        ),
                       _buildMenuItem(
                         icon: Icons.lock_outline_rounded,
                         label: lang.tr('change_password'),

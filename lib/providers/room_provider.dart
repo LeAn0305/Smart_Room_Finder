@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_room_finder/models/room_model.dart';
+import 'package:smart_room_finder/data/dspt_data.dart';
 
 class RoomProvider extends ChangeNotifier {
   final CollectionReference _roomsRef =
@@ -191,5 +192,33 @@ class RoomProvider extends ChangeNotifier {
       isFavorite: !_rooms[idx].isFavorite,
     );
     notifyListeners();
+  }
+
+  Future<void> importDsptRooms() async {
+    final uid = currentUserId;
+    if (uid == null) {
+      debugPrint('❌ Phải đăng nhập để import');
+      return;
+    }
+
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final dsptRooms = DsptData.getRooms(uid);
+      
+      for (var room in dsptRooms) {
+        // Kiểm tra xem phòng đã tồn tại chưa (dựa trên ID dspt_x)
+        // Nhưng thường thì add mới cho chắc
+        await addRoom(room);
+      }
+
+      debugPrint('✅ Đã import thành công 20 phòng từ DSPT');
+    } catch (e) {
+      debugPrint('❌ Lỗi import: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }
