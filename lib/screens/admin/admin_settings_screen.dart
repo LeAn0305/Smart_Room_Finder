@@ -1286,11 +1286,11 @@ class _ActionBar extends StatelessWidget {
             )
           : Row(
               children: [
-                SizedBox(width: 210, child: restore),
+                Flexible(child: restore),
                 const Spacer(),
-                SizedBox(width: 180, child: export),
+                Flexible(child: export),
                 const SizedBox(width: 16),
-                SizedBox(width: 220, child: save),
+                Flexible(child: save),
               ],
             ),
     );

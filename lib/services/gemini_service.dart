@@ -3,7 +3,7 @@ import 'package:smart_room_finder/models/room_model.dart';
 
 class GeminiService {
   static const String _apiKey = 'AIzaSyAsk6SYycERwnD6V-e6obJtKiUXVInb53Y';
-  static const String _modelName = 'gemini-1.5-flash-8b';
+  static const String _modelName = 'gemini-2.0-flash';
 
   static ChatSession? _chatSession;
 
