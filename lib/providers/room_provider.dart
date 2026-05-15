@@ -58,6 +58,13 @@ class RoomProvider extends ChangeNotifier {
         }).toList();
 
         debugPrint('✅ Load ${_rooms.length} phòng từ Firestore');
+        
+        // Tự động dọn dẹp các phòng bị lặp sau khi load
+        await cleanupDuplicateDsptRooms();
+        // Tự động import nếu thiếu phòng
+        await importDsptRooms();
+        // Tự động đồng bộ ảnh mới từ DsptData
+        await syncDsptRoomsWithData();
       } else {
         debugPrint('⚠️ Firestore rỗng, dùng mock tạm');
         _rooms = List.from(RoomModel.sampleRooms);
@@ -208,17 +215,125 @@ class RoomProvider extends ChangeNotifier {
       final dsptRooms = DsptData.getRooms(uid);
       
       for (var room in dsptRooms) {
-        // Kiểm tra xem phòng đã tồn tại chưa (dựa trên ID dspt_x)
-        // Nhưng thường thì add mới cho chắc
-        await addRoom(room);
+        // Kiểm tra xem phòng đã tồn tại chưa (dựa trên tiêu đề)
+        final exists = _rooms.any((r) => r.title == room.title && r.ownerId == uid);
+        if (!exists) {
+          await addRoom(room);
+        }
       }
 
-      debugPrint('✅ Đã import thành công 20 phòng từ DSPT');
+      debugPrint('✅ Đã đảm bảo danh sách 20 phòng từ DSPT (không trùng lặp)');
     } catch (e) {
       debugPrint('❌ Lỗi import: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Xóa các phòng DSPT bị lặp (cùng tiêu đề và cùng chủ sở hữu)
+  Future<void> cleanupDuplicateDsptRooms() async {
+    final uid = currentUserId;
+    if (uid == null) return;
+
+    try {
+      final dsptRooms = DsptData.getRooms(uid);
+      final dsptTitles = dsptRooms.map((r) => r.title).toSet();
+
+      // Nhóm các phòng hiện có theo tiêu đề
+      final Map<String, List<RoomModel>> groupedRooms = {};
+      for (var room in _rooms) {
+        if (dsptTitles.contains(room.title) && room.ownerId == uid) {
+          groupedRooms.putIfAbsent(room.title, () => []).add(room);
+        }
+      }
+
+      int deletedCount = 0;
+      bool changed = false;
+
+      for (var title in groupedRooms.keys) {
+        final roomsWithSameTitle = groupedRooms[title]!;
+        if (roomsWithSameTitle.length > 1) {
+          // Giữ lại phòng đầu tiên (cũ nhất hoặc mới nhất tùy vào thứ tự load, thường là theo Firestore)
+          // Xóa các bản sao còn lại
+          for (int i = 1; i < roomsWithSameTitle.length; i++) {
+            final roomToDelete = roomsWithSameTitle[i];
+            await _roomsRef.doc(roomToDelete.id).delete();
+            _rooms.removeWhere((r) => r.id == roomToDelete.id);
+            deletedCount++;
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        debugPrint('✅ Đã dọn dẹp $deletedCount phòng bị lặp');
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Lỗi khi dọn dẹp phòng lặp: $e');
+    }
+  }
+
+  /// Đồng bộ dữ liệu ảnh mới từ DsptData lên Firestore cho các phòng đã tồn tại
+  Future<void> syncDsptRoomsWithData() async {
+    final uid = currentUserId;
+    if (uid == null) return;
+
+    try {
+      final dsptRooms = DsptData.getRooms(uid);
+      bool changed = false;
+
+      for (var localRoom in dsptRooms) {
+        // Tìm phòng tương ứng trên Firestore (dựa trên tiêu đề và ownerId)
+        final existingRoomIdx = _rooms.indexWhere(
+            (r) => r.title == localRoom.title && r.ownerId == uid);
+
+        if (existingRoomIdx != -1) {
+          final existingRoom = _rooms[existingRoomIdx];
+          
+          // Kiểm tra xem danh sách ảnh có thay đổi không
+          bool imageListChanged = existingRoom.mainImageUrl != localRoom.mainImageUrl ||
+              existingRoom.subImageUrls.length != localRoom.subImageUrls.length;
+          
+          if (!imageListChanged) {
+             for(int i=0; i<localRoom.subImageUrls.length; i++) {
+               if(existingRoom.subImageUrls[i] != localRoom.subImageUrls[i]) {
+                 imageListChanged = true;
+                 break;
+               }
+             }
+          }
+
+          if (imageListChanged) {
+            debugPrint('🔄 Đồng bộ ảnh cho phòng: ${localRoom.title}');
+            
+            final updatedRoom = existingRoom.copyWith(
+              mainImageUrl: localRoom.mainImageUrl,
+              subImageUrls: localRoom.subImageUrls,
+              imageUrl: localRoom.mainImageUrl, // Cập nhật cả trường cũ nếu có dùng
+              images: [localRoom.mainImageUrl, ...localRoom.subImageUrls], // Cập nhật danh sách tổng hợp
+            );
+
+            await _roomsRef.doc(existingRoom.id).update({
+              'mainImageUrl': updatedRoom.mainImageUrl,
+              'subImageUrls': updatedRoom.subImageUrls,
+              'imageUrl': updatedRoom.imageUrl,
+              'images': updatedRoom.images,
+            });
+
+            _rooms[existingRoomIdx] = updatedRoom;
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        notifyListeners();
+        debugPrint('✅ Đã đồng bộ toàn bộ ảnh từ file DOCX lên Firestore');
+      }
+    } catch (e) {
+      debugPrint('❌ Lỗi khi đồng bộ ảnh: $e');
     }
   }
 }
