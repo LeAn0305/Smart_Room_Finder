@@ -102,8 +102,6 @@ class RoomProvider extends ChangeNotifier {
 
         // Tự động dọn dẹp các phòng bị lặp sau khi load
         await cleanupDuplicateDsptRooms();
-        // Tự động khôi phục 20 phòng mẫu nếu tài khoản hiện tại là Lê An (1@gmail.com)
-        await importDsptRooms();
         // Xóa các phòng lặp DSPT nếu user hiện tại là người lỡ tạo ra chúng
         await _cleanupMyWrongDsptRooms();
         // Tự động chèn tọa độ cho các phòng bị thiếu
