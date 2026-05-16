@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/data/dspt_data.dart';
 
@@ -63,8 +66,8 @@ class RoomProvider extends ChangeNotifier {
         await cleanupDuplicateDsptRooms();
         // Tự động import nếu thiếu phòng
         await importDsptRooms();
-        // Tự động đồng bộ ảnh mới từ DsptData
-        await syncDsptRoomsWithData();
+        // Tự động quét và vá lỗi các đường dẫn ảnh cục bộ
+        await _autoHealImagePaths();
       } else {
         debugPrint('⚠️ Firestore rỗng, dùng mock tạm');
         _rooms = List.from(RoomModel.sampleRooms);
@@ -275,65 +278,105 @@ class RoomProvider extends ChangeNotifier {
     }
   }
 
-  /// Đồng bộ dữ liệu ảnh mới từ DsptData lên Firestore cho các phòng đã tồn tại
-  Future<void> syncDsptRoomsWithData() async {
-    final uid = currentUserId;
-    if (uid == null) return;
+  /// Tự động quét và vá lỗi đường dẫn ảnh. 
+  /// Đưa các file từ 'assets/' hoặc ổ cứng local (như 'C:/...') lên Firebase Storage.
+  Future<void> _autoHealImagePaths() async {
+    bool anyRoomChanged = false;
 
-    try {
-      final dsptRooms = DsptData.getRooms(uid);
-      bool changed = false;
+    for (int i = 0; i < _rooms.length; i++) {
+      final room = _rooms[i];
+      bool roomChanged = false;
+      String newMain = room.mainImageUrl;
+      List<String> newSubs = List.from(room.subImageUrls);
 
-      for (var localRoom in dsptRooms) {
-        // Tìm phòng tương ứng trên Firestore (dựa trên tiêu đề và ownerId)
-        final existingRoomIdx = _rooms.indexWhere(
-            (r) => r.title == localRoom.title && r.ownerId == uid);
+      if (_needsHealing(newMain)) {
+        final url = await _uploadAndGetUrl(newMain);
+        if (url != null) {
+          newMain = url;
+          roomChanged = true;
+        }
+      }
 
-        if (existingRoomIdx != -1) {
-          final existingRoom = _rooms[existingRoomIdx];
-          
-          // Kiểm tra xem danh sách ảnh có thay đổi không
-          bool imageListChanged = existingRoom.mainImageUrl != localRoom.mainImageUrl ||
-              existingRoom.subImageUrls.length != localRoom.subImageUrls.length;
-          
-          if (!imageListChanged) {
-             for(int i=0; i<localRoom.subImageUrls.length; i++) {
-               if(existingRoom.subImageUrls[i] != localRoom.subImageUrls[i]) {
-                 imageListChanged = true;
-                 break;
-               }
-             }
-          }
-
-          if (imageListChanged) {
-            debugPrint('🔄 Đồng bộ ảnh cho phòng: ${localRoom.title}');
-            
-            final updatedRoom = existingRoom.copyWith(
-              mainImageUrl: localRoom.mainImageUrl,
-              subImageUrls: localRoom.subImageUrls,
-              imageUrl: localRoom.mainImageUrl, // Cập nhật cả trường cũ nếu có dùng
-              images: [localRoom.mainImageUrl, ...localRoom.subImageUrls], // Cập nhật danh sách tổng hợp
-            );
-
-            await _roomsRef.doc(existingRoom.id).update({
-              'mainImageUrl': updatedRoom.mainImageUrl,
-              'subImageUrls': updatedRoom.subImageUrls,
-              'imageUrl': updatedRoom.imageUrl,
-              'images': updatedRoom.images,
-            });
-
-            _rooms[existingRoomIdx] = updatedRoom;
-            changed = true;
+      for (int j = 0; j < newSubs.length; j++) {
+        if (_needsHealing(newSubs[j])) {
+          final url = await _uploadAndGetUrl(newSubs[j]);
+          if (url != null) {
+            newSubs[j] = url;
+            roomChanged = true;
           }
         }
       }
 
-      if (changed) {
-        notifyListeners();
-        debugPrint('✅ Đã đồng bộ toàn bộ ảnh từ file DOCX lên Firestore');
+      if (roomChanged) {
+        final updatedRoom = room.copyWith(
+          mainImageUrl: newMain,
+          subImageUrls: newSubs,
+          imageUrl: newMain, // Đồng bộ trường cũ
+          images: [newMain, ...newSubs], // Đồng bộ mảng cũ
+        );
+
+        try {
+          await _roomsRef.doc(room.id).update({
+            'mainImageUrl': updatedRoom.mainImageUrl,
+            'subImageUrls': updatedRoom.subImageUrls,
+            'imageUrl': updatedRoom.imageUrl,
+            'images': updatedRoom.images,
+          });
+          _rooms[i] = updatedRoom;
+          anyRoomChanged = true;
+          debugPrint('🔧 Đã vá lỗi ảnh thành công cho phòng: ${room.title}');
+        } catch (e) {
+          debugPrint('❌ Lỗi khi vá ảnh cho phòng ${room.title}: $e');
+        }
+      }
+    }
+
+    if (anyRoomChanged) {
+      notifyListeners();
+      debugPrint('✅ Hoàn tất vá lỗi ảnh tự động!');
+    }
+  }
+
+  bool _needsHealing(String path) {
+    if (path.isEmpty || path.startsWith('http')) return false;
+    if (path.startsWith('assets/') || path.contains(':/') || path.startsWith('/data/') || path.startsWith('/Users/')) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<String?> _uploadAndGetUrl(String localPath) async {
+    try {
+      final ext = localPath.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext) ? ext : 'jpg';
+      final fileName = 'auto_healed/${DateTime.now().millisecondsSinceEpoch}_${localPath.hashCode}.$safeExt';
+      final ref = FirebaseStorage.instance.ref(fileName);
+      
+      String contentType = 'image/jpeg';
+      if (safeExt == 'png') contentType = 'image/png';
+      if (safeExt == 'gif') contentType = 'image/gif';
+      if (safeExt == 'webp') contentType = 'image/webp';
+      
+      final metadata = SettableMetadata(contentType: contentType);
+
+      if (localPath.startsWith('assets/')) {
+        final byteData = await rootBundle.load(localPath);
+        final bytes = byteData.buffer.asUint8List();
+        await ref.putData(bytes, metadata);
+        return await ref.getDownloadURL();
+      } else {
+        final file = File(localPath);
+        if (await file.exists()) {
+          await ref.putFile(file, metadata);
+          return await ref.getDownloadURL();
+        } else {
+          debugPrint('⚠️ Không tìm thấy file local để vá: $localPath');
+          return null;
+        }
       }
     } catch (e) {
-      debugPrint('❌ Lỗi khi đồng bộ ảnh: $e');
+      debugPrint('❌ Lỗi upload ngầm file $localPath: $e');
+      return null;
     }
   }
 }
