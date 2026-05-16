@@ -2409,25 +2409,6 @@ class _PanelButton extends StatelessWidget {
   }
 }
 
-class _PageIconButton extends StatelessWidget {
-  const _PageIconButton({
-    required this.icon,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      visualDensity: VisualDensity.compact,
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      color: const Color(0xFF8EA0B4),
-    );
-  }
-}
 
 class _PageNumberButton extends StatelessWidget {
   const _PageNumberButton({

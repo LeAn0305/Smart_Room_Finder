@@ -55,7 +55,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 class _NotificationBody extends StatelessWidget {
   final _uid = FirebaseAuth.instance.currentUser?.uid;
 
-  _NotificationBody({super.key});
+  _NotificationBody();
 
   @override
   Widget build(BuildContext context) {
