@@ -20,8 +20,35 @@ class RoomProvider extends ChangeNotifier {
 
   List<RoomModel> get allRooms => List.unmodifiable(_rooms);
 
-  List<RoomModel> get activePublicRooms =>
-      _rooms.where((r) => r.isActive && !r.isDraft).toList();
+  List<RoomModel> get activePublicRooms {
+    var publicRooms = _rooms.where((r) => r.isActive && !r.isDraft).toList();
+
+    // Lọc bỏ các phòng DSPT lặp trên UI (chỉ giữ bản cũ nhất)
+    final dsptRooms = DsptData.getRooms('dummy');
+    final dsptTitles = dsptRooms.map((r) => r.title).toSet();
+
+    final Map<String, RoomModel> originalDsptRooms = {};
+    for (var room in publicRooms) {
+      if (dsptTitles.contains(room.title)) {
+        if (!originalDsptRooms.containsKey(room.title)) {
+          originalDsptRooms[room.title] = room;
+        } else {
+          final timeA = originalDsptRooms[room.title]!.postedAt ?? DateTime.now();
+          final timeB = room.postedAt ?? DateTime.now();
+          if (timeB.isBefore(timeA)) {
+            originalDsptRooms[room.title] = room;
+          }
+        }
+      }
+    }
+
+    return publicRooms.where((room) {
+      if (dsptTitles.contains(room.title)) {
+        return originalDsptRooms[room.title]?.id == room.id;
+      }
+      return true;
+    }).toList();
+  }
 
   List<RoomModel> get myActiveRooms {
     final uid = currentUserId;
@@ -75,8 +102,8 @@ class RoomProvider extends ChangeNotifier {
 
         // Tự động dọn dẹp các phòng bị lặp sau khi load
         await cleanupDuplicateDsptRooms();
-        // Xóa dứt điểm các phòng DSPT bị lặp do nhiều tài khoản tạo ra
-        await _nukeDuplicateDsptRoomsGlobally();
+        // Xóa các phòng lặp DSPT nếu user hiện tại là người lỡ tạo ra chúng
+        await _cleanupMyWrongDsptRooms();
         // Tự động chèn tọa độ cho các phòng bị thiếu
         await _autoUpdateDsptCoordinates();
         // Tự động quét và vá lỗi các đường dẫn ảnh cục bộ
@@ -291,39 +318,42 @@ class RoomProvider extends ChangeNotifier {
     }
   }
 
-  /// Dọn dẹp triệt để các phòng DSPT bị lặp do nhiều tài khoản khác nhau tạo ra.
-  /// Chỉ giữ lại 1 bản gốc (cũ nhất) cho mỗi tiêu đề DSPT.
-  Future<void> _nukeDuplicateDsptRoomsGlobally() async {
+  /// Xóa triệt để các phòng DSPT mà user hiện tại LỠ TẠO RA (do lỗi nhân bản)
+  /// Nếu user hiện tại KHÔNG phải là user tạo ra bản gốc đầu tiên, xóa hết!
+  Future<void> _cleanupMyWrongDsptRooms() async {
+    final uid = currentUserId;
+    if (uid == null) return;
+
     try {
-      // Dùng UID tạm vì getRooms bắt buộc truyền UID, nhưng ta chỉ lấy danh sách tiêu đề
-      final dsptRooms = DsptData.getRooms('dummy_uid');
+      final dsptRooms = DsptData.getRooms('dummy');
       final dsptTitles = dsptRooms.map((r) => r.title).toSet();
 
-      final Map<String, List<RoomModel>> groupedRooms = {};
+      // Tìm bản gốc của mỗi tiêu đề (phòng cũ nhất)
+      final Map<String, RoomModel> originalDsptRooms = {};
       for (var room in _rooms) {
         if (dsptTitles.contains(room.title)) {
-          groupedRooms.putIfAbsent(room.title, () => []).add(room);
+          if (!originalDsptRooms.containsKey(room.title)) {
+            originalDsptRooms[room.title] = room;
+          } else {
+            final timeA = originalDsptRooms[room.title]!.postedAt ?? DateTime.now();
+            final timeB = room.postedAt ?? DateTime.now();
+            if (timeB.isBefore(timeA)) {
+              originalDsptRooms[room.title] = room;
+            }
+          }
         }
       }
 
       int deletedCount = 0;
       bool changed = false;
 
-      for (var title in groupedRooms.keys) {
-        final roomsWithSameTitle = groupedRooms[title]!;
-        if (roomsWithSameTitle.length > 1) {
-          // Sắp xếp theo ngày đăng cũ nhất đến mới nhất
-          roomsWithSameTitle.sort((a, b) {
-            final timeA = a.postedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final timeB = b.postedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return timeA.compareTo(timeB);
-          });
-          
-          // Giữ lại phòng cũ nhất (index 0), xóa tất cả các phòng còn lại
-          for (int i = 1; i < roomsWithSameTitle.length; i++) {
-            final roomToDelete = roomsWithSameTitle[i];
-            await _roomsRef.doc(roomToDelete.id).delete();
-            _rooms.removeWhere((r) => r.id == roomToDelete.id);
+      // Quét các phòng của USER HIỆN TẠI
+      for (var room in List.from(_rooms)) {
+        if (room.ownerId == uid && dsptTitles.contains(room.title)) {
+          // Nếu phòng này KHÔNG phải là bản gốc
+          if (originalDsptRooms[room.title]?.id != room.id) {
+            await _roomsRef.doc(room.id).delete();
+            _rooms.removeWhere((r) => r.id == room.id);
             deletedCount++;
             changed = true;
           }
@@ -331,11 +361,11 @@ class RoomProvider extends ChangeNotifier {
       }
 
       if (changed) {
-        debugPrint('🧹 Đã xóa dứt điểm $deletedCount phòng mẫu bị lặp từ các tài khoản khác!');
+        debugPrint('🧹 Đã dọn dẹp $deletedCount phòng mẫu thừa của tài khoản hiện tại!');
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('❌ Lỗi _nukeDuplicateDsptRoomsGlobally: $e');
+      debugPrint('❌ Lỗi _cleanupMyWrongDsptRooms: $e');
     }
   }
 
