@@ -349,7 +349,8 @@ class RoomProvider extends ChangeNotifier {
     try {
       final ext = localPath.split('.').last.toLowerCase();
       final safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext) ? ext : 'jpg';
-      final fileName = 'auto_healed/${DateTime.now().millisecondsSinceEpoch}_${localPath.hashCode}.$safeExt';
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user';
+      final fileName = 'room_images/$userId/auto_healed_${DateTime.now().millisecondsSinceEpoch}_${localPath.hashCode}.$safeExt';
       final ref = FirebaseStorage.instance.ref(fileName);
       
       String contentType = 'image/jpeg';
