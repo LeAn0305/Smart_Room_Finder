@@ -366,6 +366,45 @@ class _MyRoomScreenState extends State<MyRoomScreen>
               ),
             ),
           ),
+          // Nút nạp lại 20 phòng mẫu (dành cho Admin)
+          GestureDetector(
+            onTap: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đang nạp lại 20 phòng mẫu từ hệ thống...'),
+                  backgroundColor: AppColors.teal,
+                ),
+              );
+              await context.read<RoomProvider>().importDsptRooms();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Đã nạp thành công 20 phòng mẫu!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.cloud_download_rounded,
+                color: Colors.blue,
+                size: 20,
+              ),
+            ),
+          ),
           GestureDetector(
             onTap: _showSortSheet,
             child: Container(
