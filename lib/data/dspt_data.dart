@@ -11,6 +11,8 @@ class DsptData {
         price: 3800000,
         address: 'Phạm Thế Hiển, Quận 8, TP. Hồ Chí Minh',
         location: 'Quận 8',
+        latitude: 10.7350,
+        longitude: 106.6620,
         mainImageUrl: 'assets/images/rooms/dspt/image1.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image2.jpeg',
@@ -32,6 +34,8 @@ class DsptData {
         price: 2390000,
         address: '28 Lê Thị Hoa, Thủ Đức, TP. Hồ Chí Minh',
         location: 'Thủ Đức',
+        latitude: 10.8844,
+        longitude: 106.7325,
         mainImageUrl: 'assets/images/rooms/dspt/image5.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image6.jpeg',
@@ -54,6 +58,8 @@ class DsptData {
         price: 3200000,
         address: '176 Đặng Văn Ngữ, Phú Nhuận, TP. Hồ Chí Minh',
         location: 'Phú Nhuận',
+        latitude: 10.7960,
+        longitude: 106.6715,
         mainImageUrl: 'assets/images/rooms/dspt/image10.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image11.jpeg',
@@ -75,6 +81,8 @@ class DsptData {
         price: 4500000,
         address: 'Hoàng Hoa Thám, Tân Bình, TP. Hồ Chí Minh',
         location: 'Tân Bình',
+        latitude: 10.8030,
+        longitude: 106.6438,
         mainImageUrl: 'assets/images/rooms/dspt/image14.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image15.jpeg',
@@ -97,6 +105,8 @@ class DsptData {
         price: 3000000,
         address: '528 Trường Chinh, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8355,
+        longitude: 106.6210,
         mainImageUrl: 'assets/images/rooms/dspt/image19.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image20.jpeg',
@@ -118,6 +128,8 @@ class DsptData {
         price: 2800000,
         address: 'Hà Huy Giáp, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8655,
+        longitude: 106.6750,
         mainImageUrl: 'assets/images/rooms/dspt/image23.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image24.jpeg',
@@ -138,6 +150,8 @@ class DsptData {
         price: 4200000,
         address: 'Trường Chinh, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8340,
+        longitude: 106.6225,
         mainImageUrl: 'assets/images/rooms/dspt/image26.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image27.jpeg',
@@ -159,6 +173,8 @@ class DsptData {
         price: 3500000,
         address: 'Tân Chánh Hiệp, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8640,
+        longitude: 106.6210,
         mainImageUrl: 'assets/images/rooms/dspt/image30.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image31.jpeg',
@@ -179,6 +195,8 @@ class DsptData {
         price: 3300000,
         address: '73/50 Đình Phong Phú, Quận 9, TP. Hồ Chí Minh',
         location: 'Quận 9',
+        latitude: 10.8395,
+        longitude: 106.7750,
         mainImageUrl: 'assets/images/rooms/dspt/image33.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image34.jpeg',
@@ -199,6 +217,8 @@ class DsptData {
         price: 3900000,
         address: 'Lê Đức Thọ, Gò Vấp, TP. Hồ Chí Minh',
         location: 'Gò Vấp',
+        latitude: 10.8410,
+        longitude: 106.6660,
         mainImageUrl: 'assets/images/rooms/dspt/image36.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image37.jpeg',
@@ -219,6 +239,8 @@ class DsptData {
         price: 6500000,
         address: 'Phan Sào Nam, Tân Bình, TP. Hồ Chí Minh',
         location: 'Tân Bình',
+        latitude: 10.7915,
+        longitude: 106.6505,
         mainImageUrl: 'assets/images/rooms/dspt/image39.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image40.jpeg',
@@ -240,6 +262,8 @@ class DsptData {
         price: 2900000,
         address: '74/1A Phan Văn Hớn, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8345,
+        longitude: 106.6120,
         mainImageUrl: 'assets/images/rooms/dspt/image42.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image43.jpeg',
@@ -260,6 +284,8 @@ class DsptData {
         price: 10500000,
         address: 'Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8525,
+        longitude: 106.6295,
         mainImageUrl: 'assets/images/rooms/dspt/image45.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image46.jpeg',
@@ -283,6 +309,8 @@ class DsptData {
         price: 4800000,
         address: 'Hoàng Hoa Thám, Tân Bình, TP. Hồ Chí Minh',
         location: 'Tân Bình',
+        latitude: 10.8035,
+        longitude: 106.6445,
         mainImageUrl: 'assets/images/rooms/dspt/image50.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image51.jpeg',
@@ -305,6 +333,8 @@ class DsptData {
         price: 5200000,
         address: 'Vũ Duy Tấn, Bình Thạnh, TP. Hồ Chí Minh',
         location: 'Bình Thạnh',
+        latitude: 10.8015,
+        longitude: 106.6970,
         mainImageUrl: 'assets/images/rooms/dspt/image55.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image56.jpeg',
@@ -325,6 +355,8 @@ class DsptData {
         price: 4990000,
         address: 'Tân Bình, TP. Hồ Chí Minh',
         location: 'Tân Bình',
+        latitude: 10.8245,
+        longitude: 106.6220,
         mainImageUrl: 'assets/images/rooms/dspt/image58.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image59.jpeg',
@@ -345,6 +377,8 @@ class DsptData {
         price: 3200000,
         address: '528 Trường Chinh, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8356,
+        longitude: 106.6211,
         mainImageUrl: 'assets/images/rooms/dspt/image61.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image62.jpeg',
@@ -366,6 +400,8 @@ class DsptData {
         price: 3100000,
         address: '105 Lê Văn Khương, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8685,
+        longitude: 106.6355,
         mainImageUrl: 'assets/images/rooms/dspt/image65.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image66.jpeg',
@@ -386,6 +422,8 @@ class DsptData {
         price: 3400000,
         address: '165/21 Phan Văn Hớn, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8342,
+        longitude: 106.6135,
         mainImageUrl: 'assets/images/rooms/dspt/image68.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image69.jpeg',
@@ -408,6 +446,8 @@ class DsptData {
         price: 3600000,
         address: '22/14 Phan Văn Hớn, Quận 12, TP. Hồ Chí Minh',
         location: 'Quận 12',
+        latitude: 10.8346,
+        longitude: 106.6145,
         mainImageUrl: 'assets/images/rooms/dspt/image73.jpeg',
         subImageUrls: [
           'assets/images/rooms/dspt/image74.jpeg',

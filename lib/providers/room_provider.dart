@@ -66,6 +66,8 @@ class RoomProvider extends ChangeNotifier {
         await cleanupDuplicateDsptRooms();
         // Tự động import nếu thiếu phòng
         await importDsptRooms();
+        // Tự động chèn tọa độ cho các phòng bị thiếu
+        await _autoUpdateDsptCoordinates();
         // Tự động quét và vá lỗi các đường dẫn ảnh cục bộ
         await _autoHealImagePaths();
       } else {
@@ -334,6 +336,46 @@ class RoomProvider extends ChangeNotifier {
     if (anyRoomChanged) {
       notifyListeners();
       debugPrint('✅ Hoàn tất vá lỗi ảnh tự động!');
+    }
+  }
+
+  /// Tự động cập nhật tọa độ cho các phòng DSPT bị thiếu (latitude == 0)
+  Future<void> _autoUpdateDsptCoordinates() async {
+    final uid = currentUserId;
+    if (uid == null) return;
+    
+    final dsptRooms = DsptData.getRooms(uid);
+    bool anyRoomChanged = false;
+
+    for (int i = 0; i < _rooms.length; i++) {
+      final room = _rooms[i];
+      // Nhận diện các phòng bị thiếu tọa độ
+      if (room.latitude == 0.0 || room.longitude == 0.0) {
+        final dsptMatch = dsptRooms.where((r) => r.title == room.title).firstOrNull;
+        if (dsptMatch != null && dsptMatch.latitude != 0.0) {
+          final updatedRoom = room.copyWith(
+            latitude: dsptMatch.latitude,
+            longitude: dsptMatch.longitude,
+          );
+          
+          try {
+            await _roomsRef.doc(room.id).update({
+              'latitude': updatedRoom.latitude,
+              'longitude': updatedRoom.longitude,
+            });
+            _rooms[i] = updatedRoom;
+            anyRoomChanged = true;
+            debugPrint('📍 Đã cập nhật tọa độ thật cho phòng: ${room.title}');
+          } catch (e) {
+            debugPrint('❌ Lỗi cập nhật tọa độ: $e');
+          }
+        }
+      }
+    }
+
+    if (anyRoomChanged) {
+      notifyListeners();
+      debugPrint('✅ Hoàn tất vá lỗi tọa độ tự động!');
     }
   }
 
