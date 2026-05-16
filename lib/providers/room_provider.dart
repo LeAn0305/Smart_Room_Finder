@@ -102,6 +102,8 @@ class RoomProvider extends ChangeNotifier {
 
         // Tự động dọn dẹp các phòng bị lặp sau khi load
         await cleanupDuplicateDsptRooms();
+        // Tự động khôi phục 20 phòng mẫu nếu tài khoản hiện tại là Lê An (1@gmail.com)
+        await importDsptRooms();
         // Xóa các phòng lặp DSPT nếu user hiện tại là người lỡ tạo ra chúng
         await _cleanupMyWrongDsptRooms();
         // Tự động chèn tọa độ cho các phòng bị thiếu
@@ -250,6 +252,10 @@ class RoomProvider extends ChangeNotifier {
       debugPrint('❌ Phải đăng nhập để import');
       return;
     }
+    
+    // Chỉ cho phép tài khoản Admin (1@gmail.com - Lê An) nạp lại phòng mẫu
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (email != '1@gmail.com') return;
 
     try {
       _isLoading = true;
@@ -265,7 +271,7 @@ class RoomProvider extends ChangeNotifier {
         }
       }
 
-      debugPrint('✅ Đã đảm bảo danh sách 20 phòng từ DSPT (không trùng lặp)');
+      debugPrint('✅ Đã khôi phục thành công 20 phòng của Lê An (1@gmail.com)');
     } catch (e) {
       debugPrint('❌ Lỗi import: $e');
     } finally {
