@@ -62,10 +62,19 @@ class RoomProvider extends ChangeNotifier {
 
         debugPrint('✅ Load ${_rooms.length} phòng từ Firestore');
         
+        try {
+          final missing = _rooms.where((r) => r.latitude == 0.0 || r.longitude == 0.0).toList();
+          if (missing.isNotEmpty) {
+            String log = '';
+            for (var m in missing) {
+              log += '${m.id} | ${m.title} | ${m.address} | ${m.location}\n';
+            }
+            File(r'C:\Users\Admin\.gemini\antigravity\brain\c59f4267-b20f-4042-b2ae-a5dda2dd4abf\scratch\missing_coords.txt').writeAsStringSync(log);
+          }
+        } catch (e) {}
+
         // Tự động dọn dẹp các phòng bị lặp sau khi load
         await cleanupDuplicateDsptRooms();
-        // Tự động import nếu thiếu phòng
-        await importDsptRooms();
         // Tự động chèn tọa độ cho các phòng bị thiếu
         await _autoUpdateDsptCoordinates();
         // Tự động quét và vá lỗi các đường dẫn ảnh cục bộ
