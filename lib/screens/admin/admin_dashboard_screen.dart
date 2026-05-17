@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
+// admin_navigation.dart is used via admin_shared_widgets.dart
+import 'package:smart_room_finder/screens/admin/admin_shared_widgets.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -16,14 +17,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _searchController = TextEditingController();
 
-  int _selectedMenuIndex = 0;
+  final int _selectedMenuIndex = 0;
   String _selectedPeriod = '7 ngày qua';
   String _selectedStatusFilter = 'Tất cả';
   bool _isLoadingData = true;
+  String _adminDisplayName = 'Admin';
+  DateTime _lastFetchTime = DateTime.now();
+
+  // Pagination
+  int _activityPage = 1;
+  int _alertPage = 1;
+  static const int _activityPageSize = 5;
+  static const int _alertPageSize = 3;
+
+  // Instance data (moved from top-level vars)
+  var _adminStats = <_AdminStat>[];
+  var _weeklyChartData = <_ChartPoint>[];
+  var _listingStatuses = <_ListingStatus>[];
+  var _quickInsights = <_QuickInsight>[];
+  var _allRecentActivities = <_RecentActivity>[];
+  var _allAlerts = <_AlertItem>[];
+
+  // Raw rooms data for chart period rebuild
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _rawRooms = [];
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() => _activityPage = 1));
+    _fetchAdminName();
     _fetchDashboardData();
   }
 
@@ -31,6 +53,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchAdminName() async {
+    final name = await fetchAdminDisplayName();
+    if (mounted) setState(() => _adminDisplayName = name);
   }
 
   // =========================
@@ -58,31 +85,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return null;
       }
 
-      final pending  = rooms.where((d) => d.data()['isVerified'] != true && d.data()['isDraft'] != true).length;
-      final verified = rooms.where((d) => d.data()['isVerified'] == true).length;
-      final rejected = rooms.where((d) => d.data()['isDraft'] == true).length;
+      // --- Status classification using approvalStatus with fallback ---
+      String classifyRoom(Map<String, dynamic> d) {
+        final approvalStatus = (d['approvalStatus'] ?? '').toString().toLowerCase();
+        if (approvalStatus.isNotEmpty) {
+          if (approvalStatus == 'verified') return 'verified';
+          if (approvalStatus == 'rejected') return 'rejected';
+          if (approvalStatus == 'needsinfo' || approvalStatus == 'needs_info') return 'needsInfo';
+          return 'pending';
+        }
+        // Fallback for old data without approvalStatus
+        if (d['isVerified'] == true) return 'verified';
+        if (d['isDraft'] == true) return 'rejected';
+        return 'pending';
+      }
+
+      int verified = 0, pending = 0, rejected = 0, needsInfo = 0;
+      for (final d in rooms) {
+        switch (classifyRoom(d.data())) {
+          case 'verified': verified++;
+          case 'rejected': rejected++;
+          case 'needsInfo': needsInfo++;
+          default: pending++;
+        }
+      }
 
       _adminStats = [
-        _AdminStat(title: 'Bài đăng chờ duyệt', value: '$pending',          changeText: '—', isPositive: false, icon: Icons.assignment_late_outlined, accent: const Color(0xFFF59E0B)),
-        _AdminStat(title: 'Người dùng',          value: '${users.length}',   changeText: '—', isPositive: true,  icon: Icons.groups_2_outlined,         accent: const Color(0xFF22B573)),
-        _AdminStat(title: 'Báo cáo mới',         value: '${reports.length}', changeText: '—', isPositive: false, icon: Icons.flag_outlined,             accent: AppColors.blue),
-        _AdminStat(title: 'Yêu cầu hỗ trợ',     value: '${support.length}', changeText: '—', isPositive: true,  icon: Icons.headset_mic_outlined,      accent: const Color(0xFF8B5CF6)),
+        _AdminStat(title: 'Bài đăng chờ duyệt', value: '${pending + needsInfo}', changeText: '—', isPositive: false, icon: Icons.assignment_late_outlined, accent: const Color(0xFFF59E0B)),
+        _AdminStat(title: 'Người dùng',          value: '${users.length}',       changeText: '—', isPositive: true,  icon: Icons.groups_2_outlined,         accent: const Color(0xFF22B573)),
+        _AdminStat(title: 'Báo cáo mới',         value: '${reports.length}',     changeText: '—', isPositive: false, icon: Icons.flag_outlined,             accent: AppColors.blue),
+        _AdminStat(title: 'Yêu cầu hỗ trợ',     value: '${support.length}',     changeText: '—', isPositive: true,  icon: Icons.headset_mic_outlined,      accent: const Color(0xFF8B5CF6)),
       ];
 
-      _weeklyChartData = List.generate(7, (i) {
-        final day   = now.subtract(Duration(days: 6 - i));
-        final count = rooms.where((d) {
-          final date = parseDate(d.data()['postedAt']);
-          return date != null && date.year == day.year && date.month == day.month && date.day == day.day;
-        }).length;
-        return _ChartPoint(label: '${day.day}/${day.month}', value: count.toDouble());
-      });
+      _rawRooms = rooms;
+      _weeklyChartData = _buildChartData(rooms, 7, now, parseDate);
 
-      final pending2 = math.max(0, rooms.length - verified - rejected);
       _listingStatuses = [
-        _ListingStatus(label: 'Đã xác minh',  count: verified, color: const Color(0xFF57C98D)),
-        _ListingStatus(label: 'Chờ xác minh', count: pending2, color: const Color(0xFFFFB84D)),
-        _ListingStatus(label: 'Bị từ chối',   count: rejected, color: const Color(0xFFFF6B6B)),
+        _ListingStatus(label: 'Đã xác minh',  count: verified,  color: const Color(0xFF57C98D)),
+        _ListingStatus(label: 'Chờ xác minh', count: pending,   color: const Color(0xFFFFB84D)),
+        _ListingStatus(label: 'Cần bổ sung',  count: needsInfo, color: const Color(0xFF3B82F6)),
+        _ListingStatus(label: 'Bị từ chối',   count: rejected,  color: const Color(0xFFFF6B6B)),
       ];
 
       final total    = rooms.length;
@@ -97,10 +139,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }).length;
 
       _quickInsights = [
-        _QuickInsight(title: 'Tỷ lệ xác minh',       value: vRate,        changeText: 'Trên $total phòng',   icon: Icons.verified_rounded,         accent: const Color(0xFF22B573), isPositive: true),
+        _QuickInsight(title: 'Tỷ lệ xác minh',       value: vRate,       changeText: 'Trên $total phòng',   icon: Icons.verified_rounded,         accent: const Color(0xFF22B573), isPositive: true),
         _QuickInsight(title: 'Đăng mới hôm nay',      value: '$todayCnt', changeText: 'Trong ngày hôm nay',  icon: Icons.note_add_rounded,         accent: AppColors.blue,          isPositive: true),
-        _QuickInsight(title: 'Người dùng mới (tuần)', value: '$newUsers', changeText: '7 ngày gần nhất',     icon: Icons.person_add_alt_1_rounded, accent: const Color(0xFF8B5CF6), isPositive: true),
-        _QuickInsight(title: 'Tổng số phòng',         value: '$total',    changeText: 'Toàn hệ thống',       icon: Icons.home_work_outlined,       accent: const Color(0xFFF59E0B), isPositive: true),
+        _QuickInsight(title: 'Người dùng mới (tuần)',  value: '$newUsers', changeText: '7 ngày gần nhất',     icon: Icons.person_add_alt_1_rounded, accent: const Color(0xFF8B5CF6), isPositive: true),
+        _QuickInsight(title: 'Tổng số phòng',          value: '$total',    changeText: 'Toàn hệ thống',       icon: Icons.home_work_outlined,       accent: const Color(0xFFF59E0B), isPositive: true),
       ];
 
       final sorted = [...rooms]..sort((a, b) {
@@ -117,13 +159,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         for (final u in users) u.id: u.data(),
       };
 
-      _recentActivities = sorted.take(5).map((doc) {
+      _allRecentActivities = sorted.map((doc) {
         final d  = doc.data();
         final id = doc.id;
         final String status;
-        if (d['isVerified'] == true)   { status = 'Đã xác minh'; }
-        else if (d['isDraft'] == true) { status = 'Bị từ chối'; }
-        else                           { status = 'Chờ duyệt'; }
+        final cls = classifyRoom(d);
+        switch (cls) {
+          case 'verified':  status = 'Đã xác minh';
+          case 'rejected':  status = 'Bị từ chối';
+          case 'needsInfo': status = 'Cần bổ sung';
+          default:          status = 'Chờ duyệt';
+        }
         final date    = parseDate(d['postedAt']);
         final dateStr = date == null ? '—'
             : '${date.day}/${date.month}/${date.year}\n${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
@@ -149,8 +195,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       }).toList();
 
-      _alerts = [
-        for (final doc in reports.take(3))
+      _allAlerts = [
+        for (final doc in reports)
           _AlertItem(
             title:    'Báo cáo nội dung',
             subtitle: (doc.data()['reason'] ?? doc.data()['message'] ?? 'Nội dung vi phạm').toString(),
@@ -158,7 +204,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             icon:     Icons.report_gmailerrorred_rounded,
             accent:   const Color(0xFFFF6B6B),
           ),
-        for (final doc in support.take(2))
+        for (final doc in support)
           _AlertItem(
             title:    'Yêu cầu hỗ trợ mới',
             subtitle: (doc.data()['message'] ?? doc.data()['subject'] ?? 'Cần phản hồi').toString(),
@@ -168,6 +214,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
       ];
 
+      _lastFetchTime = DateTime.now();
       if (mounted) setState(() => _isLoadingData = false);
     } catch (e) {
       debugPrint('❌ Dashboard fetch error: $e');
@@ -186,6 +233,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return '${diff.inDays} ngày trước';
   }
 
+
+  static List<_ChartPoint> _buildChartData(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> rooms,
+    int days,
+    DateTime now,
+    DateTime? Function(dynamic) parseDate,
+  ) {
+    return List.generate(days, (i) {
+      final day = now.subtract(Duration(days: days - 1 - i));
+      final count = rooms.where((d) {
+        final date = parseDate(d.data()['postedAt']);
+        return date != null && date.year == day.year && date.month == day.month && date.day == day.day;
+      }).length;
+      return _ChartPoint(label: '${day.day}/${day.month}', value: count.toDouble());
+    });
+  }
+
+  void _rebuildChartForPeriod(String period) {
+    final days = switch (period) {
+      '14 ngày qua' => 14,
+      '30 ngày qua' => 30,
+      _ => 7,
+    };
+    DateTime? parseDate(dynamic raw) {
+      if (raw is Timestamp) return raw.toDate();
+      if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+      return null;
+    }
+    setState(() {
+      _selectedPeriod = period;
+      _weeklyChartData = _buildChartData(_rawRooms, days, DateTime.now(), parseDate);
+    });
+  }
+
+  // Filtered activities based on search
+  List<_RecentActivity> get _filteredActivities {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _allRecentActivities;
+    return _allRecentActivities.where((a) =>
+      a.roomCode.toLowerCase().contains(query) ||
+      a.roomName.toLowerCase().contains(query) ||
+      a.ownerName.toLowerCase().contains(query) ||
+      a.ownerEmail.toLowerCase().contains(query) ||
+      a.status.toLowerCase().contains(query)
+    ).toList();
+  }
+
   // =========================
   // RESPONSIVE HELPERS
   // =========================
@@ -200,32 +294,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return;
     }
 
-    if (index == 1) {
-      openPostApproval(context);
-      return;
-    }
-
-    if (index == 2) {
-      openAdminUsers(context);
-      return;
-    }
-
-    if (index == 3) {
-      openAdminReports(context);
-      return;
-    }
-
-    if (index == 4) {
-      openAdminSupport(context);
-      return;
-    }
-
-    if (index == 5) {
-      openAdminSettings(context);
-      return;
-    }
-
-    setState(() => _selectedMenuIndex = index);
+    handleAdminMenuSelection(context, _selectedMenuIndex, index);
   }
 
   @override
@@ -244,12 +313,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               : Drawer(
                   width: math.min(screenWidth * 0.82, 320).toDouble(),
                   child: SafeArea(
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -259,11 +329,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 if (isDesktop)
                   SizedBox(
                     width: 248,
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 Expanded(
@@ -293,6 +364,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }) {
     final contentMaxWidth = isDesktop ? 1320.0 : 1080.0;
 
+    if (_isLoadingData && _adminStats.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 120),
+          child: CircularProgressIndicator(color: AppColors.blue),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         isMobile ? 16 : 24,
@@ -306,11 +386,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AdminTopbar(
+              AdminTopbar(
                 width: width,
                 isMobile: isMobile,
+                title: 'Dashboard Admin',
+                subtitle: 'Theo dõi hoạt động nền tảng, duyệt bài đăng và xử lý cảnh báo nhanh chóng.',
                 searchController: _searchController,
+                searchHint: 'Tìm kiếm bài đăng, người dùng hoặc cảnh báo...',
                 onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                adminDisplayName: _adminDisplayName,
               ),
               const SizedBox(height: 20),
               _buildStatsSection(width),
@@ -362,19 +446,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           _WeeklyActivityCard(
             selectedPeriod: _selectedPeriod,
-            onPeriodChanged: (value) {
-              setState(() => _selectedPeriod = value);
-            },
+            chartData: _weeklyChartData,
+            onPeriodChanged: (value) => _rebuildChartForPeriod(value),
           ),
           const SizedBox(height: 16),
           _ListingStatusCard(
             selectedFilter: _selectedStatusFilter,
+            listingStatuses: _listingStatuses,
+            lastFetchTime: _lastFetchTime,
             onFilterChanged: (value) {
               setState(() => _selectedStatusFilter = value);
             },
           ),
           const SizedBox(height: 16),
-          const _QuickInsightsCard(),
+          _QuickInsightsCard(insights: _quickInsights),
         ],
       );
     }
@@ -384,9 +469,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           _WeeklyActivityCard(
             selectedPeriod: _selectedPeriod,
-            onPeriodChanged: (value) {
-              setState(() => _selectedPeriod = value);
-            },
+            chartData: _weeklyChartData,
+            onPeriodChanged: (value) => _rebuildChartForPeriod(value),
           ),
           const SizedBox(height: 16),
           Row(
@@ -395,14 +479,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Expanded(
                 child: _ListingStatusCard(
                   selectedFilter: _selectedStatusFilter,
+                  listingStatuses: _listingStatuses,
+                  lastFetchTime: _lastFetchTime,
                   onFilterChanged: (value) {
                     setState(() => _selectedStatusFilter = value);
                   },
                 ),
               ),
               const SizedBox(width: 16),
-              const Expanded(
-                child: _QuickInsightsCard(),
+              Expanded(
+                child: _QuickInsightsCard(insights: _quickInsights),
               ),
             ],
           ),
@@ -417,9 +503,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           flex: 5,
           child: _WeeklyActivityCard(
             selectedPeriod: _selectedPeriod,
-            onPeriodChanged: (value) {
-              setState(() => _selectedPeriod = value);
-            },
+            chartData: _weeklyChartData,
+            onPeriodChanged: (value) => _rebuildChartForPeriod(value),
           ),
         ),
         const SizedBox(width: 16),
@@ -427,15 +512,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           flex: 3,
           child: _ListingStatusCard(
             selectedFilter: _selectedStatusFilter,
+            listingStatuses: _listingStatuses,
+            lastFetchTime: _lastFetchTime,
             onFilterChanged: (value) {
               setState(() => _selectedStatusFilter = value);
             },
           ),
         ),
         const SizedBox(width: 16),
-        const Expanded(
+        Expanded(
           flex: 3,
-          child: _QuickInsightsCard(),
+          child: _QuickInsightsCard(insights: _quickInsights),
         ),
       ],
     );
@@ -445,411 +532,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // BUILD BOTTOM SECTION
   // =========================
   Widget _buildBottomSection(double width) {
+    final activities = _filteredActivities;
+    final totalActivityPages = math.max(1, (activities.length / _activityPageSize).ceil());
+    final safeActivityPage = _activityPage.clamp(1, totalActivityPages);
+    final activityStart = (safeActivityPage - 1) * _activityPageSize;
+    final paginatedActivities = activities.skip(activityStart).take(_activityPageSize).toList();
+
+    final totalAlertPages = math.max(1, (_allAlerts.length / _alertPageSize).ceil());
+    final safeAlertPage = _alertPage.clamp(1, totalAlertPages);
+    final alertStart = (safeAlertPage - 1) * _alertPageSize;
+    final paginatedAlerts = _allAlerts.skip(alertStart).take(_alertPageSize).toList();
+
+    Widget activitySection({bool isCompact = false}) => _RecentActivitySection(
+      isCompact: isCompact,
+      activities: paginatedActivities,
+      currentPage: safeActivityPage,
+      totalPages: totalActivityPages,
+      onPrevPage: safeActivityPage > 1 ? () => setState(() => _activityPage--) : null,
+      onNextPage: safeActivityPage < totalActivityPages ? () => setState(() => _activityPage++) : null,
+    );
+
+    Widget alertSection() => _RecentAlertsSection(
+      alerts: paginatedAlerts,
+      currentPage: safeAlertPage,
+      totalPages: totalAlertPages,
+      onPrevPage: safeAlertPage > 1 ? () => setState(() => _alertPage--) : null,
+      onNextPage: safeAlertPage < totalAlertPages ? () => setState(() => _alertPage++) : null,
+    );
+
     if (_isMobile(width)) {
       return Column(
-        children: const [
-          _RecentActivitySection(isCompact: true),
-          SizedBox(height: 16),
-          _RecentAlertsSection(),
+        children: [
+          activitySection(isCompact: true),
+          const SizedBox(height: 16),
+          alertSection(),
         ],
       );
     }
 
     if (_isTablet(width)) {
-      return const Column(
-        children: [
-          _RecentActivitySection(),
-          SizedBox(height: 16),
-          _RecentAlertsSection(),
-        ],
-      );
-    }
-
-    return const Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 7,
-          child: _RecentActivitySection(),
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          flex: 4,
-          child: _RecentAlertsSection(),
-        ),
-      ],
-    );
-  }
-}
-
-// =========================
-// BUILD SIDEBAR
-// =========================
-class _AdminSidebar extends StatelessWidget {
-  const _AdminSidebar({
-    required this.selectedIndex,
-    required this.onSelected,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5BC3F4), AppColors.teal],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.home_work_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Smart Room Finder',
-                        style: TextStyle(
-                          color: Color(0xFF1E2B3A),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Nền tảng tìm phòng thông minh',
-                        style: TextStyle(
-                          color: Color(0xFF7A8798),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              children: [
-                for (var i = 0; i < _adminMenus.length; i++) ...[
-                  _SidebarMenuTile(
-                    data: _adminMenus[i],
-                    isSelected: selectedIndex == i,
-                    onTap: () => onSelected(i),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6FAFF),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE4ECF6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F7FE),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.verified_user_rounded,
-                      color: AppColors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Giữ nền tảng an toàn',
-                    style: TextStyle(
-                      color: Color(0xFF233244),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Xác minh danh tính và kiểm duyệt thường xuyên để đảm bảo chất lượng nội dung.',
-                    style: TextStyle(
-                      color: Color(0xFF7A8798),
-                      fontSize: 12,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: const Color(0xFFEAF4FF),
-                        foregroundColor: AppColors.blueDark,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Xem hướng dẫn',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '© 2025 Smart Room Finder\nPhiên bản 1.0.0',
-                style: TextStyle(
-                  color: Color(0xFF9CA8B7),
-                  fontSize: 11,
-                  height: 1.5,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =========================
-// BUILD TOPBAR
-// =========================
-class _AdminTopbar extends StatelessWidget {
-  const _AdminTopbar({
-    required this.width,
-    required this.isMobile,
-    required this.searchController,
-    required this.onMenuTap,
-  });
-
-  final double width;
-  final bool isMobile;
-  final TextEditingController searchController;
-  final VoidCallback onMenuTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isHeaderStacked = !isMobile && width < 1220;
-
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Dashboard Admin',
-          style: TextStyle(
-            color: const Color(0xFF1E2B3A),
-            fontSize: isMobile ? 24 : 28,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Theo dõi hoạt động nền tảng, duyệt bài đăng và xử lý cảnh báo nhanh chóng.',
-          style: TextStyle(
-            color: Color(0xFF7A8798),
-            fontSize: 13,
-            height: 1.45,
-          ),
-        ),
-      ],
-    );
-
-    final searchField = Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2EAF3)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF283A53).withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: searchController,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: 'Tìm kiếm bài đăng, người dùng hoặc cảnh báo...',
-          hintStyle: const TextStyle(
-            color: Color(0xFF9AA6B5),
-            fontSize: 14,
-          ),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF93A3B8),
-          ),
-          suffixIcon: Container(
-            margin: const EdgeInsets.all(10),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F7FB),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text(
-              'Ctrl K',
-              style: TextStyle(
-                color: Color(0xFF8C99A8),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-      ),
-    );
-
-    final actionRow = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _TopbarActionButton(
-          icon: Icons.notifications_none_rounded,
-          badgeCount: 8,
-          onTap: () {},
-        ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2EAF3)),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: Color(0xFFD8F5F0),
-                child: Text(
-                  'A',
-                  style: TextStyle(
-                    color: AppColors.tealDark,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Admin',
-                    style: TextStyle(
-                      color: Color(0xFF1E2B3A),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    'Quản trị viên',
-                    style: TextStyle(
-                      color: Color(0xFF8A97A8),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(width: 6),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF92A1B2),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    if (isMobile) {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TopbarActionButton(
-                icon: Icons.menu_rounded,
-                onTap: onMenuTap,
-                badgeCount: 0,
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: titleBlock),
-            ],
-          ),
+          activitySection(),
           const SizedBox(height: 16),
-          searchField,
-          const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: actionRow,
-          ),
-        ],
-      );
-    }
-
-    if (isHeaderStacked) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: titleBlock),
-              const SizedBox(width: 16),
-              Flexible(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: actionRow,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          searchField,
+          alertSection(),
         ],
       );
     }
@@ -857,27 +583,20 @@ class _AdminTopbar extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 4, child: titleBlock),
-        const SizedBox(width: 20),
-        Expanded(flex: 4, child: searchField),
+        Expanded(
+          flex: 7,
+          child: activitySection(),
+        ),
         const SizedBox(width: 16),
         Expanded(
-          flex: 3,
-          child: Align(
-            alignment: Alignment.topRight,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: actionRow,
-            ),
-          ),
+          flex: 4,
+          child: alertSection(),
         ),
       ],
     );
-  }
+}
 }
 
-// =========================
-// BUILD STAT CARD
 // =========================
 class _StatCard extends StatelessWidget {
   const _StatCard({required this.data});
@@ -886,7 +605,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -972,14 +691,17 @@ class _WeeklyActivityCard extends StatelessWidget {
   const _WeeklyActivityCard({
     this.selectedPeriod = '7 ngày qua',
     this.onPeriodChanged,
+    this.chartData = const [],
   });
 
   final String selectedPeriod;
   final ValueChanged<String>? onPeriodChanged;
+  final List<_ChartPoint> chartData;
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    final maxVal = chartData.isEmpty ? 1.0 : chartData.map((p) => p.value).reduce(math.max).clamp(1.0, double.infinity);
+    return AdminSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1000,7 +722,7 @@ class _WeeklyActivityCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const _ChartYAxis(),
+                      _ChartYAxis(maxValue: maxVal),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Stack(
@@ -1017,7 +739,7 @@ class _WeeklyActivityCard extends StatelessWidget {
                             ),
                             Positioned.fill(
                               child: CustomPaint(
-                                painter: _LineChartPainter(points: _weeklyChartData),
+                                painter: _LineChartPainter(points: chartData),
                               ),
                             ),
                           ],
@@ -1031,7 +753,7 @@ class _WeeklyActivityCard extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 36),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: _weeklyChartData
+                    children: chartData
                         .map(
                           (point) => Expanded(
                             child: Text(
@@ -1064,7 +786,7 @@ class _WeeklyActivityCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Lượt truy cập',
+                'Bài đăng mới',
                 style: TextStyle(
                   color: Color(0xFF6E7F90),
                   fontSize: 12,
@@ -1073,7 +795,7 @@ class _WeeklyActivityCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'Tổng: ${_weeklyChartData.fold(0.0, (s, p) => s + p.value).toInt()} bài đăng',
+                'Tổng: ${chartData.fold(0.0, (s, p) => s + p.value).toInt()} bài đăng',
                 style: const TextStyle(
                   color: AppColors.blueDark,
                   fontSize: 12,
@@ -1095,16 +817,23 @@ class _ListingStatusCard extends StatelessWidget {
   const _ListingStatusCard({
     this.selectedFilter = 'Tất cả',
     this.onFilterChanged,
+    this.listingStatuses = const [],
+    this.lastFetchTime,
   });
 
   final String selectedFilter;
   final ValueChanged<String>? onFilterChanged;
+  final List<_ListingStatus> listingStatuses;
+  final DateTime? lastFetchTime;
 
   @override
   Widget build(BuildContext context) {
-    final total = _listingStatuses.fold<int>(0, (sum, item) => sum + item.count);
+    final total = listingStatuses.fold<int>(0, (sum, item) => sum + item.count);
+    final timeStr = lastFetchTime != null
+        ? '${lastFetchTime!.day.toString().padLeft(2, '0')}/${lastFetchTime!.month.toString().padLeft(2, '0')}/${lastFetchTime!.year} ${lastFetchTime!.hour.toString().padLeft(2, '0')}:${lastFetchTime!.minute.toString().padLeft(2, '0')}'
+        : '--';
 
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1112,7 +841,7 @@ class _ListingStatusCard extends StatelessWidget {
             title: 'Tình trạng bài đăng',
             trailing: _CompactDropdown(
               value: selectedFilter,
-              items: const ['Tất cả', 'Đã xác minh', 'Chờ xác minh', 'Bị từ chối'],
+              items: const ['Tất cả', 'Đã xác minh', 'Chờ xác minh', 'Cần bổ sung', 'Bị từ chối'],
               onChanged: onFilterChanged,
             ),
           ),
@@ -1128,7 +857,7 @@ class _ListingStatusCard extends StatelessWidget {
                     children: [
                       CustomPaint(
                         size: const Size.square(180),
-                        painter: _DonutChartPainter(data: _listingStatuses),
+                        painter: _DonutChartPainter(data: listingStatuses),
                       ),
                       Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1160,7 +889,7 @@ class _ListingStatusCard extends StatelessWidget {
               Expanded(
                 flex: 4,
                 child: Column(
-                  children: _listingStatuses
+                  children: listingStatuses
                       .map(
                         (status) => Padding(
                           padding: const EdgeInsets.only(bottom: 14),
@@ -1173,17 +902,17 @@ class _ListingStatusCard extends StatelessWidget {
             ],
           ),
           const Divider(height: 26, color: Color(0xFFE7EDF5)),
-          const Row(
+          Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.update_rounded,
                 color: Color(0xFF92A1B2),
                 size: 18,
               ),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
-                'Cập nhật: 19/05/2025 09:30',
-                style: TextStyle(
+                'Cập nhật: $timeStr',
+                style: const TextStyle(
                   color: Color(0xFF92A1B2),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -1201,17 +930,19 @@ class _ListingStatusCard extends StatelessWidget {
 // BUILD QUICK INSIGHTS CARD
 // =========================
 class _QuickInsightsCard extends StatelessWidget {
-  const _QuickInsightsCard();
+  const _QuickInsightsCard({this.insights = const []});
+
+  final List<_QuickInsight> insights;
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionCardHeader(title: 'Thông tin nhanh'),
           const SizedBox(height: 16),
-          ..._quickInsights.map(
+          ...insights.map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: _InsightTile(data: item),
@@ -1227,21 +958,43 @@ class _QuickInsightsCard extends StatelessWidget {
 // BUILD RECENT ACTIVITY SECTION
 // =========================
 class _RecentActivitySection extends StatelessWidget {
-  const _RecentActivitySection({this.isCompact = false});
+  const _RecentActivitySection({
+    this.isCompact = false,
+    this.activities = const [],
+    this.currentPage = 1,
+    this.totalPages = 1,
+    this.onPrevPage,
+    this.onNextPage,
+  });
 
   final bool isCompact;
+  final List<_RecentActivity> activities;
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevPage;
+  final VoidCallback? onNextPage;
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _SectionCardHeader(title: 'Hoạt động gần đây'),
           const SizedBox(height: 18),
-          if (isCompact)
+          if (activities.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Không có hoạt động nào',
+                  style: TextStyle(color: Color(0xFF8D9AAA), fontSize: 13),
+                ),
+              ),
+            )
+          else if (isCompact)
             Column(
-              children: _recentActivities
+              children: activities
                   .map(
                     (activity) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -1251,21 +1004,16 @@ class _RecentActivitySection extends StatelessWidget {
                   .toList(),
             )
           else
-            const _RecentActivityTable(),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Xem tất cả hoạt động',
-                style: TextStyle(
-                  color: AppColors.blueDark,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            _RecentActivityTable(activities: activities),
+          if (totalPages > 1) ...[
+            const SizedBox(height: 10),
+            _PaginationControls(
+              currentPage: currentPage,
+              totalPages: totalPages,
+              onPrevPage: onPrevPage,
+              onNextPage: onNextPage,
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1276,57 +1024,54 @@ class _RecentActivitySection extends StatelessWidget {
 // BUILD RECENT ALERTS SECTION
 // =========================
 class _RecentAlertsSection extends StatelessWidget {
-  const _RecentAlertsSection();
+  const _RecentAlertsSection({
+    this.alerts = const [],
+    this.currentPage = 1,
+    this.totalPages = 1,
+    this.onPrevPage,
+    this.onNextPage,
+  });
+
+  final List<_AlertItem> alerts;
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevPage;
+  final VoidCallback? onNextPage;
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionCardHeader(
-            title: 'Cảnh báo gần đây',
-            trailing: TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.blueDark,
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Xem tất cả',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
+          const _SectionCardHeader(title: 'Cảnh báo gần đây'),
           const SizedBox(height: 16),
-          ..._alerts.map(
-            (alert) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _AlertTile(data: alert),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.blueDark,
-                side: const BorderSide(color: Color(0xFFD9E5F1)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          if (alerts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Không có cảnh báo nào',
+                  style: TextStyle(color: Color(0xFF8D9AAA), fontSize: 13),
                 ),
               ),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-              label: const Text(
-                'Xem tất cả cảnh báo',
-                style: TextStyle(fontWeight: FontWeight.w700),
+            )
+          else
+            ...alerts.map(
+              (alert) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _AlertTile(data: alert),
               ),
             ),
-          ),
+          if (totalPages > 1) ...[
+            const SizedBox(height: 8),
+            _PaginationControls(
+              currentPage: currentPage,
+              totalPages: totalPages,
+              onPrevPage: onPrevPage,
+              onNextPage: onNextPage,
+            ),
+          ],
         ],
       ),
     );
@@ -1334,39 +1079,52 @@ class _RecentAlertsSection extends StatelessWidget {
 }
 
 // =========================
-// SHARED SURFACE CARD
+// PAGINATION CONTROLS
 // =========================
-class _AdminSurfaceCard extends StatelessWidget {
-  const _AdminSurfaceCard({
-    required this.child,
-    this.padding = const EdgeInsets.all(20),
+class _PaginationControls extends StatelessWidget {
+  const _PaginationControls({
+    required this.currentPage,
+    required this.totalPages,
+    this.onPrevPage,
+    this.onNextPage,
   });
 
-  final Widget child;
-  final EdgeInsetsGeometry padding;
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevPage;
+  final VoidCallback? onNextPage;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE4ECF6)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF233244).withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Text(
+          'Trang $currentPage / $totalPages',
+          style: const TextStyle(
+            color: Color(0xFF7E8EA0),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
-      child: child,
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+          color: onPrevPage != null ? AppColors.blueDark : const Color(0xFFCBD4DE),
+          onPressed: onPrevPage,
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.chevron_right_rounded, size: 20),
+          color: onNextPage != null ? AppColors.blueDark : const Color(0xFFCBD4DE),
+          onPressed: onNextPage,
+        ),
+      ],
     );
   }
 }
 
-// =========================
 // SHARED SECTION HEADER
 // =========================
 class _SectionCardHeader extends StatelessWidget {
@@ -1449,136 +1207,20 @@ class _CompactDropdown extends StatelessWidget {
   }
 }
 
-// =========================
-// SIDEBAR MENU TILE
-// =========================
-class _SidebarMenuTile extends StatelessWidget {
-  const _SidebarMenuTile({
-    required this.data,
-    required this.isSelected,
-    required this.onTap,
-  });
 
-  final _AdminMenuItem data;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.blueDark : const Color(0xFF57687B);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.blue.withValues(alpha: 0.14)
-                    : const Color(0xFFF3F7FB),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(data.icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =========================
-// TOPBAR ACTION BUTTON
-// =========================
-class _TopbarActionButton extends StatelessWidget {
-  const _TopbarActionButton({
-    required this.icon,
-    required this.onTap,
-    this.badgeCount = 0,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final int badgeCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: onTap,
-            child: Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE2EAF3)),
-              ),
-              child: Icon(icon, color: const Color(0xFF57687B)),
-            ),
-          ),
-        ),
-        if (badgeCount > 0)
-          Positioned(
-            top: -4,
-            right: -2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF5B6E),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: Text(
-                '$badgeCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 // =========================
 // CHART Y AXIS
 // =========================
 class _ChartYAxis extends StatelessWidget {
-  const _ChartYAxis();
+  const _ChartYAxis({this.maxValue = 1000});
+
+  final double maxValue;
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['1000', '800', '600', '400', '200', '0'];
+    final step = maxValue / 4;
+    final labels = List.generate(5, (i) => '${(maxValue - step * i).round()}');
 
     return SizedBox(
       width: 30,
@@ -1732,7 +1374,9 @@ class _InsightTile extends StatelessWidget {
 // RECENT ACTIVITY TABLE
 // =========================
 class _RecentActivityTable extends StatelessWidget {
-  const _RecentActivityTable();
+  const _RecentActivityTable({this.activities = const []});
+
+  final List<_RecentActivity> activities;
 
   @override
   Widget build(BuildContext context) {
@@ -1755,7 +1399,7 @@ class _RecentActivityTable extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        ..._recentActivities.map(
+        ...activities.map(
           (activity) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Container(
@@ -1793,7 +1437,7 @@ class _RecentActivityTable extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () => showAdminComingSoon(context),
                     icon: const Icon(
                       Icons.more_horiz_rounded,
                       color: Color(0xFF92A1B2),
@@ -2125,11 +1769,16 @@ class _StatusChip extends StatelessWidget {
           const Color(0xFFFFF3E4),
           const Color(0xFFF59E0B),
         ),
+      'Cần bổ sung' => (
+          const Color(0xFFE8F0FE),
+          const Color(0xFF3B82F6),
+        ),
       _ => (
           const Color(0xFFFFE8E9),
           const Color(0xFFEF4444),
         ),
     };
+
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2274,47 +1923,12 @@ class _DonutChartPainter extends CustomPainter {
 }
 
 // =========================
-// MOCK DATA - SIDEBAR (UI tĩnh, giữ nguyên)
-// =========================
-const List<_AdminMenuItem> _adminMenus = [
-  _AdminMenuItem(label: 'Tổng quan',      icon: Icons.dashboard_outlined),
-  _AdminMenuItem(label: 'Duyệt bài đăng', icon: Icons.fact_check_outlined),
-  _AdminMenuItem(label: 'Người dùng',     icon: Icons.group_outlined),
-  _AdminMenuItem(label: 'Báo cáo',        icon: Icons.bar_chart_rounded),
-  _AdminMenuItem(label: 'Hỗ trợ',         icon: Icons.support_agent_outlined),
-  _AdminMenuItem(label: 'Cài đặt',        icon: Icons.settings_outlined),
-];
-
-// =========================
-// FIRESTORE DATA — được gán bởi _fetchDashboardData()
-// =========================
-var _adminStats       = <_AdminStat>[];
-var _weeklyChartData  = <_ChartPoint>[];
-var _listingStatuses  = <_ListingStatus>[];
-var _quickInsights    = <_QuickInsight>[];
-var _recentActivities = <_RecentActivity>[];
-var _alerts           = <_AlertItem>[];
-
-// =========================
 // PRIVATE HELPERS
 // =========================
 String _getInitial(String value) {
   final trimmed = value.trim();
   if (trimmed.isEmpty) return '?';
   return trimmed.substring(0, 1).toUpperCase();
-}
-
-// =========================
-// PRIVATE MODELS
-// =========================
-class _AdminMenuItem {
-  const _AdminMenuItem({
-    required this.label,
-    required this.icon,
-  });
-
-  final String label;
-  final IconData icon;
 }
 
 class _AdminStat {
@@ -2411,10 +2025,10 @@ class _AlertItem {
   final Color accent;
 }
 
-/// Tự động chọn Image.network hoặc Image.asset dựa trên [url].
-/// Nếu [url] là Firebase Storage URL (http/https) → dùng Image.network.
-/// Nếu là đường dẫn asset local (assets/...) → dùng Image.asset.
-/// Nếu rỗng hoặc lỗi → hiển thị placeholder teal.
+/// Tá»± Ä‘á»™ng chá»n Image.network hoặc Image.asset dựa trên [url].
+/// Nếu [url] là Firebase Storage URL (http/https) â†’ dÃ¹ng Image.network.
+/// Nếu là đ‘Æ°á»ng dáº«n asset local (assets/...) â†’ dÃ¹ng Image.asset.
+/// Nếu rá»—ng hoặc lá»—i â†’ hiá»ƒn thá»‹ placeholder teal.
 Widget _buildRoomThumb(String url, double width, double height) {
   Widget placeholder() => Container(
         width: width,
@@ -2449,3 +2063,4 @@ Widget _buildRoomThumb(String url, double width, double height) {
     errorBuilder: (_, __, ___) => placeholder(),
   );
 }
+

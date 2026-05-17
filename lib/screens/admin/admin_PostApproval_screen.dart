@@ -6,6 +6,7 @@ import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
 import 'package:smart_room_finder/services/fcm_service.dart';
+import 'package:smart_room_finder/screens/admin/admin_shared_widgets.dart';
 
 class PostApprovalScreen extends StatefulWidget {
   const PostApprovalScreen({super.key});
@@ -25,6 +26,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   String _selectedDateRange = '13/05/2025 - 19/05/2025';
   String _selectedSort = 'Mới nhất';
   String _selectedListingId = '';
+  String _adminDisplayName = 'Admin';
   int _selectedPreviewIndex = 0;
 
   // ---- Firebase state ----
@@ -35,6 +37,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchAdminName();
     _fetchPendingRooms();
   }
 
@@ -48,6 +51,11 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   // =========================
   // FIREBASE: FETCH PENDING
   // =========================
+  Future<void> _fetchAdminName() async {
+    final name = await fetchAdminDisplayName();
+    if (mounted) setState(() => _adminDisplayName = name);
+  }
+
   Future<void> _fetchPendingRooms() async {
     if (!mounted) return;
     setState(() {
@@ -494,39 +502,27 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
       return;
     }
 
-    if (index == 0) {
-      openAdminDashboard(context);
-      return;
+    handleAdminMenuSelection(context, _selectedMenuIndex, index);
+  }
+
+  List<_ModerationListing> get _filteredListings {
+    if (_selectedStatus == 'Tất cả') {
+      return List.unmodifiable(_listings);
     }
 
-    if (index == 2) {
-      openAdminUsers(context);
-      return;
-    }
-
-    if (index == 3) {
-      openAdminReports(context);
-      return;
-    }
-
-    if (index == 4) {
-      openAdminSupport(context);
-      return;
-    }
-
-    if (index == 5) {
-      openAdminSettings(context);
-      return;
-    }
-
-    setState(() => _selectedMenuIndex = index);
+    return List.unmodifiable(
+      _listings.where((listing) => listing.status == _selectedStatus),
+    );
   }
 
   _ModerationListing? get _selectedListing {
-    if (_listings.isEmpty || _selectedListingId.isEmpty) return null;
-    return _listings.firstWhere(
+    final listings = _filteredListings;
+    if (listings.isEmpty) return null;
+    if (_selectedListingId.isEmpty) return listings.first;
+
+    return listings.firstWhere(
       (item) => item.id == _selectedListingId,
-      orElse: () => _listings.first,
+      orElse: () => listings.first,
     );
   }
 
@@ -546,12 +542,13 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
               : Drawer(
                   width: math.min(screenWidth * 0.82, 320).toDouble(),
                   child: SafeArea(
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -561,11 +558,12 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
                 if (isDesktop)
                   SizedBox(
                     width: 248,
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 Expanded(
@@ -608,7 +606,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AdminTopbar(
+              AdminTopbar(
                 width: width,
                 isMobile: isMobile,
                 title: 'Duyệt bài đăng phòng',
@@ -617,6 +615,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
                 searchController: _searchController,
                 searchHint: 'Tìm kiếm bài đăng, chủ trọ hoặc khu vực...',
                 onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                adminDisplayName: _adminDisplayName,
               ),
               const SizedBox(height: 20),
               _buildFilterSection(width),
@@ -647,7 +646,10 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
       items: _statusOptions,
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedStatus = value);
+        setState(() {
+          _selectedStatus = value;
+          _selectedPreviewIndex = 0;
+        });
       },
     );
 
@@ -675,7 +677,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
     final filterButton = _FilterActionButton(
       label: 'Bộ lọc',
       icon: Icons.tune_rounded,
-      onTap: () {},
+      onTap: () => showAdminComingSoon(context),
     );
 
     if (isMobile) {
@@ -777,14 +779,15 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
       );
     }
 
+    final filteredListings = _filteredListings;
     final selectedListing = _selectedListing;
 
     // Shared builder for list card
     Widget listCard({required bool compact}) => _ModerationListCard(
           isCompact: compact,
           selectedSort: _selectedSort,
-          selectedListingId: _selectedListingId,
-          listings: _listings,
+          selectedListingId: selectedListing?.id ?? '',
+          listings: filteredListings,
           onSortChanged: (value) {
             if (value == null) return;
             setState(() => _selectedSort = value);
@@ -845,7 +848,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
   }
 
   Widget _buildEmptyDetail() {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       padding: const EdgeInsets.all(40),
       child: Center(
         child: Column(
@@ -956,6 +959,7 @@ class _AdminSidebar extends StatelessWidget {
                   _SidebarMenuTile(
                     data: _adminMenus[i],
                     isSelected: selectedIndex == i,
+                    isDisabled: i == 4 || i == 5,
                     onTap: () => onSelected(i),
                   ),
                   const SizedBox(height: 8),
@@ -1009,7 +1013,7 @@ class _AdminSidebar extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => showAdminComingSoon(context),
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
                         backgroundColor: const Color(0xFFEAF4FF),
@@ -1054,50 +1058,71 @@ class _SidebarMenuTile extends StatelessWidget {
     required this.data,
     required this.isSelected,
     required this.onTap,
+    this.isDisabled = false,
   });
 
   final _AdminMenuItem data;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFD8E9FF) : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              data.icon,
-              color: isSelected
-                  ? AppColors.blueDark
-                  : const Color(0xFF6F8093),
-              size: 20,
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        onTap: isDisabled ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? const Color(0xFFD8E9FF) : Colors.transparent,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: isSelected
-                      ? AppColors.blueDark
-                      : const Color(0xFF33455A),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                data.icon,
+                color: isSelected
+                    ? AppColors.blueDark
+                    : const Color(0xFF6F8093),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  data.label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? AppColors.blueDark
+                        : const Color(0xFF33455A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isDisabled)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBF0F7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Sắp ra mắt',
+                    style: TextStyle(
+                      color: Color(0xFF8EA0B4),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1207,7 +1232,7 @@ class _AdminTopbar extends StatelessWidget {
         _TopbarActionButton(
           icon: Icons.notifications_none_rounded,
           badgeCount: 8,
-          onTap: () {},
+          onTap: () => showAdminComingSoon(context),
         ),
         const SizedBox(width: 12),
         Container(
@@ -1582,7 +1607,7 @@ class _ModerationListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       padding: EdgeInsets.zero,
       child: Column(
         children: [
@@ -2072,7 +2097,7 @@ class _ListingDetailPanel extends StatelessWidget {
     final safePreviewIndex =
         allImages.isEmpty ? 0 : selectedPreviewIndex.clamp(0, allImages.length - 1).toInt();
 
-    return _AdminSurfaceCard(
+    return AdminSurfaceCard(
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2424,7 +2449,7 @@ class _ListingDetailPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: () {},
+            onPressed: () => showAdminComingSoon(context),
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
               foregroundColor: AppColors.blueDark,
@@ -2438,7 +2463,7 @@ class _ListingDetailPanel extends StatelessWidget {
           _SectionLabel(
             title: 'Giấy tờ tài liệu',
             trailing: TextButton(
-              onPressed: () {},
+              onPressed: () => showAdminComingSoon(context),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.blueDark,
                 padding: EdgeInsets.zero,
