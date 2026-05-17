@@ -22,7 +22,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   LatLng? _selectedLocation;
   String _selectedAddress = 'Đang xác định địa chỉ...';
   bool _isLoadingLocation = false;
-  bool _isSearching = false;
   List<dynamic> _searchResults = [];
   Timer? _debounce;
 
@@ -133,7 +132,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   Future<void> _searchAddress(String query) async {
-    setState(() => _isSearching = true);
     try {
       final url = 'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=5&addressdetails=1';
       final response = await http.get(Uri.parse(url), headers: {
@@ -148,8 +146,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       }
     } catch (e) {
       debugPrint('Error searching address: $e');
-    } finally {
-      setState(() => _isSearching = false);
     }
   }
 

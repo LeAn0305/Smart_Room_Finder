@@ -344,6 +344,7 @@ void _onLogout() {
                         subtitle: lang.tr('edit_profile_subtitle'),
                         onTap: () => _showEditProfile(),
                       ),
+
                       _buildMenuItem(
                         icon: Icons.lock_outline_rounded,
                         label: lang.tr('change_password'),

@@ -8,7 +8,6 @@ import 'package:smart_room_finder/models/user_model.dart';
 import 'package:smart_room_finder/providers/preference_provider.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
-import 'package:smart_room_finder/services/chat_service.dart';
 import 'package:smart_room_finder/services/fcm_service.dart';
 import 'package:smart_room_finder/screens/notification/notification_screen.dart';
 import 'package:smart_room_finder/widgets/ai_chat_box.dart';

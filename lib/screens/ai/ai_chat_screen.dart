@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
-import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/services/gemini_service.dart';
-import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 
 class AIChatScreen extends StatefulWidget {
   const AIChatScreen({super.key});
@@ -18,7 +16,6 @@ class _AIChatScreenState extends State<AIChatScreen> {
   final _scrollCtrl = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _isLoading = false;
-  bool _initialized = false;
 
   @override
   void initState() {
@@ -30,7 +27,6 @@ class _AIChatScreenState extends State<AIChatScreen> {
     final rooms = context.read<RoomProvider>().activePublicRooms;
     GeminiService.startRoomAdvisorChat(rooms);
     setState(() {
-      _initialized = true;
       _messages.add(_ChatMessage(
         text: 'Xin chào! Tôi là trợ lý tư vấn phòng trọ của Smart Room Finder. '
             'Tôi có thể giúp bạn tìm phòng phù hợp với nhu cầu và ngân sách. '

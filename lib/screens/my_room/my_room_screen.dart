@@ -7,6 +7,13 @@ import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
 import 'package:smart_room_finder/screens/post_room/post_room_screen.dart';
 
+class _SortOption {
+  final String key;
+  final IconData icon;
+  final String label;
+  const _SortOption(this.key, this.icon, this.label);
+}
+
 class MyRoomScreen extends StatefulWidget {
   const MyRoomScreen({super.key});
 
@@ -164,11 +171,11 @@ class _MyRoomScreenState extends State<MyRoomScreen>
   }
 
   void _showSortSheet() {
-    final options = [
-      ('newest', Icons.access_time_rounded, 'Mới nhất'),
-      ('views', Icons.visibility_rounded, 'Lượt xem nhiều nhất'),
-      ('price_low', Icons.arrow_upward_rounded, 'Giá thấp đến cao'),
-      ('price_high', Icons.arrow_downward_rounded, 'Giá cao đến thấp'),
+    const options = [
+      _SortOption('newest', Icons.access_time_rounded, 'Mới nhất'),
+      _SortOption('views', Icons.visibility_rounded, 'Lượt xem nhiều nhất'),
+      _SortOption('price_low', Icons.arrow_upward_rounded, 'Giá thấp đến cao'),
+      _SortOption('price_high', Icons.arrow_downward_rounded, 'Giá cao đến thấp'),
     ];
 
     showModalBottomSheet(
@@ -202,10 +209,10 @@ class _MyRoomScreenState extends State<MyRoomScreen>
             ),
             const SizedBox(height: 16),
             ...options.map((o) {
-              final sel = _sortBy == o.$1;
+              final sel = _sortBy == o.key;
               return GestureDetector(
                 onTap: () {
-                  setState(() => _sortBy = o.$1);
+                  setState(() => _sortBy = o.key);
                   Navigator.pop(context);
                 },
                 child: Container(
@@ -225,14 +232,14 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                   child: Row(
                     children: [
                       Icon(
-                        o.$2,
+                        o.icon,
                         color:
                             sel ? AppColors.teal : AppColors.textSecondary,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        o.$3,
+                        o.label,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color:
@@ -263,10 +270,11 @@ class _MyRoomScreenState extends State<MyRoomScreen>
     final activeRooms = _applySort(provider.myActiveRooms);
     final hiddenRooms = _applySort(provider.myHiddenRooms);
     final draftRooms = _applySort(provider.myDraftRooms);
-    final myRooms = <RoomModel>[];
-      myRooms.addAll(activeRooms);
-      myRooms.addAll(hiddenRooms);
-      myRooms.addAll(draftRooms);
+    final myRooms = <RoomModel>[
+      ...activeRooms,
+      ...hiddenRooms,
+      ...draftRooms,
+    ];
 
     return Scaffold(
       body: Container(

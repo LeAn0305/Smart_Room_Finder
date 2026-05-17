@@ -16,6 +16,8 @@ import 'package:smart_room_finder/screens/chat/chat_detail_screen.dart';
 import 'package:smart_room_finder/services/auth_service.dart';
 import 'package:smart_room_finder/services/chat_service.dart';
 import 'package:smart_room_finder/services/view_history_service.dart';
+import 'package:smart_room_finder/services/user_service.dart';
+
 
 class RoomDetailScreen extends StatefulWidget {
   final RoomModel room;
@@ -30,6 +32,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   int _selectedImage = 0;
   late RoomModel _room;
   UserModel? _currentUser;
+  UserModel? _hostUser;
+  bool _isLoadingHost = true;
+
 
   @override
   void initState() {
@@ -37,7 +42,23 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     _room = widget.room;
     _saveViewHistory();
     _loadCurrentUser();
+    _loadHostData();
   }
+
+  Future<void> _loadHostData() async {
+    if (_room.ownerId.isEmpty) {
+      if (mounted) setState(() => _isLoadingHost = false);
+      return;
+    }
+    final host = await UserService.getUserById(_room.ownerId);
+    if (mounted) {
+      setState(() {
+        _hostUser = host;
+        _isLoadingHost = false;
+      });
+    }
+  }
+
 
   Future<void> _loadCurrentUser() async {
     final user = await AuthService.getCurrentUserData();
@@ -690,11 +711,29 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
 
   Widget _buildHostSection() {
     final room = widget.room;
+    final hostName = _hostUser?.name ?? (room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà');
+    final hostAvatar = _hostUser?.profileImageUrl;
+
     return Row(
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 26,
-          backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=host'),
+          backgroundColor: AppColors.mintSoft,
+          backgroundImage: (hostAvatar != null && hostAvatar.isNotEmpty)
+              ? NetworkImage(hostAvatar)
+              : const NetworkImage('https://i.pravatar.cc/150?u=host'),
+          child: _isLoadingHost
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.teal,
+                  ),
+                )
+              : ((hostAvatar == null || hostAvatar.isEmpty)
+                  ? const Icon(Icons.person, color: AppColors.teal)
+                  : null),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -702,7 +741,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà',
+                hostName,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -733,6 +772,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       ],
     );
   }
+
 
   Future<void> _openChatWithOwner(BuildContext context) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -792,7 +832,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         roomImageUrl:
             room.imageUrl.isNotEmpty ? room.imageUrl : room.mainImageUrl,
         ownerId: room.ownerId.isNotEmpty ? room.ownerId : uid,
-        ownerName: room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà',
+        ownerName: _hostUser?.name ?? (room.postedBy.isNotEmpty ? room.postedBy : 'Chủ nhà'),
         renterId: uid,
         renterName: displayName,
         lastMessage: '',

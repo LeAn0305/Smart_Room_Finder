@@ -311,9 +311,7 @@ class _AISearchScreenState extends State<AISearchScreen> {
                                 ),
                                 child: RoomCard(
                                   room: room,
-                                  isFavorite: favoriteProvider.favoriteIds
-                                      .contains(room.id),
-                                  onFavoriteToggle: () => favoriteProvider
+                                  onFavoriteTap: () => favoriteProvider
                                       .toggleFavorite(room.id),
                                 ),
                               );
