@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/admin/models/admin_user_model.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
+import 'package:smart_room_finder/screens/admin/admin_shared_widgets.dart';
 
 class AdminUserScreen extends StatefulWidget {
   const AdminUserScreen({super.key});
@@ -28,12 +30,19 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
   List<AdminUserModel> _users = [];
   bool _isLoadingUsers = true;
   String? _userError;
+  String _adminDisplayName = 'Admin';
 
   @override
   void initState() {
     super.initState();
     _tableSearchController.addListener(_handleUserSearchChanged);
+    _fetchAdminName();
     _fetchUsers();
+  }
+
+  Future<void> _fetchAdminName() async {
+    final name = await fetchAdminDisplayName();
+    if (mounted) setState(() => _adminDisplayName = name);
   }
 
   @override
@@ -401,6 +410,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => _showLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -415,6 +425,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                       },
+                      onLogout: () => _showLogoutDialog(context),
                     ),
                   ),
                 Expanded(
@@ -452,11 +463,15 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AdminTopbar(
+              AdminTopbar(
                 width: width,
                 isMobile: isMobile,
+                title: 'Quản lý người dùng',
+                subtitle: 'Quản lý tài khoản, phân quyền và khóa tài khoản vi phạm.',
                 searchController: _searchController,
+                searchHint: 'Tìm kiếm người dùng...',
                 onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                adminDisplayName: _adminDisplayName,
               ),
               const SizedBox(height: 20),
               _buildStatsSection(width),
@@ -539,14 +554,6 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
       hintText: 'Tìm theo tên, email, SĐT...',
     );
 
-    final filterButton = _FilterActionButton(
-      label: 'Bộ lọc',
-      icon: Icons.filter_alt_outlined,
-      onTap: () {},
-    );
-
-    final exportButton = _ExportButton(onTap: () {});
-
     if (isMobile) {
       return _AdminSurfaceCard(
         padding: const EdgeInsets.all(14),
@@ -559,14 +566,6 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
             verificationBox,
             const SizedBox(height: 12),
             searchBox,
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: filterButton),
-                const SizedBox(width: 12),
-                Expanded(child: exportButton),
-              ],
-            ),
           ],
         ),
       );
@@ -590,10 +589,6 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
             Row(
               children: [
                 Expanded(child: searchBox),
-                const SizedBox(width: 12),
-                filterButton,
-                const SizedBox(width: 12),
-                exportButton,
               ],
             ),
           ],
@@ -612,10 +607,6 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
           SizedBox(width: 170, child: verificationBox),
           const SizedBox(width: 16),
           Expanded(child: searchBox),
-          const SizedBox(width: 12),
-          filterButton,
-          const SizedBox(width: 12),
-          exportButton,
         ],
       ),
     );
@@ -725,10 +716,12 @@ class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.selectedIndex,
     required this.onSelected,
+    this.onLogout,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -785,6 +778,7 @@ class _AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
+          // disabled set for sidebar
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -793,6 +787,7 @@ class _AdminSidebar extends StatelessWidget {
                   _SidebarMenuTile(
                     data: _adminMenus[i],
                     isSelected: selectedIndex == i,
+                    isDisabled: i == 4 || i == 5,
                     onTap: () => onSelected(i),
                   ),
                   const SizedBox(height: 8),
@@ -800,74 +795,38 @@ class _AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
+          // ── Nút Đăng xuất
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6FAFF),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE4ECF6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F7FE),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.verified_user_rounded,
-                      color: AppColors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Giữ nền tảng an toàn',
-                    style: TextStyle(
-                      color: Color(0xFF233244),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Xác minh danh tính và kiểm duyệt thường xuyên để đảm bảo chất lượng nội dung.',
-                    style: TextStyle(
-                      color: Color(0xFF7A8798),
-                      fontSize: 12,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: const Color(0xFFEAF4FF),
-                        foregroundColor: AppColors.blueDark,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Xem hướng dẫn',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: onLogout,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0F0),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFFD6D6)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 20),
+                    SizedBox(width: 12),
+                    Text(
+                      'Đăng xuất',
+                      style: TextStyle(
+                        color: Color(0xFFE53935),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(18, 0, 18, 18),
+            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -883,6 +842,47 @@ class _AdminSidebar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+void _showLogoutDialog(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(
+        children: [
+          Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 22),
+          SizedBox(width: 10),
+          Text('Đăng xuất', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        ],
+      ),
+      content: const Text(
+        'Bạn có chắc chắn muốn đăng xuất khỏi trang quản trị?',
+        style: TextStyle(color: Color(0xFF5C6D82), fontSize: 13, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Hủy', style: TextStyle(color: Color(0xFF8A97A8))),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE53935),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Đăng xuất', style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    await FirebaseAuth.instance.signOut();
+    Navigator.of(context, rootNavigator: true)
+        .pushNamedAndRemoveUntil('/', (route) => false);
   }
 }
 
@@ -1877,74 +1877,73 @@ class _FilterActionButton extends StatelessWidget {
   }
 }
 
-class _ExportButton extends StatelessWidget {
-  const _ExportButton({required this.onTap});
 
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 42,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.file_download_outlined, size: 17),
-        label: const Text(
-          'Xuất dữ liệu',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: AppColors.blue,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-        ),
-      ),
-    );
-  }
-}
 
 class _SidebarMenuTile extends StatelessWidget {
   const _SidebarMenuTile({
     required this.data,
     required this.isSelected,
     required this.onTap,
+    this.isDisabled = false,
   });
 
   final _AdminMenuItem data;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.blueDark : const Color(0xFF57687B);
+    final color = isDisabled
+        ? const Color(0xFFBBC8D8)
+        : isSelected
+            ? AppColors.blueDark
+            : const Color(0xFF57687B);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(data.icon, color: color, size: 20),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: isDisabled ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(data.icon, color: color, size: 20),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  data.label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isDisabled)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBF0F7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Sắp ra mắt',
+                    style: TextStyle(
+                      color: Color(0xFF8EA0B4),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -2104,23 +2103,41 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = label.toLowerCase() == 'admin' || label == 'Quản trị viên';
     final isOwner = label == 'Chủ trọ';
-    final color = isOwner ? const Color(0xFF9B5CFF) : AppColors.blue;
+    
+    final color = isAdmin 
+        ? const Color(0xFFE53935)
+        : isOwner 
+            ? const Color(0xFF9B5CFF) 
+            : AppColors.blue;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: isAdmin ? 0.12 : 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isAdmin) ...[
+            Icon(Icons.admin_panel_settings_rounded, color: color, size: 14),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

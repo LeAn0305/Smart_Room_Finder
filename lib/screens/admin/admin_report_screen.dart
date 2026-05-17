@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
 import 'package:smart_room_finder/screens/admin/admin_navigation.dart';
+import 'package:smart_room_finder/screens/admin/admin_shared_widgets.dart';
 
 class AdminReportScreen extends StatefulWidget {
   const AdminReportScreen({super.key});
@@ -16,13 +19,240 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   int _selectedMenuIndex = 3;
-  String _selectedReportId = _reports.first.id;
+  String _selectedReportId = '';
   String _selectedType = 'Tất cả';
   String _selectedStatus = 'Tất cả';
   String _selectedPriority = 'Tất cả';
   String _selectedTime = '7 ngày qua';
+  String _adminDisplayName = 'Admin';
   int _currentPage = 1;
   int _pageSize = 10;
+
+  // Firebase state
+  List<_ReportItem> _reports = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdminName();
+    _fetchReports();
+  }
+
+  Future<void> _fetchAdminName() async {
+    final name = await fetchAdminDisplayName();
+    if (mounted) setState(() => _adminDisplayName = name);
+  }
+
+  Future<void> _fetchReports() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('reports')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final items = <_ReportItem>[];
+      for (final doc in snap.docs) {
+        final d = doc.data();
+        final createdAt = (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+        final rawRoomId = d['roomId'] ?? d['postId'] ?? d['targetId'] ?? d['reportedRoomId'] ?? '';
+        final roomId = rawRoomId.toString().trim();
+        final reporterId = d['reporterId'] as String? ?? '';
+
+        // Fetch reporter name + avatar
+        String senderName = 'Người dùng';
+        String senderEmail = '';
+        String senderAvatarUrl = '';
+        if (reporterId.isNotEmpty) {
+          try {
+            final uDoc = await FirebaseFirestore.instance.collection('users').doc(reporterId).get();
+            if (uDoc.exists) {
+              final ud = uDoc.data()!;
+              senderName = ud['displayName'] ?? ud['name'] ?? ud['fullName'] ?? 'Người dùng';
+              senderEmail = ud['email'] ?? '';
+              senderAvatarUrl = ud['profileImageUrl'] ?? ud['photoURL'] ?? ud['avatarUrl'] ?? '';
+            }
+          } catch (_) {}
+        }
+
+        // Fetch room title
+        String roomTitle = '';
+        Map<String, dynamic>? roomData;
+        if (roomId.isNotEmpty) {
+          try {
+            final rDoc = await FirebaseFirestore.instance.collection('rooms').doc(roomId).get();
+            if (rDoc.exists) {
+              roomData = rDoc.data();
+              roomTitle = roomData?['title'] ?? roomData?['name'] ?? 'Phòng #${roomId.substring(0, 6)}';
+            }
+          } catch (_) {}
+        }
+
+        final reason = d['reason'] as String? ?? 'Khác';
+        final mappedReason = _mapReason(reason);
+        final status = d['status'] as String? ?? 'pending';
+
+        final descRaw = d['description'] ?? d['content'] ?? d['note'];
+        String descStr = descRaw?.toString().trim() ?? '';
+        
+        String finalSubtitle = descStr.isNotEmpty ? descStr : 'Lý do: $mappedReason';
+        String finalTitle = roomTitle.isNotEmpty ? roomTitle : '';
+
+        if (finalTitle.isEmpty) {
+           if (descStr.isEmpty) {
+             finalTitle = 'Không có nội dung chi tiết';
+           } else {
+             finalTitle = 'Bài đăng không xác định';
+           }
+        }
+
+        items.add(_ReportItem(
+          id: doc.id,
+          title: finalTitle.length > 60 ? finalTitle.substring(0, 60) : finalTitle,
+          subtitle: finalSubtitle,
+          sender: senderName,
+          senderEmail: senderEmail,
+          senderAvatarUrl: senderAvatarUrl,
+          type: mappedReason,
+          priority: _mapPriority(reason),
+          status: _mapStatus(status),
+          timeAgo: _timeAgo(createdAt),
+          createdAt: DateFormat('dd/MM/yyyy HH:mm').format(createdAt),
+          rawCreatedAt: createdAt,
+          description: descStr.isNotEmpty ? descStr : finalSubtitle,
+          roomId: roomId,
+          reporterId: reporterId,
+          firestoreStatus: status,
+          color: _colorForName(senderName),
+          roomData: roomData,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _reports = items;
+          _isLoading = false;
+          if (items.isNotEmpty) _selectedReportId = items.first.id;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.toString(); });
+    }
+  }
+
+  // Helpers
+  static String _mapReason(String r) {
+    final low = r.toLowerCase();
+    if (low.contains('giá không đúng') || low.contains('sai giá') || low.contains('giá')) return 'Sai giá';
+    if (low.contains('thông tin sai lệch') || low.contains('ảnh không thực tế') || low.contains('tin giả')) return 'Thông tin sai lệch';
+    if (low.contains('không còn trống') || low.contains('hết phòng')) return 'Hết phòng';
+    if (low.contains('lừa đảo') || low.contains('scam')) return 'Lừa đảo';
+    return 'Lý do khác';
+  }
+
+  static String _mapPriority(String r) {
+    final type = _mapReason(r);
+    if (type == 'Lừa đảo') return 'Cao';
+    return 'Trung bình';
+  }
+
+  static String _mapStatus(String s) {
+    switch (s) {
+      case 'resolved': return 'Đã giải quyết';
+      case 'processing': return 'Đang xử lý';
+      default: return 'Mới';
+    }
+  }
+
+  static String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+    return '${diff.inDays} ngày trước';
+  }
+
+  static Color _colorForName(String name) {
+    final colors = [Color(0xFF2F9BEF), Color(0xFF47C7B5), Color(0xFFF59E0B), Color(0xFF9B5CFF), Color(0xFF22B573)];
+    return colors[name.hashCode.abs() % colors.length];
+  }
+
+  List<_ReportItem> get _filteredReports {
+    var list = List<_ReportItem>.from(_reports);
+    if (_selectedType != 'Tất cả') list = list.where((r) => r.type == _selectedType).toList();
+    if (_selectedStatus != 'Tất cả') list = list.where((r) => r.status == _selectedStatus).toList();
+    if (_selectedPriority != 'Tất cả') list = list.where((r) => r.priority == _selectedPriority).toList();
+    if (_selectedTime != 'Tất cả') {
+      final now = DateTime.now();
+      DateTime? cutoff;
+      switch (_selectedTime) {
+        case '7 ngày qua': cutoff = now.subtract(const Duration(days: 7));
+        case '30 ngày qua': cutoff = now.subtract(const Duration(days: 30));
+        case 'Quý này': cutoff = DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1);
+        case 'Năm nay': cutoff = DateTime(now.year);
+      }
+      if (cutoff != null) list = list.where((r) => r.rawCreatedAt != null && r.rawCreatedAt!.isAfter(cutoff!)).toList();
+    }
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isNotEmpty) list = list.where((r) => r.title.toLowerCase().contains(q) || r.sender.toLowerCase().contains(q)).toList();
+    return list;
+  }
+
+  _ReportItem? get _selectedReport {
+    if (_reports.isEmpty) return null;
+    try { return _reports.firstWhere((r) => r.id == _selectedReportId); } catch (_) { return _reports.first; }
+  }
+
+  Future<void> _updateStatus(String id, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance.collection('reports').doc(id).update({'status': newStatus});
+      final idx = _reports.indexWhere((r) => r.id == id);
+      if (idx != -1 && mounted) {
+        setState(() {
+          _reports[idx] = _reports[idx].copyWith(status: _mapStatus(newStatus), firestoreStatus: newStatus);
+        });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+    }
+  }
+
+  Future<void> _hideRoom(_ReportItem report) async {
+    try {
+      if (report.roomId.isEmpty) throw 'Không tìm thấy bài đăng liên quan.';
+      
+      print('AdminReport - Hiding Room ID: ${report.roomId}');
+      await FirebaseFirestore.instance.collection('rooms').doc(report.roomId).update({
+        'approvalStatus': 'needsInfo',
+        'isActive': false,
+      });
+      await _updateStatus(report.id, 'resolved');
+      
+      // Reload danh sách để UI cập nhật
+      await _fetchReports();
+      
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã ẩn bài đăng thành công.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi ẩn phòng: $e')));
+    }
+  }
+
+  Future<void> _deleteReport(String id) async {
+    try {
+      print('AdminReport - Deleting Report ID: $id');
+      await FirebaseFirestore.instance.collection('reports').doc(id).delete();
+      
+      // Sau khi xoá thành công, cập nhật lại danh sách trên UI
+      await _fetchReports();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã bỏ qua và xóa báo cáo.')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi xoá báo cáo: $e')));
+    }
+  }
 
   @override
   void dispose() {
@@ -31,47 +261,18 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   bool _isMobile(double width) => width < 700;
-
   bool _isTablet(double width) => width >= 700 && width <= 1024;
-
   bool _isDesktop(double width) => width > 1024;
 
   void _handleMenuSelection(BuildContext context, int index) {
+    if (index == 4 || index == 5) { showAdminComingSoon(context); return; }
     if (index == _selectedMenuIndex) return;
-
-    if (index == 0) {
-      openAdminDashboard(context);
-      return;
+    switch (index) {
+      case 0: openAdminDashboard(context);
+      case 1: openPostApproval(context);
+      case 2: openAdminUsers(context);
     }
-
-    if (index == 1) {
-      openPostApproval(context);
-      return;
-    }
-
-    if (index == 2) {
-      openAdminUsers(context);
-      return;
-    }
-
-    if (index == 4) {
-      openAdminSupport(context);
-      return;
-    }
-
-    if (index == 5) {
-      openAdminSettings(context);
-      return;
-    }
-
     setState(() => _selectedMenuIndex = index);
-  }
-
-  _ReportItem get _selectedReport {
-    return _reports.firstWhere(
-      (report) => report.id == _selectedReportId,
-      orElse: () => _reports.first,
-    );
   }
 
   @override
@@ -90,12 +291,13 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
               : Drawer(
                   width: math.min(screenWidth * 0.82, 320).toDouble(),
                   child: SafeArea(
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -105,11 +307,10 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
                 if (isDesktop)
                   SizedBox(
                     width: 248,
-                    child: _AdminSidebar(
+                    child: AdminSidebar(
                       selectedIndex: _selectedMenuIndex,
-                      onSelected: (index) {
-                        _handleMenuSelection(context, index);
-                      },
+                      onSelected: (index) => _handleMenuSelection(context, index),
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 Expanded(
@@ -147,11 +348,15 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AdminTopbar(
+              AdminTopbar(
                 width: width,
                 isMobile: isMobile,
+                title: 'Quản lý báo cáo',
+                subtitle: 'Xử lý các báo cáo vi phạm, lừa đảo hoặc phản hồi từ người dùng.',
                 searchController: _searchController,
+                searchHint: 'Tìm kiếm báo cáo...',
                 onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                adminDisplayName: _adminDisplayName,
               ),
               const SizedBox(height: 20),
               _buildStatsSection(width),
@@ -167,29 +372,25 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
   }
 
   Widget _buildStatsSection(double width) {
+    // Compute stats from real data
+    final total = _reports.length;
+    final newCount = _reports.where((r) => r.firestoreStatus == 'pending').length;
+    final processing = _reports.where((r) => r.firestoreStatus == 'processing').length;
+    final resolved = _reports.where((r) => r.firestoreStatus == 'resolved').length;
+    final stats = [
+      _ReportStat(title: 'Tổng báo cáo', value: '$total', icon: Icons.bar_chart_rounded, accent: AppColors.blue, changeText: '', isPositive: true),
+      _ReportStat(title: 'Mới', value: '$newCount', icon: Icons.inbox_rounded, accent: const Color(0xFFF59E0B), changeText: 'Chưa xử lý', isPositive: false),
+      _ReportStat(title: 'Đang xử lý', value: '$processing', icon: Icons.pending_actions_rounded, accent: const Color(0xFF9B5CFF), changeText: '', isPositive: true),
+      _ReportStat(title: 'Đã giải quyết', value: '$resolved', icon: Icons.check_circle_outline_rounded, accent: const Color(0xFF22B573), changeText: '+Đã xong', isPositive: true),
+    ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = _isDesktop(width)
-            ? 4
-            : _isMobile(width)
-                ? 1
-                : 2;
+        final crossAxisCount = _isDesktop(width) ? 4 : _isMobile(width) ? 1 : 2;
         const spacing = 16.0;
-        final itemWidth =
-            (constraints.maxWidth - ((crossAxisCount - 1) * spacing)) /
-                crossAxisCount;
-
+        final itemWidth = (constraints.maxWidth - ((crossAxisCount - 1) * spacing)) / crossAxisCount;
         return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: _reportStats
-              .map(
-                (stat) => SizedBox(
-                  width: itemWidth,
-                  child: _StatCard(data: stat),
-                ),
-              )
-              .toList(),
+          spacing: spacing, runSpacing: spacing,
+          children: stats.map((s) => SizedBox(width: itemWidth, child: _StatCard(data: s))).toList(),
         );
       },
     );
@@ -205,7 +406,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       items: _typeOptions,
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedType = value);
+        setState(() { _selectedType = value; _currentPage = 1; });
       },
     );
 
@@ -215,7 +416,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       items: _statusOptions,
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedStatus = value);
+        setState(() { _selectedStatus = value; _currentPage = 1; });
       },
     );
 
@@ -225,7 +426,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       items: _priorityOptions,
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedPriority = value);
+        setState(() { _selectedPriority = value; _currentPage = 1; });
       },
     );
 
@@ -235,15 +436,11 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
       items: _timeOptions,
       onChanged: (value) {
         if (value == null) return;
-        setState(() => _selectedTime = value);
+        setState(() { _selectedTime = value; _currentPage = 1; });
       },
     );
 
-    final filterButton = _FilterActionButton(
-      label: 'Bộ lọc',
-      icon: Icons.filter_alt_outlined,
-      onTap: () {},
-    );
+
 
     if (isMobile) {
       return _AdminSurfaceCard(
@@ -256,13 +453,7 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             const SizedBox(height: 12),
             priorityBox,
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: timeBox),
-                const SizedBox(width: 12),
-                Expanded(child: filterButton),
-              ],
-            ),
+            timeBox,
           ],
         ),
       );
@@ -286,10 +477,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
             Row(
               children: [
                 Expanded(child: timeBox),
-                const SizedBox(width: 12),
-                filterButton,
-                const SizedBox(width: 12),
-                _RefreshButton(onTap: () {}),
               ],
             ),
           ],
@@ -308,10 +495,6 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           Expanded(child: priorityBox),
           const SizedBox(width: 12),
           SizedBox(width: 130, child: timeBox),
-          const SizedBox(width: 12),
-          filterButton,
-          const SizedBox(width: 12),
-          _RefreshButton(onTap: () {}),
         ],
       ),
     );
@@ -321,6 +504,37 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
     final isMobile = _isMobile(width);
     final isDesktop = _isDesktop(width);
 
+    if (_isLoading) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(60),
+        child: CircularProgressIndicator(),
+      ));
+    }
+    if (_error != null) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.error_outline, size: 48, color: Color(0xFFFF5B6E)),
+          const SizedBox(height: 12),
+          Text('Không thể tải dữ liệu', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 8),
+          TextButton.icon(icon: const Icon(Icons.refresh), label: const Text('Thử lại'), onPressed: _fetchReports),
+        ]),
+      ));
+    }
+    final displayReports = _filteredReports;
+    if (displayReports.isEmpty) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(60),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.inbox_rounded, size: 48, color: Color(0xFFBBC8D8)),
+          const SizedBox(height: 12),
+          const Text('Chưa có báo cáo nào', style: TextStyle(color: Color(0xFF8EA0B4), fontWeight: FontWeight.w700)),
+        ]),
+      ));
+    }
+    final selected = _selectedReport;
+
     if (isDesktop) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,222 +542,69 @@ class _AdminReportScreenState extends State<AdminReportScreen> {
           Expanded(
             flex: 7,
             child: _ReportTableCard(
-              reports: _reports,
+              reports: _pagedReports(displayReports),
+              totalFiltered: displayReports.length,
               selectedReportId: _selectedReportId,
               isCompact: false,
               currentPage: _currentPage,
               pageSize: _pageSize,
-              onSelectReport: (report) {
-                setState(() => _selectedReportId = report.id);
-              },
-              onPageChanged: (page) {
-                setState(() => _currentPage = page);
-              },
-              onPageSizeChanged: (size) {
-                if (size == null) return;
-                setState(() => _pageSize = size);
-              },
+              onSelectReport: (r) => setState(() => _selectedReportId = r.id),
+              onPageChanged: (p) => setState(() => _currentPage = p),
+              onPageSizeChanged: (s) { if (s != null) setState(() { _pageSize = s; _currentPage = 1; }); },
             ),
           ),
           const SizedBox(width: 16),
-          SizedBox(
-            width: 320,
-            child: _ReportDetailPanel(report: _selectedReport),
-          ),
+          if (selected != null)
+            SizedBox(
+              width: 320,
+              child: _ReportDetailPanel(
+                report: selected,
+                onMarkProcessing: () => _updateStatus(selected.id, 'processing'),
+                onMarkResolved: () => _updateStatus(selected.id, 'resolved'),
+                onDismiss: () => _updateStatus(selected.id, 'dismissed'),
+                onHideRoom: () => _hideRoom(selected),
+                onDeleteReport: () => _deleteReport(selected.id),
+              ),
+            ),
         ],
       );
     }
 
-    return Column(
-      children: [
-        _ReportTableCard(
-          reports: _reports,
-          selectedReportId: _selectedReportId,
-          isCompact: isMobile,
-          currentPage: _currentPage,
-          pageSize: _pageSize,
-          onSelectReport: (report) {
-            setState(() => _selectedReportId = report.id);
-          },
-          onPageChanged: (page) {
-            setState(() => _currentPage = page);
-          },
-          onPageSizeChanged: (size) {
-            if (size == null) return;
-            setState(() => _pageSize = size);
-          },
-        ),
-        const SizedBox(height: 16),
-        _ReportDetailPanel(report: _selectedReport),
-      ],
-    );
-  }
-}
-
-class _AdminSidebar extends StatelessWidget {
-  const _AdminSidebar({
-    required this.selectedIndex,
-    required this.onSelected,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5BC3F4), AppColors.teal],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.home_work_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Smart Room Finder',
-                        style: TextStyle(
-                          color: Color(0xFF1E2B3A),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Nền tảng tìm phòng thông minh',
-                        style: TextStyle(
-                          color: Color(0xFF7A8798),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              children: [
-                for (var i = 0; i < _adminMenus.length; i++) ...[
-                  _SidebarMenuTile(
-                    data: _adminMenus[i],
-                    isSelected: selectedIndex == i,
-                    onTap: () => onSelected(i),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6FAFF),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE4ECF6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F7FE),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.verified_user_rounded,
-                      color: AppColors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Giữ nền tảng an toàn',
-                    style: TextStyle(
-                      color: Color(0xFF233244),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Xác minh danh tính và kiểm duyệt thường xuyên để đảm bảo chất lượng nội dung.',
-                    style: TextStyle(
-                      color: Color(0xFF7A8798),
-                      fontSize: 12,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: const Color(0xFFEAF4FF),
-                        foregroundColor: AppColors.blueDark,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Xem hướng dẫn',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '© 2025 Smart Room Finder\nPhiên bản 1.0.0',
-                style: TextStyle(
-                  color: Color(0xFF9CA8B7),
-                  fontSize: 11,
-                  height: 1.5,
-                ),
-              ),
-            ),
-          ),
-        ],
+    return Column(children: [
+      _ReportTableCard(
+        reports: _pagedReports(displayReports),
+        totalFiltered: displayReports.length,
+        selectedReportId: _selectedReportId,
+        isCompact: isMobile,
+        currentPage: _currentPage,
+        pageSize: _pageSize,
+        onSelectReport: (r) => setState(() => _selectedReportId = r.id),
+        onPageChanged: (p) => setState(() => _currentPage = p),
+        onPageSizeChanged: (s) { if (s != null) setState(() { _pageSize = s; _currentPage = 1; }); },
       ),
-    );
+      const SizedBox(height: 16),
+      if (selected != null)
+        _ReportDetailPanel(
+          report: selected,
+          onMarkProcessing: () => _updateStatus(selected.id, 'processing'),
+          onMarkResolved: () => _updateStatus(selected.id, 'resolved'),
+          onDismiss: () => _updateStatus(selected.id, 'dismissed'),
+          onHideRoom: () => _hideRoom(selected),
+          onDeleteReport: () => _deleteReport(selected.id),
+        ),
+    ]);
+  }
+
+  List<_ReportItem> _pagedReports(List<_ReportItem> filtered) {
+    final start = (_currentPage - 1) * _pageSize;
+    if (start >= filtered.length) return [];
+    final end = math.min(start + _pageSize, filtered.length);
+    return filtered.sublist(start, end);
   }
 }
+
+// _AdminSidebar removed – now uses shared AdminSidebar from admin_shared_widgets.dart
+
 
 class _AdminTopbar extends StatelessWidget {
   const _AdminTopbar({
@@ -828,6 +889,7 @@ class _StatCard extends StatelessWidget {
 class _ReportTableCard extends StatelessWidget {
   const _ReportTableCard({
     required this.reports,
+    required this.totalFiltered,
     required this.selectedReportId,
     required this.isCompact,
     required this.currentPage,
@@ -838,6 +900,7 @@ class _ReportTableCard extends StatelessWidget {
   });
 
   final List<_ReportItem> reports;
+  final int totalFiltered;
   final String selectedReportId;
   final bool isCompact;
   final int currentPage;
@@ -867,9 +930,9 @@ class _ReportTableCard extends StatelessWidget {
                   ),
                 ),
                 if (!isCompact)
-                  const Text(
-                    'Tổng: 391 báo cáo',
-                    style: TextStyle(
+                  Text(
+                    'Tổng: $totalFiltered báo cáo',
+                    style: const TextStyle(
                       color: Color(0xFF7D8EA3),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -889,7 +952,7 @@ class _ReportTableCard extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: reports.length,
-            separatorBuilder: (_, __) => const Divider(
+            separatorBuilder: (context, index) => const Divider(
               height: 1,
               color: Color(0xFFEAF0F7),
             ),
@@ -906,6 +969,7 @@ class _ReportTableCard extends StatelessWidget {
           _PaginationBar(
             currentPage: currentPage,
             pageSize: pageSize,
+            totalItems: totalFiltered,
             onPageChanged: onPageChanged,
             onPageSizeChanged: onPageSizeChanged,
           ),
@@ -1066,7 +1130,7 @@ class _ReportTableRow extends StatelessWidget {
               flex: 3,
               child: Row(
                 children: [
-                  _Avatar(name: report.sender, size: 30, color: report.color),
+                  _Avatar(name: report.sender, size: 30, color: report.color, imageUrl: report.senderAvatarUrl),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -1110,9 +1174,21 @@ class _ReportTableRow extends StatelessWidget {
 }
 
 class _ReportDetailPanel extends StatelessWidget {
-  const _ReportDetailPanel({required this.report});
+  const _ReportDetailPanel({
+    required this.report,
+    this.onMarkProcessing,
+    this.onMarkResolved,
+    this.onDismiss,
+    this.onHideRoom,
+    this.onDeleteReport,
+  });
 
   final _ReportItem report;
+  final VoidCallback? onMarkProcessing;
+  final VoidCallback? onMarkResolved;
+  final VoidCallback? onDismiss;
+  final VoidCallback? onHideRoom;
+  final VoidCallback? onDeleteReport;
 
   @override
   Widget build(BuildContext context) {
@@ -1144,12 +1220,16 @@ class _ReportDetailPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(
-                report.id,
-                style: const TextStyle(
-                  color: Color(0xFF1E2B3A),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+              Flexible(
+                child: Text(
+                  report.id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF1E2B3A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1159,11 +1239,15 @@ class _ReportDetailPanel extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Text(
-                'Được tạo: ${report.createdAt}',
-                style: _smallMutedStyle,
+              Flexible(
+                child: Text(
+                  'Được tạo: ${report.createdAt}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _smallMutedStyle,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(report.timeAgo, style: _smallMutedStyle),
             ],
           ),
@@ -1182,13 +1266,14 @@ class _ReportDetailPanel extends StatelessWidget {
           const SizedBox(height: 18),
           const _DetailLabel('Bài đăng liên quan'),
           const SizedBox(height: 10),
-          const _RelatedListingCard(),
+          _RelatedListingCard(report: report),
           const SizedBox(height: 18),
           const _DetailLabel('Người gửi báo cáo'),
           const SizedBox(height: 10),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Avatar(name: report.sender, size: 38, color: report.color),
+              _Avatar(name: report.sender, size: 38, color: report.color, imageUrl: report.senderAvatarUrl),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -1196,6 +1281,8 @@ class _ReportDetailPanel extends StatelessWidget {
                   children: [
                     Text(
                       report.sender,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF1E2B3A),
                         fontSize: 13,
@@ -1204,11 +1291,14 @@ class _ReportDetailPanel extends StatelessWidget {
                     ),
                     Text(
                       report.senderEmail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: _smallMutedStyle,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1234,10 +1324,6 @@ class _ReportDetailPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          const _DetailLabel('Bằng chứng đính kèm (2)'),
-          const SizedBox(height: 10),
-          const _EvidenceRow(),
-          const SizedBox(height: 18),
           const _DetailLabel('Lịch sử xử lý'),
           const SizedBox(height: 10),
           const _TimelineItem(
@@ -1254,25 +1340,12 @@ class _ReportDetailPanel extends StatelessWidget {
                   foreground: Colors.white,
                   background: const Color(0xFFFF4D4F),
                   border: const Color(0xFFFF4D4F),
-                  onTap: () {},
+                  onTap: () {
+                    if (onHideRoom != null) onHideRoom!();
+                  },
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: _PanelButton(
-                  label: 'Cảnh báo chủ trọ',
-                  icon: Icons.warning_amber_rounded,
-                  foreground: const Color(0xFFF59E0B),
-                  background: const Color(0xFFFFFAF0),
-                  border: const Color(0xFFFAD7A0),
-                  onTap: () {},
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
               Expanded(
                 child: _PanelButton(
                   label: 'Bỏ qua',
@@ -1280,18 +1353,9 @@ class _ReportDetailPanel extends StatelessWidget {
                   foreground: const Color(0xFF52657A),
                   background: Colors.white,
                   border: const Color(0xFFE2EAF3),
-                  onTap: () {},
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _PanelButton(
-                  label: 'Đánh dấu đã xử lý',
-                  icon: Icons.check_rounded,
-                  foreground: Colors.white,
-                  background: AppColors.blue,
-                  border: AppColors.blue,
-                  onTap: () {},
+                  onTap: () {
+                    if (onDeleteReport != null) onDeleteReport!();
+                  },
                 ),
               ),
             ],
@@ -1303,10 +1367,45 @@ class _ReportDetailPanel extends StatelessWidget {
 }
 
 class _RelatedListingCard extends StatelessWidget {
-  const _RelatedListingCard();
+  const _RelatedListingCard({required this.report});
+
+  final _ReportItem report;
 
   @override
   Widget build(BuildContext context) {
+    if (report.roomId.isEmpty || report.roomData == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2EAF3)),
+        ),
+        child: const Center(
+          child: Text(
+            'Không có bài đăng liên quan',
+            style: TextStyle(
+              color: Color(0xFF8EA0B4),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final data = report.roomData!;
+    final title = data['title'] ?? data['name'] ?? 'Phòng #${report.roomId.substring(0, 6)}';
+    final address = data['address'] ?? data['location'] ?? 'Không có địa chỉ';
+    
+    final images = data['images'];
+    String? imageUrl;
+    if (images is List && images.isNotEmpty) {
+      imageUrl = images.first.toString();
+    } else if (data['imageUrl'] is String) {
+      imageUrl = data['imageUrl'];
+    }
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1321,48 +1420,44 @@ class _RelatedListingCard extends StatelessWidget {
             height: 62,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE7D8C8), Color(0xFFF3F6FA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: const Color(0xFFE2EAF3),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: const Icon(
-              Icons.apartment_rounded,
-              color: Color(0xFFB7A18C),
-            ),
+            child: imageUrl == null
+                ? const Icon(
+                    Icons.apartment_rounded,
+                    color: Color(0xFFB7A18C),
+                  )
+                : null,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cho thuê phòng giá rẻ chỉ 500k/tháng',
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Color(0xFF1E2B3A),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
-                  'Phòng trọ giá rẻ Gò Vấp',
-                  style: TextStyle(
+                  address,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     color: Color(0xFF7D8EA3),
                     fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Đăng bởi Nguyễn Văn Bình\n19/05/2025 08:30',
-                  style: TextStyle(
-                    color: Color(0xFF9AA6B5),
-                    fontSize: 10,
-                    height: 1.35,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1382,86 +1477,6 @@ class _RelatedListingCard extends StatelessWidget {
   }
 }
 
-class _EvidenceRow extends StatelessWidget {
-  const _EvidenceRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const _EvidenceTile(icon: Icons.receipt_long_outlined, label: 'Ảnh chụp'),
-        const SizedBox(width: 8),
-        const _EvidenceTile(icon: Icons.article_outlined, label: 'Nội dung'),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(
-            height: 68,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FBFF),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2EAF3)),
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_rounded, color: Color(0xFF90A0B4), size: 20),
-                SizedBox(height: 4),
-                Text(
-                  'Thêm bằng chứng',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF7D8EA3),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EvidenceTile extends StatelessWidget {
-  const _EvidenceTile({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 68,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FBFF),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE2EAF3)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF7D8EA3), size: 20),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF52657A),
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _TimelineItem extends StatelessWidget {
   const _TimelineItem({
@@ -1525,17 +1540,33 @@ class _PaginationBar extends StatelessWidget {
   const _PaginationBar({
     required this.currentPage,
     required this.pageSize,
+    required this.totalItems,
     required this.onPageChanged,
     required this.onPageSizeChanged,
   });
 
   final int currentPage;
   final int pageSize;
+  final int totalItems;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int?> onPageSizeChanged;
 
   @override
   Widget build(BuildContext context) {
+    final totalPages = math.max(1, (totalItems / pageSize).ceil());
+    final isFirst = currentPage <= 1;
+    final isLast = currentPage >= totalPages;
+
+    // Build page number buttons: show up to 5 pages around current
+    final pages = <int>[];
+    if (totalPages <= 5) {
+      for (var i = 1; i <= totalPages; i++) { pages.add(i); }
+    } else {
+      final start = math.max(1, currentPage - 2);
+      final end = math.min(totalPages, start + 4);
+      for (var i = start; i <= end; i++) { pages.add(i); }
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
       child: Wrap(
@@ -1584,6 +1615,11 @@ class _PaginationBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               const Text('trên mỗi trang', style: _paginationTextStyle),
+              const SizedBox(width: 12),
+              Text(
+                'Tổng: $totalItems',
+                style: _paginationTextStyle,
+              ),
             ],
           ),
           Row(
@@ -1591,32 +1627,30 @@ class _PaginationBar extends StatelessWidget {
             children: [
               _PageIconButton(
                 icon: Icons.chevron_left_rounded,
-                onTap: () => onPageChanged(math.max(1, currentPage - 1)),
+                onTap: isFirst ? () {} : () => onPageChanged(currentPage - 1),
+                isDisabled: isFirst,
               ),
-              for (final page in const [1, 2, 3])
+              for (final page in pages)
                 _PageNumberButton(
                   page: page,
                   isSelected: currentPage == page,
                   onTap: () => onPageChanged(page),
                 ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '...',
-                  style: TextStyle(
-                    color: Color(0xFF7D8EA3),
-                    fontWeight: FontWeight.w800,
-                  ),
+              if (totalPages > 5 && pages.last < totalPages) ...[  
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text('...', style: TextStyle(color: Color(0xFF7D8EA3), fontWeight: FontWeight.w800)),
                 ),
-              ),
-              _PageNumberButton(
-                page: 40,
-                isSelected: currentPage == 40,
-                onTap: () => onPageChanged(40),
-              ),
+                _PageNumberButton(
+                  page: totalPages,
+                  isSelected: currentPage == totalPages,
+                  onTap: () => onPageChanged(totalPages),
+                ),
+              ],
               _PageIconButton(
                 icon: Icons.chevron_right_rounded,
-                onTap: () => onPageChanged(math.min(40, currentPage + 1)),
+                onTap: isLast ? () {} : () => onPageChanged(currentPage + 1),
+                isDisabled: isLast,
               ),
             ],
           ),
@@ -1675,7 +1709,8 @@ class _FilterDropdown extends StatelessWidget {
       height: 42,
       child: DropdownButtonHideUnderline(
         child: DropdownButtonFormField<String>(
-          value: value,
+          key: ValueKey(value),
+          initialValue: value,
           isExpanded: true,
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -1988,6 +2023,47 @@ class _Avatar extends StatelessWidget {
     required this.name,
     required this.size,
     required this.color,
+    this.imageUrl = '',
+  });
+
+  final String name;
+  final double size;
+  final Color color;
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _AvatarInitials(name: name, size: size, color: color);
+
+    if (imageUrl.isNotEmpty) {
+      return ClipOval(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Image.network(
+            imageUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => initials,
+            loadingBuilder: (_, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return initials;
+            },
+          ),
+        ),
+      );
+    }
+
+    return initials;
+  }
+}
+
+class _AvatarInitials extends StatelessWidget {
+  const _AvatarInitials({
+    required this.name,
+    required this.size,
+    required this.color,
   });
 
   final String name;
@@ -2082,51 +2158,8 @@ class _PanelButton extends StatelessWidget {
   }
 }
 
-class _SidebarMenuTile extends StatelessWidget {
-  const _SidebarMenuTile({
-    required this.data,
-    required this.isSelected,
-    required this.onTap,
-  });
+// _SidebarMenuTile removed (now using shared AdminSidebar)
 
-  final _AdminMenuItem data;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.blueDark : const Color(0xFF57687B);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(data.icon, color: color, size: 20),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _TopbarActionButton extends StatelessWidget {
   const _TopbarActionButton({
@@ -2191,18 +2224,20 @@ class _PageIconButton extends StatelessWidget {
   const _PageIconButton({
     required this.icon,
     required this.onTap,
+    this.isDisabled = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       visualDensity: VisualDensity.compact,
-      onPressed: onTap,
+      onPressed: isDisabled ? null : onTap,
       icon: Icon(icon, size: 18),
-      color: const Color(0xFF8EA0B4),
+      color: isDisabled ? const Color(0xFFCDD9E5) : const Color(0xFF8EA0B4),
     );
   }
 }
@@ -2267,14 +2302,15 @@ const TextStyle _paginationTextStyle = TextStyle(
 
 Color _typeColor(String type) {
   switch (type) {
-    case 'Tin giả':
+    case 'Thông tin sai lệch':
       return AppColors.blue;
-    case 'Nội dung không phù hợp':
+    case 'Sai giá':
       return const Color(0xFF9B5CFF);
     case 'Lừa đảo':
-      return const Color(0xFFFF8A00);
-    case 'Spam':
-      return const Color(0xFF90A0B4);
+      return const Color(0xFFFF5B6E);
+    case 'Hết phòng':
+      return const Color(0xFFF59E0B);
+    case 'Lý do khác':
     default:
       return const Color(0xFF52657A);
   }
@@ -2312,21 +2348,16 @@ String _getInitial(String value) {
   return trimmed.substring(0, 1).toUpperCase();
 }
 
-const List<_AdminMenuItem> _adminMenus = [
-  _AdminMenuItem(label: 'Tổng quan', icon: Icons.dashboard_outlined),
-  _AdminMenuItem(label: 'Duyệt bài đăng', icon: Icons.fact_check_outlined),
-  _AdminMenuItem(label: 'Người dùng', icon: Icons.group_outlined),
-  _AdminMenuItem(label: 'Báo cáo', icon: Icons.bar_chart_rounded),
-  _AdminMenuItem(label: 'Hỗ trợ', icon: Icons.support_agent_outlined),
-  _AdminMenuItem(label: 'Cài đặt', icon: Icons.settings_outlined),
-];
+// _adminMenus removed (now using shared AdminSidebar)
+
 
 const List<String> _typeOptions = [
   'Tất cả',
-  'Tin giả',
-  'Nội dung không phù hợp',
+  'Thông tin sai lệch',
+  'Sai giá',
+  'Hết phòng',
   'Lừa đảo',
-  'Spam',
+  'Lý do khác',
 ];
 const List<String> _statusOptions = [
   'Tất cả',
@@ -2342,184 +2373,22 @@ const List<String> _timeOptions = [
   'Năm nay',
 ];
 
-const List<_ReportStat> _reportStats = [
-  _ReportStat(
-    title: 'Báo cáo mới',
-    value: '23',
-    changeText: '+21.1%',
-    isPositive: false,
-    icon: Icons.headset_mic_outlined,
-    accent: Color(0xFF9B5CFF),
-  ),
-  _ReportStat(
-    title: 'Đang xử lý',
-    value: '56',
-    changeText: '+8.2%',
-    isPositive: false,
-    icon: Icons.hourglass_empty_rounded,
-    accent: Color(0xFFF59E0B),
-  ),
-  _ReportStat(
-    title: 'Đã giải quyết',
-    value: '312',
-    changeText: '+15.7%',
-    isPositive: true,
-    icon: Icons.check_circle_outline_rounded,
-    accent: Color(0xFF22B573),
-  ),
-  _ReportStat(
-    title: 'Mức độ khẩn cấp cao',
-    value: '7',
-    changeText: '+16.7%',
-    isPositive: false,
-    icon: Icons.warning_amber_rounded,
-    accent: Color(0xFFFF5B6E),
-  ),
-];
+// (mock data removed - data loaded from Firestore)
 
-const List<_ReportItem> _reports = [
-  _ReportItem(
-    id: '#RC-2025-0519',
-    title: 'Cho thuê phòng giá rẻ chỉ 500k/tháng',
-    subtitle: 'Đăng trong Phòng trọ giá rẻ Gò Vấp',
-    sender: 'Nguyễn Văn A',
-    senderEmail: '@nguyenvana',
-    type: 'Tin giả',
-    priority: 'Cao',
-    status: 'Mới',
-    timeAgo: '10 phút trước',
-    createdAt: '19/05/2025 09:15',
-    description:
-        'Bài đăng cung cấp thông tin giá thuê không đúng sự thật. Phòng thực tế không có với mức giá như trong bài.',
-    color: Color(0xFF2F9BEF),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0518',
-    title: 'Hình ảnh phản cảm trong bài đăng',
-    subtitle: 'Đăng trong Phòng trọ Tân Bình',
-    sender: 'Trần Thị Mai',
-    senderEmail: '@tranthimai',
-    type: 'Nội dung không phù hợp',
-    priority: 'Cao',
-    status: 'Đang xử lý',
-    timeAgo: '35 phút trước',
-    createdAt: '19/05/2025 08:50',
-    description:
-        'Người dùng báo cáo ảnh minh họa không phù hợp với nội dung thuê phòng.',
-    color: Color(0xFF47C7B5),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0517',
-    title: 'Yêu cầu chuyển tiền đặt cọc trước',
-    subtitle: 'Đăng trong Phòng trọ Bình Thạnh',
-    sender: 'Lê Minh Tuấn',
-    senderEmail: '@leminhtuan',
-    type: 'Lừa đảo',
-    priority: 'Cao',
-    status: 'Đang xử lý',
-    timeAgo: '1 giờ trước',
-    createdAt: '19/05/2025 08:05',
-    description:
-        'Bên đăng yêu cầu chuyển tiền cọc trước khi cho xem phòng, có dấu hiệu lừa đảo.',
-    color: Color(0xFFF59E0B),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0516',
-    title: 'Liên tục đăng tin quảng cáo',
-    subtitle: 'Đăng trong Căn hộ dịch vụ Q.7',
-    sender: 'Phạm Văn Hùng',
-    senderEmail: '@phamvanhung',
-    type: 'Spam',
-    priority: 'Thấp',
-    status: 'Mới',
-    timeAgo: '2 giờ trước',
-    createdAt: '19/05/2025 07:20',
-    description:
-        'Tài khoản gửi nhiều nội dung quảng cáo trùng lặp trong thời gian ngắn.',
-    color: Color(0xFFFF8A00),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0515',
-    title: 'Thông tin sai sự thật về vị trí',
-    subtitle: 'Đăng trong Phòng trọ Thủ Đức',
-    sender: 'Đỗ Thu Hằng',
-    senderEmail: '@dothuhang',
-    type: 'Tin giả',
-    priority: 'Trung bình',
-    status: 'Đã giải quyết',
-    timeAgo: '3 giờ trước',
-    createdAt: '19/05/2025 06:40',
-    description:
-        'Vị trí thực tế khác với mô tả trong bài đăng, gây nhầm lẫn cho người thuê.',
-    color: Color(0xFF9B5CFF),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0514',
-    title: 'Nội dung miệt thị người khác',
-    subtitle: 'Đăng trong Phòng trọ Quận 1',
-    sender: 'Hoàng Văn Duy',
-    senderEmail: '@hoangvduy',
-    type: 'Nội dung không phù hợp',
-    priority: 'Cao',
-    status: 'Đã giải quyết',
-    timeAgo: '5 giờ trước',
-    createdAt: '19/05/2025 04:10',
-    description:
-        'Mô tả bài đăng chứa ngôn từ không phù hợp, có thể ảnh hưởng cộng đồng.',
-    color: Color(0xFF22B573),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0513',
-    title: 'Đường link lạ trong bài đăng',
-    subtitle: 'Đăng trong Phòng trọ Tân Phú',
-    sender: 'Ngô Quang Huy',
-    senderEmail: '@ngoquanghuy',
-    type: 'Lừa đảo',
-    priority: 'Cao',
-    status: 'Đã giải quyết',
-    timeAgo: '1 ngày trước',
-    createdAt: '18/05/2025 20:35',
-    description:
-        'Bài đăng gắn đường link ngoài không rõ nguồn, có dấu hiệu thu thập thông tin.',
-    color: Color(0xFF2F9BEF),
-  ),
-  _ReportItem(
-    id: '#RC-2025-0512',
-    title: 'Đăng tin trùng lặp nhiều lần',
-    subtitle: 'Đăng trong Phòng trọ Gò Vấp',
-    sender: 'Vũ Thanh Tâm',
-    senderEmail: '@vuthanhtam',
-    type: 'Spam',
-    priority: 'Thấp',
-    status: 'Đã giải quyết',
-    timeAgo: '1 ngày trước',
-    createdAt: '18/05/2025 18:20',
-    description:
-        'Một nội dung được đăng lặp lại nhiều lần ở nhiều khu vực khác nhau.',
-    color: Color(0xFFFF5B6E),
-  ),
-];
-
-class _AdminMenuItem {
-  const _AdminMenuItem({
-    required this.label,
-    required this.icon,
-  });
-
-  final String label;
-  final IconData icon;
-}
+// =====================
+// DATA CLASSES
+// =====================
+// _AdminMenuItem removed (now using shared AdminSidebar)
 
 class _ReportStat {
   const _ReportStat({
     required this.title,
     required this.value,
-    required this.changeText,
-    required this.isPositive,
     required this.icon,
     required this.accent,
+    this.changeText = '',
+    this.isPositive = true,
   });
-
   final String title;
   final String value;
   final String changeText;
@@ -2542,6 +2411,12 @@ class _ReportItem {
     required this.createdAt,
     required this.description,
     required this.color,
+    this.rawCreatedAt,
+    this.roomId = '',
+    this.reporterId = '',
+    this.firestoreStatus = 'pending',
+    this.senderAvatarUrl = '',
+    this.roomData,
   });
 
   final String id;
@@ -2556,4 +2431,27 @@ class _ReportItem {
   final String createdAt;
   final String description;
   final Color color;
+  final DateTime? rawCreatedAt;
+  final String roomId;
+  final String reporterId;
+  final String firestoreStatus;
+  final String senderAvatarUrl;
+  final Map<String, dynamic>? roomData;
+
+  _ReportItem copyWith({String? status, String? firestoreStatus}) {
+    return _ReportItem(
+      id: id, title: title, subtitle: subtitle,
+      sender: sender, senderEmail: senderEmail,
+      senderAvatarUrl: senderAvatarUrl,
+      type: type, priority: priority,
+      status: status ?? this.status,
+      timeAgo: timeAgo, createdAt: createdAt,
+      rawCreatedAt: rawCreatedAt,
+      description: description, color: color,
+      roomId: roomId, reporterId: reporterId,
+      firestoreStatus: firestoreStatus ?? this.firestoreStatus,
+      roomData: roomData,
+    );
+  }
 }
+

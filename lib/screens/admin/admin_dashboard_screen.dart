@@ -319,6 +319,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -333,6 +334,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 Expanded(

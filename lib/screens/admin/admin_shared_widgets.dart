@@ -16,6 +16,9 @@ const List<AdminMenuItem> adminMenus = [
   AdminMenuItem(label: 'Cài đặt',        icon: Icons.settings_outlined),
 ];
 
+/// Indexes of menu items that are disabled (coming soon)
+const Set<int> adminDisabledMenuIndexes = {4, 5};
+
 class AdminMenuItem {
   const AdminMenuItem({
     required this.label,
@@ -30,6 +33,11 @@ class AdminMenuItem {
 // NAVIGATION HANDLER (shared)
 // =========================
 void handleAdminMenuSelection(BuildContext context, int currentIndex, int targetIndex, [VoidCallback? onSameIndex]) {
+  // Disabled items → show coming soon snackbar
+  if (adminDisabledMenuIndexes.contains(targetIndex)) {
+    showAdminComingSoon(context);
+    return;
+  }
   if (targetIndex == currentIndex) {
     onSameIndex?.call();
     return;
@@ -39,8 +47,6 @@ void handleAdminMenuSelection(BuildContext context, int currentIndex, int target
     case 1: openPostApproval(context);
     case 2: openAdminUsers(context);
     case 3: openAdminReports(context);
-    case 4: openAdminSupport(context);
-    case 5: openAdminSettings(context);
   }
 }
 
@@ -52,10 +58,12 @@ class AdminSidebar extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onSelected,
+    this.onLogout,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +128,7 @@ class AdminSidebar extends StatelessWidget {
                   AdminSidebarMenuTile(
                     data: adminMenus[i],
                     isSelected: selectedIndex == i,
+                    isDisabled: adminDisabledMenuIndexes.contains(i),
                     onTap: () => onSelected(i),
                   ),
                   const SizedBox(height: 8),
@@ -127,8 +136,38 @@ class AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
+          // ── Nút Đăng xuất ──────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: onLogout,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0F0),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFFD6D6)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 20),
+                    SizedBox(width: 12),
+                    Text(
+                      'Đăng xuất',
+                      style: TextStyle(
+                        color: Color(0xFFE53935),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(18, 0, 18, 18),
+            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -156,51 +195,76 @@ class AdminSidebarMenuTile extends StatelessWidget {
     required this.data,
     required this.isSelected,
     required this.onTap,
+    this.isDisabled = false,
   });
 
   final AdminMenuItem data;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? AppColors.blueDark : const Color(0xFF57687B);
+    final color = isDisabled
+        ? const Color(0xFFBBC8D8)
+        : isSelected
+            ? AppColors.blueDark
+            : const Color(0xFF57687B);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.blue.withValues(alpha: 0.14)
-                    : const Color(0xFFF3F7FB),
-                borderRadius: BorderRadius.circular(12),
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: isDisabled ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF5FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.blue.withValues(alpha: 0.14)
+                      : const Color(0xFFF3F7FB),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(data.icon, color: color, size: 20),
               ),
-              child: Icon(data.icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  data.label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isDisabled)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBF0F7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Sắp ra mắt',
+                    style: TextStyle(
+                      color: Color(0xFF8EA0B4),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -562,6 +626,54 @@ void showAdminComingSoon(BuildContext context) {
       duration: const Duration(seconds: 2),
     ),
   );
+}
+
+// =========================
+// LOGOUT DIALOG HELPER
+// =========================
+Future<void> showAdminLogoutDialog(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Row(
+        children: [
+          Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 22),
+          SizedBox(width: 10),
+          Text(
+            'Đăng xuất',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+      content: const Text(
+        'Bạn có chắc chắn muốn đăng xuất khỏi trang quản trị?',
+        style: TextStyle(color: Color(0xFF5C6D82), fontSize: 13, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Hủy', style: TextStyle(color: Color(0xFF8A97A8))),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE53935),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Đăng xuất', style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    await FirebaseAuth.instance.signOut();
+    // Navigate back to root (login screen)
+    Navigator.of(context, rootNavigator: true)
+        .pushNamedAndRemoveUntil('/', (route) => false);
+  }
 }
 
 void showAdminSnackBar(BuildContext context, String message, {bool isError = false}) {

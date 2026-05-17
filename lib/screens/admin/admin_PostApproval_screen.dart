@@ -528,6 +528,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
                         _handleMenuSelection(context, index);
                         Navigator.of(context).pop();
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 ),
@@ -542,6 +543,7 @@ class _PostApprovalScreenState extends State<PostApprovalScreen> {
                       onSelected: (index) {
                         _handleMenuSelection(context, index);
                       },
+                      onLogout: () => showAdminLogoutDialog(context),
                     ),
                   ),
                 Expanded(
@@ -937,6 +939,7 @@ class _AdminSidebar extends StatelessWidget {
                   _SidebarMenuTile(
                     data: _adminMenus[i],
                     isSelected: selectedIndex == i,
+                    isDisabled: i == 4 || i == 5,
                     onTap: () => onSelected(i),
                   ),
                   const SizedBox(height: 8),
@@ -1035,50 +1038,71 @@ class _SidebarMenuTile extends StatelessWidget {
     required this.data,
     required this.isSelected,
     required this.onTap,
+    this.isDisabled = false,
   });
 
   final _AdminMenuItem data;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFD8E9FF) : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              data.icon,
-              color: isSelected
-                  ? AppColors.blueDark
-                  : const Color(0xFF6F8093),
-              size: 20,
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        onTap: isDisabled ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? const Color(0xFFD8E9FF) : Colors.transparent,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: isSelected
-                      ? AppColors.blueDark
-                      : const Color(0xFF33455A),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                data.icon,
+                color: isSelected
+                    ? AppColors.blueDark
+                    : const Color(0xFF6F8093),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  data.label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? AppColors.blueDark
+                        : const Color(0xFF33455A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isDisabled)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBF0F7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Sắp ra mắt',
+                    style: TextStyle(
+                      color: Color(0xFF8EA0B4),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

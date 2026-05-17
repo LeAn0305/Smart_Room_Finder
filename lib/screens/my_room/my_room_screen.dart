@@ -787,14 +787,30 @@ class _MyRoomScreenState extends State<MyRoomScreen>
                       () => _editRoom(room),
                     ),
                     const SizedBox(width: 6),
-                    _actionBtn(
-                      room.isActive
-                          ? Icons.visibility_off_rounded
-                          : Icons.visibility_rounded,
-                      room.isActive ? 'Ẩn' : 'Hiện',
-                      room.isActive ? Colors.orange : Colors.green,
-                      () => _toggleActive(room),
-                    ),
+                    if (room.approvalStatus == RoomStatus.needsInfo)
+                      _actionBtn(
+                        Icons.warning_amber_rounded,
+                        'Cần sửa',
+                        Colors.redAccent,
+                        () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Phòng đang bị khóa do báo cáo. Vui lòng cập nhật lại thông tin.'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          _editRoom(room);
+                        },
+                      )
+                    else
+                      _actionBtn(
+                        room.isActive
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        room.isActive ? 'Ẩn' : 'Hiện',
+                        room.isActive ? Colors.orange : Colors.green,
+                        () => _toggleActive(room),
+                      ),
                     const SizedBox(width: 6),
                     _actionBtn(
                       Icons.copy_rounded,
