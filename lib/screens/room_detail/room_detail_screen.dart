@@ -601,7 +601,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _errorImage(),
       );
-    } else if (imgPath.startsWith('http') || kIsWeb) {
+    } else if (imgPath.startsWith('http') || imgPath.startsWith('https') || kIsWeb) {
       return Image.network(
         imgPath,
         fit: BoxFit.cover,
@@ -623,7 +623,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _errorThumb(),
       );
-    } else if (imgPath.startsWith('http') || kIsWeb) {
+    } else if (imgPath.startsWith('http') || imgPath.startsWith('https') || kIsWeb) {
       return Image.network(
         imgPath,
         fit: BoxFit.cover,

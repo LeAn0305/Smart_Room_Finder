@@ -477,26 +477,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Chào buổi sáng,',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chào buổi sáng,',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                            Text(
-                              displayName,
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
+                              Text(
+                                displayName,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         // ── Chuông + Avatar ──────────────────
                         Row(
@@ -695,12 +699,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           size: 18,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          displayLocation,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                        Flexible(
+                          child: Text(
+                            displayLocation,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -736,9 +744,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                  SizedBox(
-                    height: 360,
-                    child: filtered.isEmpty
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardHeight = (constraints.maxWidth * 0.85).clamp(280.0, 380.0);
+                      return SizedBox(
+                        height: cardHeight,
+                        child: filtered.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -783,6 +794,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               );
                             },
                           ),
+                      );
+                    },
                   ),
 
                   SectionTitle(
@@ -836,10 +849,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBannerCards() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bannerHeight = (constraints.maxWidth * 0.38).clamp(130.0, 200.0);
+        return _buildBannerCardsWithHeight(bannerHeight);
+      },
+    );
+  }
+
+  Widget _buildBannerCardsWithHeight(double bannerHeight) {
     return Column(
       children: [
         SizedBox(
-          height: 150,
+          height: bannerHeight,
           child: PageView.builder(
             controller: _bannerCtrl,
             onPageChanged: (i) => setState(() => _bannerPage = i),

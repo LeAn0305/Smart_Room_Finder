@@ -562,7 +562,7 @@ void _onLogout() {
           ),
           Positioned(
             bottom: 4,
-            right: 100,
+            right: 0,
             child: GestureDetector(
               onTap: _showImageSourcePicker,
               child: Container(
@@ -614,12 +614,16 @@ void _onLogout() {
               color: AppColors.textSecondary,
             ),
             const SizedBox(width: 4),
-            Text(
-              displayEmail,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary.withValues(alpha: 0.85),
-                fontWeight: FontWeight.w500,
+            Flexible(
+              child: Text(
+                displayEmail,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -634,12 +638,16 @@ void _onLogout() {
               color: AppColors.textSecondary,
             ),
             const SizedBox(width: 4),
-            Text(
-              displayLocation,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary.withValues(alpha: 0.85),
-                fontWeight: FontWeight.w500,
+            Flexible(
+              child: Text(
+                displayLocation,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

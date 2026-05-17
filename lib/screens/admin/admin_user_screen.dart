@@ -604,11 +604,11 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          SizedBox(width: 116, child: roleBox),
+          Flexible(flex: 2, child: roleBox),
           const SizedBox(width: 12),
-          SizedBox(width: 138, child: statusBox),
+          Flexible(flex: 2, child: statusBox),
           const SizedBox(width: 12),
-          SizedBox(width: 170, child: verificationBox),
+          Flexible(flex: 3, child: verificationBox),
           const SizedBox(width: 16),
           Expanded(child: searchBox),
         ],
@@ -674,8 +674,8 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          SizedBox(
-            width: 280,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
             child: _UserDetailPanel(
               user: selectedUser!,
               onLockUser: _showLockUserDialog,

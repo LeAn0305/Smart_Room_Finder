@@ -235,7 +235,10 @@ class _AdminSupportScreenState extends State<AdminSupportScreen> {
         children: [
           Expanded(flex: 7, child: queue),
           const SizedBox(width: 16),
-          SizedBox(width: 430, child: detail),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 320, maxWidth: 430),
+            child: detail,
+          ),
         ],
       );
     }
