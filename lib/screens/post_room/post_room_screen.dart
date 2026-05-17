@@ -118,14 +118,8 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
 
   void _removeSubImage(int index) {
     setState(() {
-      _subImages.removeAt(index);
-      // Xóa XFile tương ứng nếu là ảnh mới (chưa upload)
-      // _subXFiles song song với _subImages chỉ cho ảnh mới chọn
-      // Vì ảnh cũ (http URL) không có trong _subXFiles,
-      // chỉ xóa nếu index hợp lệ trong _subXFiles
-      if (index < _subXFiles.length) {
-        _subXFiles.removeAt(index);
-      }
+      final removedPath = _subImages.removeAt(index);
+      _subXFiles.removeWhere((x) => x.path == removedPath);
     });
   }
 
@@ -164,9 +158,6 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   Future<List<String>> _uploadSubImages() async {
     final urls = <String>[];
     final svc = ImageService();
-    // Ảnh phụ trong _subImages: có thể là http (ảnh cũ) hoặc local path (ảnh mới)
-    // _subXFiles chứa XFile cho các ảnh mới được chọn (theo thứ tự thêm vào)
-    int xfileIndex = 0;
     for (final path in _subImages) {
       if (path.startsWith('http')) {
         // Ảnh cũ đã có URL — giữ nguyên
@@ -174,10 +165,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
       } else if (path.startsWith('assets/')) {
         urls.add(path);
       } else {
-        // Ảnh mới: dùng XFile nếu còn trong _subXFiles
-        if (xfileIndex < _subXFiles.length) {
-          final url = await svc.uploadXFile(_subXFiles[xfileIndex]);
-          xfileIndex++;
+        // Tìm XFile có path tương ứng
+        final xfile = _subXFiles.where((x) => x.path == path).firstOrNull;
+        if (xfile != null) {
+          final url = await svc.uploadXFile(xfile);
           if (url.isNotEmpty) urls.add(url);
         } else {
           // Fallback Mobile
@@ -238,6 +229,8 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
   RoomModel _buildRoom({required bool isDraft, required String mainImgUrl, List<String>? uploadedUrls}) {
   final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
   final finalImages = uploadedUrls ?? [];
+  final defaultImg = 'assets/images/room_studio_luxury.png';
+  final resolvedMain = mainImgUrl.isNotEmpty ? mainImgUrl : defaultImg;
 
   return RoomModel(
     id: isEditing
@@ -250,10 +243,10 @@ class _PostRoomScreenState extends State<PostRoomScreen> {
     description: _descCtrl.text.trim(),
     price: double.tryParse(_priceCtrl.text.trim()) ?? 0,
     address: _addressCtrl.text.trim(),
-    imageUrl: mainImgUrl.isNotEmpty
-        ? mainImgUrl
-        : 'assets/images/room_studio_luxury.png',
+    imageUrl: resolvedMain,
+    mainImageUrl: resolvedMain,
     images: finalImages,
+    subImageUrls: finalImages,
     rating: isEditing ? widget.editRoom!.rating : 0.0,
     type: _selectedType,
     location: 'TP. Ho Chi Minh',
