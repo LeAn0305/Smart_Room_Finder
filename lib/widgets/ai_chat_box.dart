@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_room_finder/core/constants/app_colors.dart';
+import 'package:smart_room_finder/models/room_model.dart';
 import 'package:smart_room_finder/providers/room_provider.dart';
+import 'package:smart_room_finder/screens/room_detail/room_detail_screen.dart';
 import 'package:smart_room_finder/services/gemini_service.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -95,10 +97,16 @@ class _AIChatBoxState extends State<AIChatBox>
     _scrollToBottom();
 
     final reply = await GeminiService.sendChatMessage(text);
+    final suggested = List<RoomModel>.from(GeminiService.lastSuggestedRooms);
 
     if (!mounted) return;
     setState(() {
-      _messages.add(_Msg(text: reply, isUser: false, time: _now()));
+      _messages.add(_Msg(
+        text: reply,
+        isUser: false,
+        time: _now(),
+        suggestedRooms: suggested.isNotEmpty ? suggested : null,
+      ));
       _isLoading = false;
     });
     _scrollToBottom();
@@ -526,7 +534,8 @@ class _Msg {
   final String text;
   final bool isUser;
   final String time;
-  _Msg({required this.text, required this.isUser, required this.time});
+  final List<RoomModel>? suggestedRooms;
+  _Msg({required this.text, required this.isUser, required this.time, this.suggestedRooms});
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -608,6 +617,8 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (msg.suggestedRooms != null && msg.suggestedRooms!.isNotEmpty)
+                  _buildSuggestedRoomsList(context, msg.suggestedRooms!),
                 const SizedBox(height: 3),
                 Text(
                   msg.time,
@@ -621,6 +632,128 @@ class _MessageBubble extends StatelessWidget {
           ),
           if (msg.isUser) const SizedBox(width: 7),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestedRoomsList(BuildContext context, List<RoomModel> rooms) {
+    return Container(
+      height: 180,
+      width: 240,
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: rooms.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, idx) {
+          final room = rooms[idx];
+          return Container(
+            width: 170,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: Image.network(
+                    room.mainImageUrl.isNotEmpty ? room.mainImageUrl : room.imageUrl,
+                    height: 75,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 75,
+                      color: Colors.grey.shade100,
+                      child: const Icon(Icons.image_not_supported_rounded, color: Colors.grey, size: 20),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          room.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '${(room.price / 1000000).toStringAsFixed(1)} triệu/tháng',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.teal,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, size: 8, color: Colors.grey),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              child: Text(
+                                room.location.isNotEmpty ? room.location : room.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 22,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.teal,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RoomDetailScreen(room: room),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Xem chi tiết',
+                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
