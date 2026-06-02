@@ -171,6 +171,22 @@ class AuthService {
   // GOOGLE LOGIN
   // =========================
   static Future<UserCredential?> signInWithGoogle() async {
+    // Trên Web: dùng Firebase signInWithPopup vì google_sign_in_all_platforms
+    // không hỗ trợ signInOnline()/signIn() trên nền tảng web.
+    if (kIsWeb) {
+      final googleProvider = GoogleAuthProvider();
+      final cred = await _auth.signInWithPopup(googleProvider);
+
+      if (cred.user != null) {
+        await _syncUserToFirestore(cred.user!);
+        await _ensureCurrentUserNotLocked(cred.user!);
+        await FCMService.initialize();
+      }
+
+      return cred;
+    }
+
+    // Desktop / Android: giữ nguyên flow cũ đang hoạt động.
     final credentials = await _googleSignIn.signInOnline();
     if (credentials == null) return null;
 
