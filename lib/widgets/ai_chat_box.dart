@@ -98,6 +98,8 @@ class _AIChatBoxState extends State<AIChatBox>
     });
     _scrollToBottom();
 
+    final rooms = context.read<RoomProvider>().activePublicRooms;
+    GeminiService.updateRooms(rooms);
     final reply = await GeminiService.sendChatMessage(text);
     final suggested = List<RoomModel>.from(GeminiService.lastSuggestedRooms);
 

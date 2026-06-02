@@ -70,13 +70,49 @@ class GeminiService {
       return securityResponse;
     }
 
+    final cleanText = message.toLowerCase().trim();
+
+    // Xử lý câu tìm phòng gần đây (fallback an toàn)
+    final nearKeywords = [
+      'gần đây', 'gan day', 'gần tôi', 'gan toi', 'gần vị trí', 'gan vi tri',
+      'gần đây nhất', 'gan day nhat', 'gần chỗ tôi', 'gan cho toi',
+      'phòng gần đây', 'phong gan day', 'phòng gần tôi', 'phong gan toi'
+    ];
+    if (nearKeywords.any((kw) => cleanText.contains(kw))) {
+      return 'Hiện tại mình chưa có vị trí chính xác của bạn trong khung chat. Bạn có thể tìm theo khu vực như Quận 12, Tân Bình, Thủ Đức hoặc dùng chức năng bản đồ/chỉ đường để xem phòng gần bạn.';
+    }
+
+    // Xử lý câu so sánh phòng
+    if (cleanText.contains('so sánh') || cleanText.contains('so sanh')) {
+      final compareResult = _tryCompareRooms(message);
+      if (compareResult != null) {
+        return compareResult;
+      }
+      return 'Bạn hãy gửi tên 2 phòng cụ thể hoặc mở từng phòng để xem chi tiết. Mình có thể hỗ trợ so sánh theo giá, khu vực và tiện ích.';
+    }
+
     // 1. Thử parse local trước cho các câu tìm phòng đơn giản để tiết kiệm quota
     final localCriteria = _tryLocalParseSearchQuery(message);
     if (localCriteria != null) {
+      // Nhận diện và xử lý yêu cầu gợi ý phòng tốt nhất tại local
+      if (localCriteria['best'] == true) {
+        final sortedRooms = _getBestRooms(_allAvailableRooms);
+        _lastSuggestedRooms = sortedRooms;
+        final count = _lastSuggestedRooms.length;
+        if (count == 0) {
+          return 'Hiện tại mình chưa có danh sách phòng để đánh giá phòng tốt nhất.';
+        }
+        return 'Mình gợi ý các phòng nổi bật dựa trên giá, tiện ích và thông tin hiện có.';
+      }
+
       final filtered = filterRoomsByAI(_allAvailableRooms, localCriteria);
       if (filtered.isNotEmpty) {
-        _lastSuggestedRooms = filtered.take(3).toList();
+        // Lớp phòng thủ thứ hai: loại phòng giá <= 0 trước khi hiển thị card cho người dùng
+        _lastSuggestedRooms = filtered.where((r) => r.price > 0).take(3).toList();
         final count = _lastSuggestedRooms.length;
+        if (count == 0) {
+          return 'Tôi chưa tìm thấy phòng phù hợp với điều kiện này. Bạn có thể thử nới rộng mức giá, khu vực hoặc tiện ích nhé.';
+        }
         return 'Tôi tìm thấy $count phòng phù hợp nhất với tiêu chí của bạn dưới đây:';
       } else {
         final location = localCriteria['location'] as String?;
@@ -328,7 +364,9 @@ Thông tin về app:
     List<RoomModel> rooms,
     Map<String, dynamic> criteria,
   ) {
-    var result = rooms;
+    // Loại bỏ phòng có giá không hợp lệ (dữ liệu test/mock) trước khi lọc theo tiêu chí
+    // Ngưỡng 100.000 đ — mọi phòng thật đều có giá cao hơn, loại được cả giá 0.0, 0.001 và giá âm
+    var result = rooms.where((r) => r.price >= 100000).toList();
 
     final maxPrice = criteria['maxPrice'] as int?;
     if (maxPrice != null) {
@@ -374,9 +412,31 @@ Thông tin về app:
     if (amenities != null && amenities.isNotEmpty) {
       result = result.where((r) {
         return amenities.every(
-          (a) => r.amenities.any(
-            (ra) => ra.toLowerCase().contains(a.toString().toLowerCase()),
-          ),
+          (a) {
+            final cleanA = _removeDiacritics(a.toString().toLowerCase().trim());
+            if (cleanA.isEmpty) return true;
+
+            // 1. Kiểm tra trong room.amenities (không dấu)
+            final inAmenities = r.amenities.any(
+              (ra) => _removeDiacritics(ra.toLowerCase()).contains(cleanA),
+            );
+            if (inAmenities) return true;
+
+            // 2. Kiểm tra trong room.title/name (không dấu)
+            final inTitle = _removeDiacritics(r.title.toLowerCase()).contains(cleanA);
+            if (inTitle) return true;
+
+            // 3. Kiểm tra trong room.description (không dấu)
+            final inDesc = _removeDiacritics(r.description.toLowerCase()).contains(cleanA);
+            if (inDesc) return true;
+
+            // 4. Kiểm tra trong room.address hoặc room.location (không dấu)
+            final inAddress = _removeDiacritics(r.address.toLowerCase()).contains(cleanA) ||
+                             _removeDiacritics(r.location.toLowerCase()).contains(cleanA);
+            if (inAddress) return true;
+
+            return false;
+          },
         );
       }).toList();
     }
@@ -412,6 +472,18 @@ Thông tin về app:
       'tìm thuê', 'tim thue',
       'cần phòng', 'can phong',
       'phòng rẻ', 'phong re',
+      // Các cụm tự nhiên bổ sung về mong muốn tìm phòng
+      'tớ muốn có phòng', 'to muon co phong',
+      'tôi muốn có phòng', 'toi muon co phong',
+      'tớ muốn phòng', 'to muon phong',
+      'tôi muốn phòng', 'toi muon phong',
+      'muốn có phòng', 'muon co phong',
+      'muốn phòng', 'muon phong',
+      // Cụm từ phòng tốt nhất
+      'tốt nhất', 'tot nhat',
+      'tốt nhứt', 'tot nhut',
+      'phòng tốt', 'phong tot',
+      'gợi ý phòng tốt', 'goi y phong tot',
       // Cụm ngầm hiểu có intent tìm (dạng mô tả điều kiện)
       'phòng dưới', 'phong duoi',
       'phòng trên', 'phong tren',
@@ -586,6 +658,24 @@ Thông tin về app:
                           cleanText.contains('can phong') ||
                           cleanText.contains('phòng rẻ') ||
                           cleanText.contains('phong re') ||
+                          // Các cụm tự nhiên bổ sung về mong muốn tìm phòng
+                          cleanText.contains('tớ muốn có phòng') ||
+                          cleanText.contains('to muon co phong') ||
+                          cleanText.contains('tôi muốn có phòng') ||
+                          cleanText.contains('toi muon co phong') ||
+                          cleanText.contains('tớ muốn phòng') ||
+                          cleanText.contains('to muon phong') ||
+                          cleanText.contains('tôi muốn phòng') ||
+                          cleanText.contains('toi muon phong') ||
+                          cleanText.contains('muốn có phòng') ||
+                          cleanText.contains('muon co phong') ||
+                          cleanText.contains('muốn phòng') ||
+                          cleanText.contains('muon phong') ||
+                          // Cụm từ phòng tốt nhất
+                          cleanText.contains('tốt nhất') ||
+                          cleanText.contains('tot nhat') ||
+                          cleanText.contains('phòng tốt') ||
+                          cleanText.contains('phong tot') ||
                           // Cụm giá rẻ/bình dân — chứa từ ghép, cần liệt kê riêng
                           // vì "phòng giá rẻ" không khớp "phòng rẻ" do có "giá" ở giữa
                           cleanText.contains('giá rẻ') ||
@@ -635,7 +725,7 @@ Thông tin về app:
       }
     }
 
-    // 3. Tiện ích (wifi, máy lạnh)
+    // 3. Tiện ích (wifi, máy lạnh và các tiện ích động khác)
     final amenities = <String>[];
     if (cleanText.contains('wifi') || cleanText.contains('internet')) {
       amenities.add('wifi');
@@ -645,6 +735,21 @@ Thông tin về app:
       amenities.add('máy lạnh');
       detected = true;
     }
+
+    // Tự động phân tích tiện ích động sau chữ "có" hoặc "co"
+    final hasPattern = RegExp(r'\b(?:phòng|phong|trọ|tro|nào|nao|có|co)\s+(?:có|co)\s+([^,.\?]+)');
+    final hasMatch = hasPattern.firstMatch(cleanText);
+    if (hasMatch != null) {
+      final rawSegment = hasMatch.group(1) ?? '';
+      final cleanedList = _extractDynamicAmenities(rawSegment);
+      for (final am in cleanedList) {
+        if (!amenities.contains(am)) {
+          amenities.add(am);
+          detected = true;
+        }
+      }
+    }
+
     if (amenities.isNotEmpty) {
       criteria['amenities'] = amenities;
     }
@@ -734,5 +839,221 @@ Thông tin về app:
     }
 
     return detected ? criteria : null;
+  }
+
+  // ── Cập nhật danh sách phòng mới nhất từ provider ──────────────
+  static void updateRooms(List<RoomModel> rooms) {
+    _allAvailableRooms = rooms;
+  }
+
+  // ── Phân tích và thử so sánh hai phòng cụ thể ───────────────────
+  static String? _tryCompareRooms(String message) {
+    var content = message.trim();
+    // Loại bỏ tiền tố so sánh ở đầu câu
+    final compareStartRegex = RegExp(
+      r'^(?:so sánh|so sanh|so sánh hai phòng|so sánh 2 phòng|so sanh hai phong|so sanh 2 phong)\s*(?::\s*)?',
+      caseSensitive: false,
+    );
+    content = content.replaceFirst(compareStartRegex, '').trim();
+
+    // Tách hai tên phòng qua từ nối "và", "với", hoặc dấu phẩy ","
+    final splitRegex = RegExp(r'\s+(?:và|với|va|voi)\s+|\s*,\s*', caseSensitive: false);
+    final parts = content.split(splitRegex);
+    if (parts.length != 2) return null;
+
+    String cleanRoomName(String name) {
+      return name.replaceFirst(RegExp(r'^(?:phòng|phong)\s*', caseSensitive: false), '').trim();
+    }
+
+    final cleanNameA = cleanRoomName(parts[0]);
+    final cleanNameB = cleanRoomName(parts[1]);
+
+    RoomModel? findMatchingRoom(String nameQuery) {
+      if (nameQuery.isEmpty) return null;
+      final queryUnaccented = _removeDiacritics(nameQuery.toLowerCase());
+      
+      for (final room in _allAvailableRooms) {
+        final titleUnaccented = _removeDiacritics(room.title.toLowerCase());
+        if (titleUnaccented.contains(queryUnaccented) || queryUnaccented.contains(titleUnaccented)) {
+          return room;
+        }
+      }
+      return null;
+    }
+
+    final roomA = findMatchingRoom(cleanNameA);
+    final roomB = findMatchingRoom(cleanNameB);
+
+    if (roomA != null && roomB != null && roomA.id != roomB.id) {
+      return _generateComparisonText(roomA, roomB);
+    }
+
+    if (cleanNameA.isNotEmpty && cleanNameB.isNotEmpty) {
+      return 'Mình không tìm thấy đủ 2 phòng khớp với tên "$cleanNameA" và "$cleanNameB" trong danh sách hiện tại. Bạn vui lòng kiểm tra lại và nhập đúng tên phòng cần so sánh nhé.';
+    }
+    return null;
+  }
+
+  // ── Tạo nội dung so sánh chi tiết hai phòng (Dạng Plain Text) ────
+  static String _generateComparisonText(RoomModel a, RoomModel b) {
+    final buffer = StringBuffer();
+    buffer.writeln('So sánh 2 phòng:\n');
+
+    final priceAStr = a.price > 0 ? '${(a.price / 1000000).toStringAsFixed(1)} triệu/tháng' : 'Chưa cập nhật';
+    final locA = a.location.isNotEmpty ? a.location : (a.address.isNotEmpty ? a.address : 'Chưa cập nhật');
+    final amA = a.amenities.isNotEmpty ? a.amenities.join(', ') : 'Chưa có tiện ích cụ thể';
+    final verA = a.isVerified ? 'Đã xác minh' : 'Chưa xác minh';
+    buffer.writeln('1. ${a.title}');
+    buffer.writeln('- Giá: $priceAStr');
+    buffer.writeln('- Khu vực: $locA');
+    buffer.writeln('- Tiện ích: $amA');
+    buffer.writeln('- Trạng thái: $verA, đánh giá ${a.rating.toStringAsFixed(1)}/5\n');
+
+    final priceBStr = b.price > 0 ? '${(b.price / 1000000).toStringAsFixed(1)} triệu/tháng' : 'Chưa cập nhật';
+    final locB = b.location.isNotEmpty ? b.location : (b.address.isNotEmpty ? b.address : 'Chưa cập nhật');
+    final amB = b.amenities.isNotEmpty ? b.amenities.join(', ') : 'Chưa có tiện ích cụ thể';
+    final verB = b.isVerified ? 'Đã xác minh' : 'Chưa xác minh';
+    buffer.writeln('2. ${b.title}');
+    buffer.writeln('- Giá: $priceBStr');
+    buffer.writeln('- Khu vực: $locB');
+    buffer.writeln('- Tiện ích: $amB');
+    buffer.writeln('- Trạng thái: $verB, đánh giá ${b.rating.toStringAsFixed(1)}/5\n');
+
+    buffer.write('Gợi ý: ');
+    if (a.price > 0 && b.price > 0) {
+      if (a.price < b.price) {
+        buffer.write('Nếu ưu tiên giá thấp hơn, bạn nên chọn phòng 1. ');
+      } else if (b.price < a.price) {
+        buffer.write('Nếu ưu tiên giá thấp hơn, bạn nên chọn phòng 2. ');
+      }
+    }
+
+    if (a.amenities.length > b.amenities.length) {
+      buffer.write('Nếu ưu tiên không gian rộng và nhiều tiện ích hơn, bạn nên chọn phòng 1.');
+    } else if (b.amenities.length > a.amenities.length) {
+      buffer.write('Nếu ưu tiên không gian rộng và nhiều tiện ích hơn, bạn nên chọn phòng 2.');
+    } else {
+      buffer.write('Cả hai phòng đều có các ưu điểm riêng về vị trí và tiện ích.');
+    }
+
+    return buffer.toString();
+  }
+
+  // ── Gợi ý các phòng nổi bật dựa trên tiêu chí an toàn ──────────
+  static List<RoomModel> _getBestRooms(List<RoomModel> rooms) {
+    // 1. Loại bỏ phòng có price <= 0 và lọc phòng hợp lệ
+    var validRooms = rooms.where((r) => r.price >= 100000).toList();
+    if (validRooms.isEmpty) return [];
+
+    // 2. Sắp xếp: ưu tiên đã xác minh, rating cao, nhiều tiện ích, có ảnh thật, giá tốt
+    validRooms.sort((a, b) {
+      if (a.isVerified && !b.isVerified) return -1;
+      if (!a.isVerified && b.isVerified) return 1;
+
+      final aHasImg = a.mainImageUrl.isNotEmpty || a.imageUrl.isNotEmpty;
+      final bHasImg = b.mainImageUrl.isNotEmpty || b.imageUrl.isNotEmpty;
+      if (aHasImg && !bHasImg) return -1;
+      if (!aHasImg && bHasImg) return 1;
+
+      if (b.rating != a.rating) {
+        return b.rating.compareTo(a.rating);
+      }
+
+      if (b.amenities.length != a.amenities.length) {
+        return b.amenities.length.compareTo(a.amenities.length);
+      }
+
+      return a.price.compareTo(b.price);
+    });
+
+    return validRooms.take(3).toList();
+  }
+
+  // ── Loại bỏ dấu tiếng Việt để so khớp không dấu ────────────────
+  static String _removeDiacritics(String str) {
+    const vietnamese = 'aAeEoOuUiIdDyYoO';
+    const vietnameseRegex = [
+      'àáạảãâầấậẩẫăằắặẳẵ',
+      'ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ',
+      'èéẹẻẽêềếệểễ',
+      'ÈÉẸẺẼÊỀẾỆỂỄ',
+      'òóọỏõôồốộổỗơờớợởỡ',
+      'ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ',
+      'ùúụủũưừứựửữ',
+      'ÙÚỤỦŨƯỪỨỰỬỮ',
+      'ìíịỉĩ',
+      'ÌÍỊỈĨ',
+      'đ',
+      'Đ',
+      'ỳýỵỷỹ',
+      'ỲÝỴỶỸ',
+      'óòọỏõóòọỏõ',
+      'ÓÒỌỎÕÓÒỌỎÕ',
+    ];
+
+    var result = str;
+    for (var i = 0; i < vietnameseRegex.length; i++) {
+      final replacedChar = vietnamese[i];
+      final regex = RegExp('[${vietnameseRegex[i]}]');
+      result = result.replaceAll(regex, replacedChar);
+    }
+    return result;
+  }
+
+  // ── Phân tích tách tiện ích động từ chuỗi sau chữ "có" ──────────
+  static List<String> _extractDynamicAmenities(String text) {
+    final result = <String>[];
+    final parts = text.split(RegExp(r',|và|va|&|\+'));
+    for (var part in parts) {
+      var t = part.trim();
+      if (t.isEmpty) continue;
+
+      if (t.startsWith('có ') || t.startsWith('co ')) {
+        t = t.substring(3).trim();
+      }
+
+      // Loại bỏ từ hỏi / lịch sự cuối câu
+      final endWords = [
+        'không', 'khong', 'nhỉ', 'nhi', 'nha', 'ạ', 'a', 'nhé', 'nhe', 'với', 'voi', 
+        'không?', 'khong?', 'nhỉ?', 'nhi?', 'ạ?', 'a?'
+      ];
+      for (final word in endWords) {
+        final reg = RegExp('\\b${RegExp.escape(word)}\\s*\$');
+        t = t.replaceFirst(reg, '').trim();
+      }
+
+      // Loại bỏ phần liên quan đến giá cả
+      final pricePatterns = [
+        r'\b(?:dưới|duoi|trên|tren|khoảng|khoang|tầm|tam)?\s*\d+(?:\.\d+)?\s*(?:triệu|trieu|tr)\b',
+        r'\b(?:giá rẻ|gia re|giá tốt|gia tot|bình dân|binh dan|tiết kiệm|tiet kiem)\b'
+      ];
+      for (final pattern in pricePatterns) {
+        t = t.replaceAll(RegExp(pattern), '').trim();
+      }
+
+      // Loại bỏ địa điểm
+      final locationPatterns = [
+        r'\b(?:ở|o|tại|tai|khu vực|khu vuc|quận|quan|phường|phuong|đường|duong)\s+[a-zA-Z0-9\sđĐàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+',
+        r'\b(?:quận|quan)\s+\d+\b',
+        r'\b(?:bình thạnh|binh thanh|gò vấp|go vap|thủ đức|thu duc|phú nhuận|phu nhuan|tân bình|tan binh|tân phú|tan phu|bình tân|binh tan)\b'
+      ];
+      for (final pattern in locationPatterns) {
+        t = t.replaceAll(RegExp(pattern), '').trim();
+      }
+
+      t = t.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+      if (t.endsWith('ở') || t.endsWith('o') || t.endsWith('tại') || t.endsWith('tai')) {
+        t = t.substring(0, t.length - 1).trim();
+      }
+      if (t.startsWith('ở') || t.startsWith('o') || t.startsWith('tại') || t.startsWith('tai')) {
+        t = t.substring(1).trim();
+      }
+
+      if (t.isNotEmpty && t.length > 1) {
+        result.add(t);
+      }
+    }
+    return result;
   }
 }
