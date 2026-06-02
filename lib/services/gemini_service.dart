@@ -396,9 +396,51 @@ Thông tin về app:
     return result;
   }
 
+  // ── Kiểm tra xem câu hỏi có phải intent tìm/thuê phòng không ─────────
+  // Nếu đúng thì không được xử lý trong _checkLocalFallbackAndTopic()
+  // mà phải để nhánh local parse / Gemini lọc phòng thật xử lý.
+  static bool _isRoomSearchIntent(String cleanText) {
+    final searchPhrases = [
+      // Cụm tường minh (từ mục 1 & 2 cũ)
+      'tìm phòng', 'tim phong', 'tìm trọ', 'tim tro',
+      'kiếm phòng', 'kiem phong',
+      // Cụm mở rộng (mục 3 — câu tự nhiên)
+      'có phòng nào', 'co phong nao',
+      'phòng nào', 'phong nao',
+      'cho thuê', 'cho thue',
+      'muốn thuê', 'muon thue',
+      'tìm thuê', 'tim thue',
+      'cần phòng', 'can phong',
+      'phòng rẻ', 'phong re',
+      // Cụm ngầm hiểu có intent tìm (dạng mô tả điều kiện)
+      'phòng dưới', 'phong duoi',
+      'phòng trên', 'phong tren',
+      'phòng có', 'phong co',
+      'phòng ở', 'phong o',
+      'trọ ở', 'tro o',
+      'phòng cho sinh viên', 'phong cho sinh vien',
+      'phòng sinh viên', 'phong sinh vien',
+      // Cụm giá rẻ/bình dân không có số — cần được lọc phòng thật
+      'giá rẻ', 'gia re',
+      'giá tốt', 'gia tot',
+      'bình dân', 'binh dan',
+      'tiết kiệm', 'tiet kiem',
+      'rẻ không', 're khong',
+      'rẻ hơn', 're hon',
+    ];
+    for (final phrase in searchPhrases) {
+      if (cleanText.contains(phrase)) return true;
+    }
+    return false;
+  }
+
   // ── Helper xử lý fallback local và lọc chủ đề ───────────────────
   static String? _checkLocalFallbackAndTopic(String text) {
     final cleanText = text.toLowerCase().trim();
+
+    // Ưu tiên kiểm tra: nếu câu là intent tìm/thuê phòng thì KHÔNG xử lý
+    // ở đây — chuyển xuống nhánh local parse / Gemini để lọc phòng thật.
+    if (_isRoomSearchIntent(cleanText)) return null;
 
     // 1. Chào hỏi xã giao & câu giao tiếp thông thường ngắn
     if (cleanText.contains('cảm ơn') || cleanText.contains('cam on') || cleanText.contains('cám ơn') ||
@@ -420,7 +462,9 @@ Thông tin về app:
       return 'Tạm biệt nha. Chúc bạn sớm tìm được phòng phù hợp.';
     }
 
-    // Các từ khóa fallback local
+    // 2. Hướng dẫn sử dụng tính năng của ứng dụng
+    // Lưu ý: chỉ xử lý các câu hỏi về UI/tính năng app,
+    // KHÔNG xử lý các câu có intent tìm phòng (đã guard ở trên).
     if (cleanText.contains('đăng phòng') || cleanText.contains('dang phong') || cleanText.contains('đăng tin') || cleanText.contains('dang tin')) {
       return 'Để đăng phòng mới, bạn hãy vào mục **Cá nhân** (tab cuối cùng bên phải) -> Chọn **Phòng trọ của tôi** -> Bấm nút **[+]** ở góc trên để điền thông tin phòng và đăng tải.';
     }
@@ -438,12 +482,6 @@ Thông tin về app:
     }
     if (cleanText.contains('đặt lịch') || cleanText.contains('dat lich') || cleanText.contains('gửi đơn thuê') || cleanText.contains('gui don thue') || cleanText.contains('yêu cầu thuê') || cleanText.contains('yeu cau thue')) {
       return 'Để gửi yêu cầu thuê phòng, bạn hãy bấm vào chi tiết phòng trọ đó, chọn **Gửi đơn thuê phòng**, điền đầy đủ thông tin cá nhân và ngày dự kiến dọn vào để gửi đến chủ trọ xét duyệt.';
-    }
-    if (cleanText.contains('phòng dưới 5 triệu') || cleanText.contains('phong duoi 5 trieu') || cleanText.contains('dưới 5tr') || cleanText.contains('duoi 5tr') || cleanText.contains('phòng giá rẻ') || cleanText.contains('phong gia re') || cleanText.contains('giá rẻ') || cleanText.contains('gia re')) {
-      return 'Để tìm phòng giá rẻ hoặc dưới 5 triệu, bạn có thể nhập yêu cầu cụ thể vào thanh tìm kiếm ở trang chủ, hoặc sử dụng tính năng lọc phòng nâng cao và giới hạn mức giá tối đa là 5.000.000đ.';
-    }
-    if (cleanText.contains('tìm phòng') || cleanText.contains('tim phong') || cleanText.contains('kiếm phòng') || cleanText.contains('kiem phong') || cleanText.contains('tìm trọ') || cleanText.contains('tim tro')) {
-      return 'Bạn có thể tìm phòng bằng cách nhập từ khóa vào thanh tìm kiếm ở trang chủ, hoặc sử dụng tính năng **Lọc phòng** nâng cao để tìm phòng theo vị trí và mức giá mong muốn.';
     }
 
     // Kiểm tra chủ đề lạc đề
@@ -522,17 +560,54 @@ Thông tin về app:
   static Map<String, dynamic>? _tryLocalParseSearchQuery(String message) {
     final cleanText = message.toLowerCase().trim();
 
-    final isSearchQuery = cleanText.contains('tìm phòng') || 
-                          cleanText.contains('tim phong') || 
-                          cleanText.contains('tìm trọ') || 
+    // Nhận diện intent tìm phòng — mở rộng thêm nhiều cách nói tự nhiên
+    final isSearchQuery = cleanText.contains('tìm phòng') ||
+                          cleanText.contains('tim phong') ||
+                          cleanText.contains('tìm trọ') ||
                           cleanText.contains('tim tro') ||
                           cleanText.contains('kiếm phòng') ||
                           cleanText.contains('kiem phong') ||
                           cleanText.contains('phòng ở') ||
                           cleanText.contains('phong o') ||
                           cleanText.contains('trọ ở') ||
-                          cleanText.contains('tro o');
-                          
+                          cleanText.contains('tro o') ||
+                          // Các cụm tự nhiên bổ sung (mục 3)
+                          cleanText.contains('có phòng nào') ||
+                          cleanText.contains('co phong nao') ||
+                          cleanText.contains('phòng nào') ||
+                          cleanText.contains('phong nao') ||
+                          cleanText.contains('cho thuê') ||
+                          cleanText.contains('cho thue') ||
+                          cleanText.contains('muốn thuê') ||
+                          cleanText.contains('muon thue') ||
+                          cleanText.contains('tìm thuê') ||
+                          cleanText.contains('tim thue') ||
+                          cleanText.contains('cần phòng') ||
+                          cleanText.contains('can phong') ||
+                          cleanText.contains('phòng rẻ') ||
+                          cleanText.contains('phong re') ||
+                          // Cụm giá rẻ/bình dân — chứa từ ghép, cần liệt kê riêng
+                          // vì "phòng giá rẻ" không khớp "phòng rẻ" do có "giá" ở giữa
+                          cleanText.contains('giá rẻ') ||
+                          cleanText.contains('gia re') ||
+                          cleanText.contains('giá tốt') ||
+                          cleanText.contains('gia tot') ||
+                          cleanText.contains('bình dân') ||
+                          cleanText.contains('binh dan') ||
+                          cleanText.contains('tiết kiệm') ||
+                          cleanText.contains('tiet kiem') ||
+                          // Cụm mô tả điều kiện không có động từ tìm
+                          cleanText.contains('phòng dưới') ||
+                          cleanText.contains('phong duoi') ||
+                          cleanText.contains('phòng trên') ||
+                          cleanText.contains('phong tren') ||
+                          cleanText.contains('phòng có') ||
+                          cleanText.contains('phong co') ||
+                          cleanText.contains('phòng sinh viên') ||
+                          cleanText.contains('phong sinh vien') ||
+                          cleanText.contains('phòng cho sinh viên') ||
+                          cleanText.contains('phong cho sinh vien');
+
     if (!isSearchQuery) return null;
 
     final criteria = <String, dynamic>{};
@@ -574,7 +649,31 @@ Thông tin về app:
       criteria['amenities'] = amenities;
     }
 
-    // 4. Địa điểm (quận 12, quận 9, Bình Thạnh, Gò Vấp, vv.)
+    // 5. Nhận diện intent giá rẻ/bình dân không có số cụ thể
+    // Map thành maxPrice mặc định 4.000.000 để lọc phòng thật
+    if (!criteria.containsKey('maxPrice')) {
+      final isCheapIntent = cleanText.contains('rẻ') ||
+                            cleanText.contains('re ') ||
+                            cleanText.contains(' re') ||
+                            cleanText == 're' ||
+                            cleanText.contains('bình dân') ||
+                            cleanText.contains('binh dan') ||
+                            cleanText.contains('tiết kiệm') ||
+                            cleanText.contains('tiet kiem') ||
+                            cleanText.contains('giá tốt') ||
+                            cleanText.contains('gia tot') ||
+                            cleanText.contains('phòng rẻ') ||
+                            cleanText.contains('phong re') ||
+                            cleanText.contains('giá rẻ') ||
+                            cleanText.contains('gia re');
+      if (isCheapIntent) {
+        // Ngưỡng 4 triệu — bao phủ phần lớn phòng trọ, KTX, phòng sinh viên
+        criteria['maxPrice'] = 4000000;
+        detected = true;
+      }
+    }
+
+    // 6. Địa điểm (quận 12, quận 9, Bình Thạnh, Gò Vấp, vv.)
     final districts = [
       'quận 12', 'quận 9', 'bình thạnh', 'gò vấp',
       'quan 12', 'quan 9', 'binh thanh', 'go vap',

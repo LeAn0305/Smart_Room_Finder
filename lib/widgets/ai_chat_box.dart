@@ -30,11 +30,13 @@ class _AIChatBoxState extends State<AIChatBox>
   late final Animation<double> _scaleAnim;
   late final Animation<double> _fadeAnim;
 
+  // Các gợi ý nhanh — dùng cụm "Tìm phòng..." để kích hoạt đúng
+  // nhánh lọc phòng thật thay vì nhánh hướng dẫn UI
   static const _quickReplies = [
-    'Phòng dưới 5 triệu',
-    'Chung cư có wifi',
-    'Gần trường đại học',
-    'Phòng rộng 30m²+',
+    'Tìm phòng dưới 5 triệu',
+    'Tìm phòng có wifi',
+    'Tìm phòng gần trường',
+    'Tìm phòng có máy lạnh',
   ];
 
   @override
