@@ -93,10 +93,16 @@ class GeminiService {
 
     // 1. Thử parse local trước cho các câu tìm phòng đơn giản để tiết kiệm quota
     final localCriteria = _tryLocalParseSearchQuery(message);
+
     if (localCriteria != null) {
       // Nhận diện và xử lý yêu cầu gợi ý phòng tốt nhất tại local
       if (localCriteria['best'] == true) {
-        final sortedRooms = _getBestRooms(_allAvailableRooms);
+        List<RoomModel> candidateRooms = _allAvailableRooms;
+        final tempCriteria = Map<String, dynamic>.from(localCriteria)..remove('best');
+        if (tempCriteria.isNotEmpty) {
+          candidateRooms = filterRoomsByAI(candidateRooms, tempCriteria);
+        }
+        final sortedRooms = _getBestRooms(candidateRooms);
         _lastSuggestedRooms = sortedRooms;
         final count = _lastSuggestedRooms.length;
         if (count == 0) {
@@ -105,25 +111,66 @@ class GeminiService {
         return 'Mình gợi ý các phòng nổi bật dựa trên giá, tiện ích và thông tin hiện có.';
       }
 
-      final filtered = filterRoomsByAI(_allAvailableRooms, localCriteria);
-      if (filtered.isNotEmpty) {
-        // Lớp phòng thủ thứ hai: loại phòng giá <= 0 trước khi hiển thị card cho người dùng
-        _lastSuggestedRooms = filtered.where((r) => r.price > 0).take(3).toList();
-        final count = _lastSuggestedRooms.length;
-        if (count == 0) {
-          return 'Tôi chưa tìm thấy phòng phù hợp với điều kiện này. Bạn có thể thử nới rộng mức giá, khu vực hoặc tiện ích nhé.';
+      final isCheapOrStudent = localCriteria['cheap'] == true || localCriteria['student'] == true;
+
+      // Với cheap/student intent: xử lý riêng, không dùng maxPrice để filter cứng
+      if (isCheapOrStudent) {
+        // Lấy criteria không có maxPrice/cheap/student (chỉ giữ location nếu có)
+        // KHÔNG giữ amenities cho cheap intent vì amenities hay bị parse sai
+        final cheapCriteria = <String, dynamic>{};
+        final loc = localCriteria['location'] as String?;
+        if (loc != null && loc.isNotEmpty) {
+          cheapCriteria['location'] = loc;
         }
-        return 'Tôi tìm thấy $count phòng phù hợp nhất với tiêu chí của bạn dưới đây:';
-      } else {
-        final location = localCriteria['location'] as String?;
-        if (location != null && location.isNotEmpty) {
-          final roomsInLocation = filterRoomsByAI(_allAvailableRooms, {'location': location});
-          if (roomsInLocation.isEmpty) {
-            return 'Tôi chưa tìm thấy phòng phù hợp với khu vực này. Bạn có thể thử nhập tên quận/khu vực khác hoặc nới rộng phạm vi tìm kiếm nhé.';
+
+        // Lọc theo location trước (nếu có), sau đó sort giá tăng dần
+        var candidateRooms = filterRoomsByAI(_allAvailableRooms, cheapCriteria);
+        candidateRooms = candidateRooms.where((r) => r.price > 0).toList();
+        candidateRooms.sort((a, b) => a.price.compareTo(b.price));
+
+        if (candidateRooms.isNotEmpty) {
+          final priceLimit = localCriteria['cheap'] == true ? 3000000.0 : 3500000.0;
+          final cheapOnes = candidateRooms.where((r) => r.price <= priceLimit).toList();
+
+          if (cheapOnes.isNotEmpty) {
+            _lastSuggestedRooms = cheapOnes.take(3).toList();
+            return 'Tôi tìm thấy ${_lastSuggestedRooms.length} phòng phù hợp nhất với tiêu chí của bạn dưới đây:';
+          } else {
+            _lastSuggestedRooms = candidateRooms.take(3).toList();
+            final hasLocation = loc != null && loc.isNotEmpty;
+            if (hasLocation) {
+              return 'Đây là các phòng giá thấp nhất hiện có ở $loc:';
+            }
+            return 'Đây là các phòng giá thấp nhất hiện có:';
           }
         }
-        return 'Tôi chưa tìm thấy phòng phù hợp với điều kiện này. Bạn có thể thử nới rộng mức giá, khu vực hoặc tiện ích nhé.';
+
+        // Không có phòng nào → báo rõ
+        final hasLocation = loc != null && loc.isNotEmpty;
+        if (hasLocation) {
+          return 'Tôi chưa tìm thấy phòng phù hợp với khu vực này. Bạn có thể thử nhập tên quận/khu vực khác nhé.';
+        }
+        return 'Tôi chưa tìm thấy phòng phù hợp. Bạn có thể nới rộng tiêu chí tìm kiếm nhé.';
       }
+
+      // Không phải cheap/student → filter bình thường
+      final filtered = filterRoomsByAI(_allAvailableRooms, localCriteria);
+      if (filtered.isNotEmpty) {
+        _lastSuggestedRooms = filtered.where((r) => r.price > 0).take(3).toList();
+        final count = _lastSuggestedRooms.length;
+        if (count > 0) {
+          return 'Tôi tìm thấy $count phòng phù hợp nhất với tiêu chí của bạn dưới đây:';
+        }
+      }
+
+      final location = localCriteria['location'] as String?;
+      if (location != null && location.isNotEmpty) {
+        final roomsInLocation = filterRoomsByAI(_allAvailableRooms, {'location': location});
+        if (roomsInLocation.isEmpty) {
+          return 'Tôi chưa tìm thấy phòng phù hợp với khu vực này. Bạn có thể thử nhập tên quận/khu vực khác hoặc nới rộng phạm vi tìm kiếm nhé.';
+        }
+      }
+      return 'Tôi chưa tìm thấy phòng phù hợp với điều kiện này. Bạn có thể thử nới rộng mức giá, khu vực hoặc tiện ích nhé.';
     }
 
     final localResponse = _checkLocalFallbackAndTopic(message);
@@ -289,32 +336,69 @@ Ví dụ: {"maxPrice":5000000,"minArea":20,"location":"Quận 1","roomType":"Ph�
       return 'Chưa cấu hình API Key chính xác cho Trợ lý AI trong file gemini_config.dart.';
     }
     try {
-      final amenStr = amenities.isEmpty
-          ? 'không có tiện ích đặc biệt'
-          : amenities.join(', ');
-      final bedroomStr = (bedrooms != null && bedrooms > 0)
-          ? '$bedrooms phòng ngủ'
-          : '';
+      // Chuẩn hóa các trường có thể rỗng hoặc bằng 0
+      final priceStr = price > 0
+          ? '${(price / 1000000).toStringAsFixed(1)} triệu/tháng'
+          : 'chưa xác định';
+      final areaStr = area > 0 ? '${area.toInt()}m²' : '';
+      final bedStr  = (bedrooms != null && bedrooms > 0) ? '$bedrooms phòng ngủ' : '';
+      final addrStr = address.trim().isNotEmpty ? address.trim() : 'khu vực TP. Hồ Chí Minh';
+      final detailParts = [areaStr, bedStr].where((s) => s.isNotEmpty).join(', ');
+      // Chỉ truyền tối đa 3 tiện ích vào prompt để tránh mô tả liệt kê dài
+      final amenPreview = amenities.take(3).toList();
+      final amenLine = amenPreview.isEmpty ? '' : '- Tiện ích có sẵn: ${amenPreview.join(', ')}';
 
-      final prompt =
-          '''
-Viết mô tả hấp dẫn cho phòng trọ sau bằng tiếng Việt (2-3 câu, tự nhiên, không dùng emoji):
-- Tên: $title
-- Loại: $roomType  
-- Giá: ${(price / 1000000).toStringAsFixed(1)} triệu/tháng
-- Diện tích: ${area.toInt()}m² $bedroomStr
-- Địa chỉ: $address
-- Tiện ích: $amenStr
+      // Kiểm tra title có phải dữ liệu test/tào lao không
+      final titleIsSuspicious = _isSuspiciousRoomTitle(title);
+      // Nếu title bình thường thì đưa vào prompt, ngược lại bỏ qua để AI không diễn giải sai
+      final titleLine = titleIsSuspicious
+          ? ''
+          : '- Tên / tiêu đề: $title';
 
-Chỉ trả về đoạn mô tả, không có tiêu đề hay giải thích thêm.
+      final prompt = '''
+Hãy viết mô tả đăng tin cho thuê phòng bằng tiếng Việt, giọng văn tự nhiên và thực tế.
+
+Thông tin phòng:
+${titleLine.isNotEmpty ? '$titleLine\n' : ''}- Loại: $roomType${detailParts.isNotEmpty ? '\n- Diện tích / phòng ngủ: $detailParts' : ''}
+- Giá thuê: $priceStr
+- Địa chỉ / khu vực: $addrStr
+${amenLine.isNotEmpty ? amenLine : ''}
+
+Yêu cầu bắt buộc:
+1. Chỉ dùng đúng các thông tin được cung cấp. Không tự bịa thêm tiện ích, vị trí, ưu điểm không có trong dữ liệu.
+2. Không dùng phong cách quảng cáo cường điệu: tránh "đẳng cấp tuyệt đối", "thiên đường", "có một không hai", "trải nghiệm độc đáo", "không gian sống hoàn hảo".
+3. Không tự khẳng định "gần trường", "gần chợ", "an ninh tốt", "đầy đủ nội thất" nếu dữ liệu không đề cập.
+4. Viết 2–4 câu ngắn, rõ ràng, thân thiện. Phù hợp hiển thị trên ứng dụng tìm phòng trọ.
+5. Nếu tên phòng có nội dung không liên quan đến việc cho thuê phòng (ví dụ: "ngoài vũ trụ", "có người yêu", test, demo) thì tuyệt đối bỏ qua tên phòng và viết mô tả trung tính dựa trên giá, khu vực, loại phòng và tiện ích.
+6. Không đặt tên phòng trong dấu ngoặc kép (ví dụ tránh viết: phòng "Tên phòng...").
+7. Câu "Vui lòng liên hệ..." chỉ dùng khi dữ liệu quá thiếu; nếu đã có đủ thông tin thì không cần câu này.
+8. Nếu có tiện ích, nhắc tự nhiên tối đa 2–3 tiện ích trong mô tả, không liệt kê dạng bullet.
+9. Không dùng emoji. Không có tiêu đề hay giải thích thêm. Chỉ trả về đoạn mô tả thuần văn bản.
 ''';
 
+      // Bọc request Gemini bằng timeout 18 giây
       final response = await _createModel().generateContent([
         Content.text(prompt),
-      ]);
-      return response.text?.trim() ?? '';
-    } catch (e) {
-      return 'Không thể tạo mô tả lúc này: ${_formatFriendlyError(e)}';
+      ]).timeout(const Duration(seconds: 18));
+
+      final text = response.text?.trim() ?? '';
+      // Nếu Gemini trả rỗng thì dùng fallback local
+      if (text.isEmpty) {
+        return _generateLocalRoomDescriptionFallback(
+          title: title, price: price, address: address,
+          roomType: roomType, bedrooms: bedrooms ?? 0,
+          area: area, amenities: amenities,
+        );
+      }
+      return text;
+    } catch (_) {
+      // Mọi lỗi (quota, 429, 503, timeout, network...) → fallback local
+      // Không đổ câu lỗi kỹ thuật vào ô mô tả
+      return _generateLocalRoomDescriptionFallback(
+        title: title, price: price, address: address,
+        roomType: roomType, bedrooms: bedrooms ?? 0,
+        area: area, amenities: amenities,
+      );
     }
   }
 
@@ -364,8 +448,7 @@ Thông tin về app:
     List<RoomModel> rooms,
     Map<String, dynamic> criteria,
   ) {
-    // Loại bỏ phòng có giá không hợp lệ (dữ liệu test/mock) trước khi lọc theo tiêu chí
-    // Ngưỡng 100.000 đ — mọi phòng thật đều có giá cao hơn, loại được cả giá 0.0, 0.001 và giá âm
+    // Loại bỏ phòng có giá không hợp lệ trước khi lọc theo tiêu chí
     var result = rooms.where((r) => r.price >= 100000).toList();
 
     final maxPrice = criteria['maxPrice'] as int?;
@@ -484,6 +567,8 @@ Thông tin về app:
       'tốt nhứt', 'tot nhut',
       'phòng tốt', 'phong tot',
       'gợi ý phòng tốt', 'goi y phong tot',
+      'nổi bật', 'noi bat',
+      'đáng thuê', 'dang thue',
       // Cụm ngầm hiểu có intent tìm (dạng mô tả điều kiện)
       'phòng dưới', 'phong duoi',
       'phòng trên', 'phong tren',
@@ -676,6 +761,10 @@ Thông tin về app:
                           cleanText.contains('tot nhat') ||
                           cleanText.contains('phòng tốt') ||
                           cleanText.contains('phong tot') ||
+                          cleanText.contains('nổi bật') ||
+                          cleanText.contains('noi bat') ||
+                          cleanText.contains('đáng thuê') ||
+                          cleanText.contains('dang thue') ||
                           // Cụm giá rẻ/bình dân — chứa từ ghép, cần liệt kê riêng
                           // vì "phòng giá rẻ" không khớp "phòng rẻ" do có "giá" ở giữa
                           cleanText.contains('giá rẻ') ||
@@ -696,12 +785,32 @@ Thông tin về app:
                           cleanText.contains('phòng sinh viên') ||
                           cleanText.contains('phong sinh vien') ||
                           cleanText.contains('phòng cho sinh viên') ||
-                          cleanText.contains('phong cho sinh vien');
+                          cleanText.contains('phong cho sinh vien') ||
+                          _hasCheapIntent(cleanText) ||
+                          _hasStudentIntent(cleanText);
 
     if (!isSearchQuery) return null;
 
     final criteria = <String, dynamic>{};
     bool detected = false;
+
+    // Nhận diện câu hỏi về phòng tốt nhất / nổi bật nhất / đáng thuê nhất (để xử lý local)
+    final isBestQuery = cleanText.contains('tốt nhất') ||
+                        cleanText.contains('tot nhat') ||
+                        cleanText.contains('nổi bật nhất') ||
+                        cleanText.contains('noi bat nhat') ||
+                        cleanText.contains('đáng thuê nhất') ||
+                        cleanText.contains('dang thue nhat') ||
+                        cleanText.contains('phòng tốt') ||
+                        cleanText.contains('phong tot') ||
+                        cleanText.contains('phòng nổi bật') ||
+                        cleanText.contains('phong noi bat') ||
+                        cleanText.contains('gợi ý phòng tốt') ||
+                        cleanText.contains('goi y phong tot');
+    if (isBestQuery) {
+      criteria['best'] = true;
+      detected = true;
+    }
 
     // 1. Lọc giá tối đa (dưới X triệu/tr)
     final maxPriceRegex = RegExp(r'(?:dưới|duoi)\s*(\d+(?:\.\d+)?)\s*(?:triệu|trieu|tr)\b');
@@ -725,22 +834,61 @@ Thông tin về app:
       }
     }
 
-    // 3. Tiện ích (wifi, máy lạnh và các tiện ích động khác)
+    // 3. Tiện ích — parse cứng các tiện ích phổ biến trước (ưu tiên cao)
     final amenities = <String>[];
-    if (cleanText.contains('wifi') || cleanText.contains('internet')) {
-      amenities.add('wifi');
-      detected = true;
-    }
-    if (cleanText.contains('máy lạnh') || cleanText.contains('may lanh') || cleanText.contains('điều hòa') || cleanText.contains('dieu hoa')) {
-      amenities.add('máy lạnh');
-      detected = true;
-    }
 
-    // Tự động phân tích tiện ích động sau chữ "có" hoặc "co"
-    final hasPattern = RegExp(r'\b(?:phòng|phong|trọ|tro|nào|nao|có|co)\s+(?:có|co)\s+([^,.\?]+)');
-    final hasMatch = hasPattern.firstMatch(cleanText);
-    if (hasMatch != null) {
-      final rawSegment = hasMatch.group(1) ?? '';
+    // Map từ khóa người dùng → tên chuẩn trong data
+    final amenityKeywords = {
+      'wifi': 'wifi',
+      'internet': 'wifi',
+      'máy lạnh': 'máy lạnh',
+      'may lanh': 'máy lạnh',
+      'điều hòa': 'máy lạnh',
+      'dieu hoa': 'máy lạnh',
+      'máy giặt': 'máy giặt',
+      'may giat': 'máy giặt',
+      'tủ lạnh': 'tủ lạnh',
+      'tu lanh': 'tủ lạnh',
+      'ban công': 'ban công',
+      'ban cong': 'ban công',
+      'bancong': 'ban công',
+      'gác lửng': 'gác lửng',
+      'gac lung': 'gác lửng',
+      'gaclung': 'gác lửng',
+      'chỗ để xe': 'chỗ để xe',
+      'cho de xe': 'chỗ để xe',
+      'giữ xe': 'chỗ để xe',
+      'giu xe': 'chỗ để xe',
+      'bếp': 'bếp',
+      'bep': 'bếp',
+      'nội thất': 'nội thất',
+      'noi that': 'nội thất',
+      'full nội thất': 'nội thất',
+      'full noi that': 'nội thất',
+      'đầy đủ nội thất': 'nội thất',
+      'day du noi that': 'nội thất',
+    };
+    amenityKeywords.forEach((kw, canonical) {
+      if (cleanText.contains(kw) && !amenities.contains(canonical)) {
+        amenities.add(canonical);
+        detected = true;
+      }
+    });
+
+    // Tự động phân tích tiện ích động sau từ khóa chỉ phòng (Tiếng Việt có dấu)
+    // Chỉ bắt đoạn SAU từ "có" — tránh bắt nhầm cụm giá "trên X triệu có Y"
+    final hasPattern = RegExp(
+      r'\b(?:phòng|phong|trọ|tro)\s+(?:có|co|thuê|thue|ở|o|cần|can|muốn|muon)?\s*(?:có|co)?\s*(?!\d)([^,.\?]+)',
+    );
+    // Cũng bắt dạng "muốn có phòng + tiện ích" và "... có + tiện ích" sau khi xử lý giá
+    final afterCoPattern = RegExp(
+      r'(?:có|co)\s+(?!\d)((?:(?!(?:phòng|phong|trọ|tro|quận|quan|triệu|trieu|tr\b)).)*)$',
+    );
+    for (final match in [hasPattern.firstMatch(cleanText), afterCoPattern.firstMatch(cleanText)]) {
+      if (match == null) continue;
+      final rawSegment = match.group(1) ?? '';
+      // Bỏ qua nếu đoạn bắt đầu bằng số (giá tiền)
+      if (RegExp(r'^\d').hasMatch(rawSegment.trim())) continue;
       final cleanedList = _extractDynamicAmenities(rawSegment);
       for (final am in cleanedList) {
         if (!amenities.contains(am)) {
@@ -751,30 +899,37 @@ Thông tin về app:
     }
 
     if (amenities.isNotEmpty) {
-      criteria['amenities'] = amenities;
+      // Deduplicate: bỏ các amenity mà chuỗi không-dấu của nó là suffix/infix
+      // của một amenity khác đã có trong list (VD: nếu có "ban công" thì bỏ "công")
+      final cleanedAmenities = amenities.where((a) {
+        final aNoAccent = _removeDiacritics(a.toLowerCase());
+        // Bỏ nếu có amenity khác dài hơn và chứa a như suffix/infix
+        return !amenities.any((b) {
+          if (b == a) return false;
+          final bNoAccent = _removeDiacritics(b.toLowerCase());
+          return bNoAccent.contains(aNoAccent) && bNoAccent.length > aNoAccent.length;
+        });
+      }).toList();
+      criteria['amenities'] = cleanedAmenities;
     }
 
-    // 5. Nhận diện intent giá rẻ/bình dân không có số cụ thể
-    // Map thành maxPrice mặc định 4.000.000 để lọc phòng thật
+    // 5. Nhận diện intent giá rẻ/bình dân/sinh viên không có số cụ thể
     if (!criteria.containsKey('maxPrice')) {
-      final isCheapIntent = cleanText.contains('rẻ') ||
-                            cleanText.contains('re ') ||
-                            cleanText.contains(' re') ||
-                            cleanText == 're' ||
-                            cleanText.contains('bình dân') ||
-                            cleanText.contains('binh dan') ||
-                            cleanText.contains('tiết kiệm') ||
-                            cleanText.contains('tiet kiem') ||
-                            cleanText.contains('giá tốt') ||
-                            cleanText.contains('gia tot') ||
-                            cleanText.contains('phòng rẻ') ||
-                            cleanText.contains('phong re') ||
-                            cleanText.contains('giá rẻ') ||
-                            cleanText.contains('gia re');
-      if (isCheapIntent) {
-        // Ngưỡng 4 triệu — bao phủ phần lớn phòng trọ, KTX, phòng sinh viên
-        criteria['maxPrice'] = 4000000;
+      if (_hasCheapIntent(cleanText)) {
+        criteria['cheap'] = true;
+        criteria['maxPrice'] = 3000000;
         detected = true;
+      } else if (_hasStudentIntent(cleanText)) {
+        criteria['student'] = true;
+        criteria['maxPrice'] = 3500000;
+        detected = true;
+      }
+    } else {
+      if (_hasCheapIntent(cleanText)) {
+        criteria['cheap'] = true;
+      }
+      if (_hasStudentIntent(cleanText)) {
+        criteria['student'] = true;
       }
     }
 
@@ -920,20 +1075,30 @@ Thông tin về app:
     buffer.writeln('- Trạng thái: $verB, đánh giá ${b.rating.toStringAsFixed(1)}/5\n');
 
     buffer.write('Gợi ý: ');
-    if (a.price > 0 && b.price > 0) {
-      if (a.price < b.price) {
+
+    final cheaperRoom = (a.price > 0 && b.price > 0)
+        ? (a.price < b.price ? 1 : (b.price < a.price ? 2 : 0))
+        : 0;
+    final moreAmenRoom = a.amenities.length > b.amenities.length
+        ? 1
+        : (b.amenities.length > a.amenities.length ? 2 : 0);
+
+    if (cheaperRoom != 0 && cheaperRoom == moreAmenRoom) {
+      // Cùng 1 phòng vừa rẻ hơn vừa nhiều tiện ích hơn → gộp 1 câu
+      buffer.write('Phòng $cheaperRoom có giá thấp hơn và nhiều tiện ích hơn, là lựa chọn đáng cân nhắc.');
+    } else {
+      if (cheaperRoom == 1) {
         buffer.write('Nếu ưu tiên giá thấp hơn, bạn nên chọn phòng 1. ');
-      } else if (b.price < a.price) {
+      } else if (cheaperRoom == 2) {
         buffer.write('Nếu ưu tiên giá thấp hơn, bạn nên chọn phòng 2. ');
       }
-    }
-
-    if (a.amenities.length > b.amenities.length) {
-      buffer.write('Nếu ưu tiên không gian rộng và nhiều tiện ích hơn, bạn nên chọn phòng 1.');
-    } else if (b.amenities.length > a.amenities.length) {
-      buffer.write('Nếu ưu tiên không gian rộng và nhiều tiện ích hơn, bạn nên chọn phòng 2.');
-    } else {
-      buffer.write('Cả hai phòng đều có các ưu điểm riêng về vị trí và tiện ích.');
+      if (moreAmenRoom == 1) {
+        buffer.write('Nếu ưu tiên nhiều tiện ích hơn, bạn nên chọn phòng 1.');
+      } else if (moreAmenRoom == 2) {
+        buffer.write('Nếu ưu tiên nhiều tiện ích hơn, bạn nên chọn phòng 2.');
+      } else if (cheaperRoom == 0) {
+        buffer.write('Cả hai phòng đều có các ưu điểm riêng về vị trí và tiện ích.');
+      }
     }
 
     return buffer.toString();
@@ -1002,19 +1167,26 @@ Thông tin về app:
 
   // ── Phân tích tách tiện ích động từ chuỗi sau chữ "có" ──────────
   static List<String> _extractDynamicAmenities(String text) {
+    // Từ rác cứng cần loại bỏ hoàn toàn (không dấu để so khớp dễ)
+    const trashAmenities = {
+      'cong', 'co cong', 'co', 'co ban', 'ban', 'phong', 'tro', 'nha',
+      'tim', 'co phong', 'phong co', 'tim phong',
+    };
+
     final result = <String>[];
     final parts = text.split(RegExp(r',|và|va|&|\+'));
     for (var part in parts) {
       var t = part.trim();
       if (t.isEmpty) continue;
 
+      // Cắt "có/co" ở đầu lần 1 (trước khi xử lý giá)
       if (t.startsWith('có ') || t.startsWith('co ')) {
         t = t.substring(3).trim();
       }
 
       // Loại bỏ từ hỏi / lịch sự cuối câu
       final endWords = [
-        'không', 'khong', 'nhỉ', 'nhi', 'nha', 'ạ', 'a', 'nhé', 'nhe', 'với', 'voi', 
+        'không', 'khong', 'nhỉ', 'nhi', 'nha', 'ạ', 'a', 'nhé', 'nhe', 'với', 'voi',
         'không?', 'khong?', 'nhỉ?', 'nhi?', 'ạ?', 'a?'
       ];
       for (final word in endWords) {
@@ -1031,6 +1203,11 @@ Thông tin về app:
         t = t.replaceAll(RegExp(pattern), '').trim();
       }
 
+      // Sau khi xóa giá, nếu còn "có/co" ở đầu thì cắt tiếp (VD: "trên 5tr có ban công" → "có ban công" → "ban công")
+      if (t.startsWith('có ') || t.startsWith('co ')) {
+        t = t.substring(3).trim();
+      }
+
       // Loại bỏ địa điểm
       final locationPatterns = [
         r'\b(?:ở|o|tại|tai|khu vực|khu vuc|quận|quan|phường|phuong|đường|duong)\s+[a-zA-Z0-9\sđĐàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+',
@@ -1043,17 +1220,150 @@ Thông tin về app:
 
       t = t.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-      if (t.endsWith('ở') || t.endsWith('o') || t.endsWith('tại') || t.endsWith('tai')) {
-        t = t.substring(0, t.length - 1).trim();
+      if (t.endsWith('ở') || t.endsWith('tại') || t.endsWith('tai')) {
+        t = t.replaceAll(RegExp(r'(?:ở|tại|tai)\s*\$'), '').trim();
       }
-      if (t.startsWith('ở') || t.startsWith('o') || t.startsWith('tại') || t.startsWith('tai')) {
-        t = t.substring(1).trim();
+      if (t.startsWith('ở') || t.startsWith('tại') || t.startsWith('tai ')) {
+        t = t.replaceAll(RegExp(r'^(?:ở|tại|tai)\s*'), '').trim();
       }
 
-      if (t.isNotEmpty && t.length > 1) {
-        result.add(t);
+      // Loại bỏ các từ không mang nghĩa tiện ích
+      final ignorePatterns = [
+        r'\b(?:tốt nhất|tot nhat|nổi bật nhất|noi bat nhat|đáng thuê nhất|dang thue nhat|tốt|tot|nổi bật|noi bat|đáng thuê|dang thue|nào|nao|gợi ý|goi y|muốn|muon|cần|can|yêu cầu|yeu cau|đại ca|dai ca|tớ|to|tôi|toi|bạn|ban|hộ|ho|rẻ|re|giá rẻ|gia re|phòng rẻ|phong re|sinh viên|sinh vien|giá mềm|gia mem|bình dân|binh dan|tiết kiệm|tiet kiem|dưới|duoi|trên|tren|triệu|trieu|tr|quận|quan|khu vực|khu vuc)\b'
+      ];
+      for (final pattern in ignorePatterns) {
+        t = t.replaceAll(RegExp(pattern), '').trim();
       }
+
+      t = t.trim();
+      if (t.isEmpty || t.length <= 1) continue;
+
+      // Bỏ nếu là từ rác sau khi đã remove diacritics để so sánh
+      final tNoAccent = _removeDiacritics(t.toLowerCase());
+      if (trashAmenities.contains(tNoAccent)) continue;
+
+      result.add(t);
     }
     return result;
+  }
+  static bool _hasCheapIntent(String cleanText) {
+    return cleanText.contains('rẻ') ||
+           cleanText.contains('re ') ||
+           cleanText.contains(' re') ||
+           cleanText == 're' ||
+           cleanText.contains('giá rẻ') ||
+           cleanText.contains('gia re') ||
+           cleanText.contains('phòng rẻ') ||
+           cleanText.contains('phong re') ||
+           cleanText.contains('giá mềm') ||
+           cleanText.contains('gia mem') ||
+           cleanText.contains('bình dân') ||
+           cleanText.contains('binh dan') ||
+           cleanText.contains('tiết kiệm') ||
+           cleanText.contains('tiet kiem') ||
+           cleanText.contains('giá tốt') ||
+           cleanText.contains('gia tot');
+  }
+
+  static bool _hasStudentIntent(String cleanText) {
+    return cleanText.contains('sinh viên') ||
+           cleanText.contains('sinh vien');
+  }
+
+  // ── Fallback local khi Gemini lỗi/quota/timeout ──────────────────────────
+  // Xây mô tả 2–3 câu thuần từ dữ liệu form, không gọi API
+  static String _generateLocalRoomDescriptionFallback({
+    required String title,
+    required double price,
+    required String address,
+    required String roomType,
+    required int bedrooms,
+    required double area,
+    required List<String> amenities,
+  }) {
+    final addrStr = address.trim().isNotEmpty
+        ? address.trim()
+        : 'khu vực TP. Hồ Chí Minh';
+
+    // Format giá: 1500000 → "1.5 triệu/tháng"
+    final priceStr = price > 0
+        ? '${(price / 1000000).toStringAsFixed(price % 1000000 == 0 ? 0 : 1)} triệu/tháng'
+        : '';
+
+    final suspicious = _isSuspiciousRoomTitle(title);
+
+    // Câu 1: loại phòng + địa chỉ + giá
+    final sentence1 = StringBuffer();
+    sentence1.write('$roomType tại $addrStr');
+    if (priceStr.isNotEmpty) {
+      sentence1.write(' hiện đang cho thuê với giá $priceStr.');
+    } else {
+      sentence1.write(' hiện đang cho thuê.');
+    }
+
+    // Câu 2: diện tích / tiện ích / số phòng ngủ
+    final sentence2 = StringBuffer();
+    final amenPreview = amenities.take(3).toList();
+    if (amenPreview.isNotEmpty) {
+      if (amenPreview.length == 1) {
+        sentence2.write('Phòng có tiện ích ${amenPreview[0]}');
+      } else {
+        final last = amenPreview.last;
+        final others = amenPreview.sublist(0, amenPreview.length - 1).join(', ');
+        sentence2.write('Phòng có các tiện ích như $others và $last');
+      }
+      if (area > 0) {
+        sentence2.write(', diện tích ${area.toInt()}m²');
+      }
+      if (bedrooms > 0) {
+        sentence2.write(', $bedrooms phòng ngủ');
+      }
+      sentence2.write(', phù hợp cho nhu cầu thuê ở cơ bản.');
+    } else if (area > 0 || bedrooms > 0) {
+      final details = <String>[];
+      if (area > 0) details.add('diện tích ${area.toInt()}m²');
+      if (bedrooms > 0) details.add('$bedrooms phòng ngủ');
+      sentence2.write('Phòng có ${details.join(', ')}, phù hợp cho nhu cầu ở ổn định.');
+    }
+
+    // Câu 3: nếu giá = 0 thì nhắc liên hệ; nếu title đẹp và không suspicious thì có thể nhắc nhẹ
+    final sentence3 = StringBuffer();
+    if (price <= 0) {
+      sentence3.write(' Giá thuê chưa xác định, vui lòng liên hệ để biết thêm thông tin chi tiết.');
+    } else if (!suspicious && title.trim().isNotEmpty && sentence2.isEmpty) {
+      // Ít dữ liệu nhưng title bình thường → viết trung tính
+      sentence3.write(' Thông tin phòng được trình bày trung tính, phù hợp cho người cần tìm nơi ở cơ bản.');
+    } else if (suspicious && sentence2.isEmpty) {
+      sentence3.write(' Thông tin phòng được trình bày trung tính, phù hợp cho người cần tìm nơi ở cơ bản.');
+    }
+
+    final parts = [
+      sentence1.toString(),
+      if (sentence2.isNotEmpty) sentence2.toString(),
+    ].join(' ');
+
+    return (parts + sentence3.toString()).trim();
+  }
+
+  // ── Kiểm tra title phòng có dấu hiệu là dữ liệu test/tào lao không ────
+  // Nếu true → không đưa title vào prompt để AI không diễn giải theo nghĩa đen
+  static bool _isSuspiciousRoomTitle(String title) {
+    final t = _removeDiacritics(title.toLowerCase().trim());
+    // Các keyword rõ ràng là test/tào lao
+    const suspiciousKeywords = [
+      'test', 'demo', 'fix', 'debug', 'fake', 'mock', 'dummy',
+      'du lieu ao', 'du lieu test', 'du lieu demo',
+      'ngoai vu tru', 'vu tru',
+      'co nguoi yeu', 'nguoi yeu', 'tinh yeu', 'crush',
+      'abcxyz', 'abc123', 'xyz123', '123123', 'aaaa', 'qwerty',
+      'test phong', 'phong test', 'phong demo', 'phong fix',
+      'thu nghiem', 'tao lao', 'linh tinh', 'random',
+    ];
+    if (suspiciousKeywords.any((kw) => t.contains(kw))) return true;
+
+    // Title có quá ít ký tự hoặc hoàn toàn là số/ký hiệu → ngầm hiểu là dữ liệu nhập ẩu
+    if (t.replaceAll(RegExp(r'[^a-z]'), '').length < 3) return true;
+
+    return false;
   }
 }

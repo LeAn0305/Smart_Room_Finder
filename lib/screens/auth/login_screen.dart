@@ -28,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _adminSecretCodeController = TextEditingController();
 
   bool _isAdminPasswordVisible = false;
+  bool _isAdminSecretVisible = false;
   bool _isAdminLoading = false;
 
   bool _isPasswordVisible = false;
@@ -237,6 +238,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             icon: Icons.pin_outlined,
                             keyboardType: TextInputType.number,
                             maxLength: 6,
+                            obscureText: !_isAdminSecretVisible,
+                            onTogglePassword: () {
+                              setDialogState(() {
+                                _isAdminSecretVisible =
+                                    !_isAdminSecretVisible;
+                              });
+                            },
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(6),
